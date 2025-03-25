@@ -1,0 +1,12 @@
+{
+ "Config": "GPS_Receiver",
+ "ip1": "192",
+ "ip2": "168",
+ "ip3": "167",
+ "ip4": "73",
+ "serverAdr" : "151",
+ "serverPort" : "5501",
+ "ssid" : "FERT",
+ "password" : "Fert504!",
+ "URL": "http://30.30.30.151:5500/GPS_Receiver_1.1.0001.bin"
+}

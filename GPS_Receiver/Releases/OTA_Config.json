@@ -1,0 +1,9 @@
+{
+    "Configurations": [
+        {
+            "Config": "GPS_Receiver",
+            "Version": "1.1.0075",
+            "URL": "/GPS_Receiver/Releases/GPS_Receiver_1.1.0075.bin"
+        }
+    ]
+}

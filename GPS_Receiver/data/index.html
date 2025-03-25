@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32 Web Manager</title>
+  <meta charset="utf-8">
+  <script>
+    function reboot() {
+        fetch('/reboot')
+            .then(response => response.text())
+            .then(data => {
+                alert('Rebooting...');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+</script>
+  <script>
+    // Function to fetch debug variables
+    function fetchDebugVars() {
+      fetch('/getDebugVars')
+        .then(response => response.json())
+        .then(data => {
+          let debugList = document.getElementById("debugList");
+          debugList.innerHTML = "";  // Clear current list
+          data.forEach((item, index) => {
+            let li = document.createElement("li");
+            li.textContent = item;
+            debugList.appendChild(li);
+          });
+        })
+        .catch(error => console.log("Error fetching debug variables:", error));
+    }
+
+    // Function to fetch file list
+    function fetchFileList() {
+      fetch('/listFiles')
+        .then(response => response.json())
+        .then(data => {
+          let fileList = document.getElementById("fileList");
+          fileList.innerHTML = "";  // Clear current list
+          data.forEach(file => {
+            let li = document.createElement("li");
+            li.innerHTML = file.name + " (" + file.size + " bytes) " +
+              "<a href='/download?filename=" + encodeURIComponent(file.name) + "'>Download</a>";
+            fileList.appendChild(li);
+          });
+        })
+        .catch(error => console.log("Error fetching file list:", error));
+    }
+
+    // Auto-refresh both the debug variables and file list
+    setInterval(fetchDebugVars, 500);
+    setInterval(fetchFileList, 5000);
+  </script>
+</head>
+<body>
+  <h1>ESP32 Web Server</h1>
+  <button onclick="reboot()">Reboot ESP32</button>
+  
+  <h1>ESP32 Debug Variables</h1>
+  <ul id="debugList">
+    <!-- Debug variables will be dynamically added here -->
+  </ul>
+
+  <h1>Files on Device</h1>
+  <ul id="fileList">
+    <!-- File list will be dynamically added here -->
+  </ul>
+
+  <h2>Upload File</h2>
+  <form method="POST" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="upload">
+    <input type="submit" value="Upload">
+  </form>
+</body>
+</html>
