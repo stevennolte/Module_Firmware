@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controller with Performance Variables</title>
+</head>
+<style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: left;
+      background-color: #f0f0f0;
+      padding: 20px;
+    }
+    h1 { color: #333; }
+    nav {
+      margin-bottom: 20px;
+    }
+    nav a {
+      text-decoration: none;
+      color: #ffffff;
+      padding: 10px 20px;
+      border: 2px solid #020204;
+      background-color: #4CAF50;
+      border-radius: 8px;
+      margin-right: 10px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    nav a:hover {
+      background-color: #45a049;
+      color: white;
+    }
+    .switch-container {
+      display: flex;
+      align-items: center; /* Vertically center the switch and label */
+      gap: 10px; /* Add spacing between the switch and the label */
+      margin-bottom: 20px; /* Add spacing between switches */
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.4s;
+      border-radius: 34px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Add a subtle shadow */
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Add a shadow to the toggle */
+    }
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .switch-label {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+    .progress-container {
+        margin-bottom: 20px;
+    }
+    .progress-label {
+        font-size: 14px;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    .progress-bar-container {
+        display: flex;
+        flex-direction: column; /* Stack bars vertically */
+        gap: 5px; /* Add spacing between the bars */
+        width: 100%;
+        background-color: #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .progress-bar {
+        height: 20px;
+        border-radius: 8px;
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    .target-bar {
+        background-color: #FFC107; /* Yellow for the target bar */
+    }
+    .actual-bar {
+        background-color: #4CAF50; /* Green for the actual bar */
+    }
+    .bar-label {
+        position: relative;
+        z-index: 1; /* Ensure the label is visible above the bar */
+    }
+    .input-container {
+        margin-top: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .input-label {
+        font-size: 16px;
+        font-weight: bold;
+        color: #333;
+    }
+    .input-box {
+        padding: 5px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 150px;
+    }
+    .input-button {
+        padding: 5px 10px;
+        font-size: 14px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .input-button:hover {
+        background-color: #45a049;
+    }
+    .state-indicator-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+        padding-left: 10px;
+        
+        
+    }
+    .state-label {
+        font-size: 16px;
+        font-weight: bold;
+        color: #333;
+    }
+    .state-indicator {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .state-indicator.good {
+        background-color: #4CAF50; /* Green for Good */
+    }
+    .state-indicator.disconnected {
+        background-color: #FF0000; /* Red for Disconnected */
+    }
+    .state-text {
+        font-size: 16px;
+        font-weight: bold;
+        color: #333;
+    }
+    .position-container {
+        margin-top: 10px;
+        font-size: 16px;
+        color: #333;
+    }
+    .position-label {
+        margin-bottom: 5px;
+    }
+    .separator {
+        border-top: 2px solid #ccc; /* Line color */
+        margin: 20px 0; /* Spacing above and below the line */
+    }
+</style>
+<script>
+    // Function to handle the "Enable" switch toggle
+    function toggleEnable(event) {
+        const isChecked = event.target.checked;
+        console.log(`Enable is now ${isChecked ? 'ON' : 'OFF'}`);
+        const endpoint = `/enable/${isChecked ? 'on' : 'off'}`;
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => console.log(`Response from controller: ${data}`))
+            .catch(error => console.error('Error sending command:', error));
+    }
+
+    // Function to handle the "Narrow Boom" switch toggle
+    function toggleNarrowBoom(event) {
+        const isChecked = event.target.checked;
+        console.log(`Narrow Boom is now ${isChecked ? 'ON' : 'OFF'}`);
+        const endpoint = `/narrowBoom/${isChecked ? 'on' : 'off'}`;
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => console.log(`Response from controller: ${data}`))
+            .catch(error => console.error('Error sending command:', error));
+    }
+
+    // Function to fetch the current state of the "Enable" variable
+    function getEnableState() {
+        fetch('/enable/state')
+            .then(response => response.json())
+            .then(data => {
+                const enableSwitch = document.getElementById('enableSwitch');
+                enableSwitch.checked = data.state;
+                console.log(`Enable state fetched: ${data.state ? 'ON' : 'OFF'}`);
+            })
+            .catch(error => console.error('Error fetching enable state:', error));
+    }
+
+    // Function to fetch the current state of the "Narrow Boom" variable
+    function getNarrowBoomState() {
+        fetch('/narrowBoom/state')
+            .then(response => response.json())
+            .then(data => {
+                const narrowBoomSwitch = document.getElementById('narrowBoomSwitch');
+                narrowBoomSwitch.checked = data.state;
+                console.log(`Narrow Boom state fetched: ${data.state ? 'ON' : 'OFF'}`);
+            })
+            .catch(error => console.error('Error fetching narrow boom state:', error));
+    }
+
+    // Function to fetch and update performance variables and their targets
+    function updatePerformanceVariables() {
+        console.log('Fetching performance variables...');
+        fetch('/performance/variables') // Replace with the correct endpoint
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.text(); // Read the response as text
+            })
+            .then(text => {
+                if (!text) {
+                    throw new Error('Empty response from server');
+                }
+                const data = JSON.parse(text); // Parse the JSON manually
+                console.log('Performance variables fetched:', data);
+                // Update each progress bar dynamically
+                Object.keys(data).forEach(variable => {
+                    const progressBar = document.getElementById(`${variable}Progress`);
+                    const targetBar = document.getElementById(`${variable}Target`);
+
+                    if (progressBar && targetBar) {
+                        // Update the actual progress bar
+                        progressBar.style.width = `${data[variable].current}%`;
+                        progressBar.textContent = `${data[variable].current}%`;
+
+                        // Update the target progress bar
+                        targetBar.style.width = `${data[variable].target}%`;
+                    }
+                });
+            })
+            .catch(error => console.error('Error fetching performance variables:', error));
+    }
+
+    // Function to send the "Application Rate" to the controller
+    function setApplicationRate() {
+        const applicationRateInput = document.getElementById('applicationRateInput');
+        const applicationRate = parseFloat(applicationRateInput.value);
+
+        if (isNaN(applicationRate)) {
+            alert('Please enter a valid number for the Application Rate.');
+            return;
+        }
+
+        console.log(`Setting Application Rate to: ${applicationRate}`);
+        fetch(`/setApplicationRate?rate=${applicationRate}`, { method: 'POST' })
+                .then(response => response.text())
+                .then(data => console.log(`Response from controller: ${data}`))
+                .catch(error => console.error(`Error sending momentary command for ${button}:`, error));
+    }
+
+    
+    
+
+    // Fetch the current states and performance variables when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        getEnableState();
+        getNarrowBoomState();
+        updatePerformanceVariables();
+        const intervalId = setInterval(updatePerformanceVariables, 1000); // Refresh every second
+        console.log('Interval ID:', intervalId);
+    });
+</script>
+<script>
+    // Function to fetch and update the module state, target position, and current position
+    function updateModuleState() {
+        fetch('/module/state') // Replace with the correct endpoint
+            .then(response => response.json())
+            .then(data => {
+                // Update the state indicator
+                const stateIndicator = document.getElementById('moduleStateIndicator');
+                const stateText = document.getElementById('moduleStateText');
+
+                if (data.state === 'good') {
+                    stateIndicator.classList.remove('disconnected');
+                    stateIndicator.classList.add('good');
+                    stateText.textContent = 'Good';
+                } else if (data.state === 'disconnected') {
+                    stateIndicator.classList.remove('good');
+                    stateIndicator.classList.add('disconnected');
+                    stateText.textContent = 'Disconnected';
+                }
+
+                // Update the target position and current position
+                const targetPosition = document.getElementById('targetPosition');
+                const currentPosition = document.getElementById('currentPosition');
+
+                targetPosition.textContent = data.targetPosition.toFixed(2); // Format to 2 decimal places
+                currentPosition.textContent = data.currentPosition.toFixed(2); // Format to 2 decimal places
+            })
+            .catch(error => console.error('Error fetching module state:', error));
+    }
+
+    // Fetch the module state when the page loads and periodically update it
+    document.addEventListener('DOMContentLoaded', () => {
+        updateModuleState();
+        setInterval(updateModuleState, 5000); // Refresh every 5 seconds
+    });
+</script>
+<script>
+    // Function to fetch the current application rate from the device
+    function getApplicationRate() {
+        fetch('/getApplicationRate') // Replace with the correct endpoint
+            .then(response => response.json())
+            .then(data => {
+                const applicationRateInput = document.getElementById('applicationRateInput');
+                applicationRateInput.value = data.rate.toFixed(2); // Set the input field with the fetched rate
+                console.log(`Application Rate fetched: ${data.rate}`);
+            })
+            .catch(error => console.error('Error fetching application rate:', error));
+    }
+
+    // Fetch the current application rate when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        getApplicationRate();
+    });
+</script>
+<body>
+    <nav>
+        <a href="boom.html">Boom Control</a>
+        <a href="product.html">Product Control</a>
+        <a href="debug.html">Debug</a>
+        <a href="settings.html">Settings</a>
+    </nav>
+    <h1>Controller</h1>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="enableSwitch" onchange="toggleEnable(event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Enable</span>
+    </div>
+    
+    <div class="separator"></div>
+    <div class="input-container">
+        <label for="applicationRateInput" class="input-label">Application Rate:</label>
+        <input type="number" id="applicationRateInput" step="0.01" placeholder="Enter rate" class="input-box">
+        <button onclick="setApplicationRate()" class="input-button">Set</button>
+    </div>
+    <div class="separator"></div>
+    <div class="progress-container">
+        <div class="progress-label">Pressure</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar target-bar" id="PressureTarget">
+                <span class="bar-label">Target</span>
+            </div>
+            <div class="progress-bar actual-bar" id="PressureProgress">
+                <span class="bar-label">Actual</span>
+            </div>
+        </div>
+    </div>
+    <div class="progress-container">
+        <div class="progress-label">Flowrate</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar target-bar" id="FlowrateTarget">
+                <span class="bar-label">Target</span>
+            </div>
+            <div class="progress-bar actual-bar" id="FlowrateProgress">
+                <span class="bar-label">Actual</span>
+            </div>
+        </div>
+    </div>
+    <div class="progress-container">
+        <div class="progress-label">Level</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar target-bar" id="LevelTarget">
+                <span class="bar-label">Target</span>
+            </div>
+            <div class="progress-bar actual-bar" id="LevelProgress">
+                <span class="bar-label">Actual</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="separator"></div>
+    
+       <h3>Regulator:</h3>
+    
+    <div>
+        <span id="moduleStateIndicator" class="state-indicator good"></span>
+        <span id="moduleStateText" class="state-text">Good</span>
+    </div>
+    <div class="position-container">
+        <div class="position-label">Target Position: <span id="targetPosition">0.00</span></div>
+        <div class="position-label">Current Position: <span id="currentPosition">0.00</span></div>
+    </div>
+    <hr>
+    
+    
+</body>
+</html>

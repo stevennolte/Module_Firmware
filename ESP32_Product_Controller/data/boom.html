@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boom Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .switch-label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 columns */
+            gap: 10px; /* Spacing between buttons */
+            margin-top: 20px;
+        }
+        .button-grid button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .button-grid button:hover {
+            background-color: #45a049;
+        }
+        .button-grid button:active {
+            background-color: #3e8e41;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="boom.html">Boom Control</a>
+        <a href="product.html">Product Control</a>
+        <a href="debug.html">Debug</a>
+        <a href="settings.html">Settings</a>
+    </nav>
+    <h1>Boom Control</h1>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="foldOuterWings" onchange="handleToggleChange('foldOuterWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Fold Outer Wings</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="foldCenterWings" onchange="handleToggleChange('foldCenterWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Fold Center Wings</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="raiseWings" onchange="handleToggleChange('raiseWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Raise Wings</span>
+    </div>
+    <div class="button-grid">
+        <button 
+            onmousedown="handleButtonPress(event, 'leftFlipOut')" 
+            onmouseup="handleButtonRelease('leftFlipOut')" 
+            ontouchstart="handleButtonPress(event, 'leftFlipOut')" 
+            ontouchend="handleButtonRelease('leftFlipOut')">
+            Left Flip Out
+        </button>
+        <button onmousedown="startSendingCommand('leftFlipIn')" onmouseup="stopSendingCommand('leftFlipIn')" 
+                ontouchstart="startSendingCommand('leftFlipIn')" ontouchend="stopSendingCommand('leftFlipIn')">
+            Left Flip In
+        </button>
+        <button onmousedown="startSendingCommand('leftLiftUp')" onmouseup="stopSendingCommand('leftLiftUp')" 
+                ontouchstart="startSendingCommand('leftLiftUp')" ontouchend="stopSendingCommand('leftLiftUp')">
+            Left Lift
+        </button>
+        <button onmousedown="startSendingCommand('leftLowerUp')" onmouseup="stopSendingCommand('leftLowerUp')" 
+                ontouchstart="startSendingCommand('leftLowerUp')" ontouchend="stopSendingCommand('leftLowerUp')">
+            Left Lower
+        </button>
+        <button onmousedown="startSendingCommand('leftFoldIn')" onmouseup="stopSendingCommand('leftFoldIn')" 
+                ontouchstart="startSendingCommand('leftFoldIn')" ontouchend="stopSendingCommand('leftFoldIn')">
+            Left Fold Out
+        </button>
+        <button onmousedown="startSendingCommand('leftFoldOut')" onmouseup="stopSendingCommand('leftFoldOut')" 
+                ontouchstart="startSendingCommand('leftFoldOut')" ontouchend="stopSendingCommand('leftFoldOut')">
+            Left Fold In
+        </button>
+        <button onmousedown="startSendingCommand('centerUp')" onmouseup="stopSendingCommand('centerUp')" 
+                ontouchstart="startSendingCommand('centerUp')" ontouchend="stopSendingCommand('centerUp')">
+            Center Raise
+        </button>
+        <button onmousedown="startSendingCommand('centerDown')" onmouseup="stopSendingCommand('centerDown')" 
+                ontouchstart="startSendingCommand('centerDown')" ontouchend="stopSendingCommand('centerDown')">
+            Center Lower
+        </button>
+        <button onmousedown="startSendingCommand('RightFoldIn')" onmouseup="stopSendingCommand('RightFoldIn')" 
+                ontouchstart="startSendingCommand('RightFoldIn')" ontouchend="stopSendingCommand('RightFoldIn')">
+            Right Fold Out
+        </button>
+        <button onmousedown="startSendingCommand('RightFoldOut')" onmouseup="stopSendingCommand('RightFoldOut')" 
+                ontouchstart="startSendingCommand('RightFoldOut')" ontouchend="stopSendingCommand('RightFoldOut')">
+            Right Fold In
+        </button>
+        <button onmousedown="startSendingCommand('RightLiftUp')" onmouseup="stopSendingCommand('RightLiftUp')" 
+                ontouchstart="startSendingCommand('RightLiftUp')" ontouchend="stopSendingCommand('RightLiftUp')">
+            Right Lift
+        </button>
+        <button onmousedown="startSendingCommand('RightLiftDown')" onmouseup="stopSendingCommand('RightLiftDown')" 
+                ontouchstart="startSendingCommand('RightLiftDown')" ontouchend="stopSendingCommand('RightLiftDown')">
+            Right Lower
+        </button>
+        <button onmousedown="startSendingCommand('RightFlipOut')" onmouseup="stopSendingCommand('RightFlipOut')" 
+                ontouchstart="startSendingCommand('RightFlipOut')" ontouchend="stopSendingCommand('RightFlipOut')">
+            Right Flip Out
+        </button>
+        <button onmousedown="startSendingCommand('RightFlipIn')" onmouseup="stopSendingCommand('RightFlipIn')" 
+                ontouchstart="startSendingCommand('RightFlipIn')" ontouchend="stopSendingCommand('RightFlipIn')">
+            Right Flip In
+        </button>
+        
+    </div>
+    <script>
+        // Function to send a command to the controller
+        function sendCommand(command, state) {
+            const action = state ? 'on' : 'off';
+            console.log(`Sending command: ${command} - ${action}`);
+            fetch(`/${command}/${action}`, { method: 'POST' })
+                .then(response => response.text())
+                .then(data => console.log(`Response from controller: ${data}`))
+                .catch(error => console.error(`Error sending command for ${command}:`, error));
+        }
+
+        let intervalId = null; // To store the interval ID
+
+        // Function to send a momentary command to the controller
+        function sendMomentaryCommand(button, action) {
+            console.log(`Sending momentary command: ${button} - ${action}`);
+            fetch(`/momentary?button=${button}&action=${action}`, { method: 'POST' })
+                .then(response => response.text())
+                .then(data => console.log(`Response from controller: ${data}`))
+                .catch(error => console.error(`Error sending momentary command for ${button}:`, error));
+        }
+
+        // Function to start sending commands repeatedly
+        function startSendingCommand(button) {
+            sendMomentaryCommand(button, 'start'); // Send the first command immediately
+            intervalId = setInterval(() => {
+                sendMomentaryCommand(button, 'start');
+            }, 500); // Repeat every 500ms
+        }
+
+        // Function to stop sending commands
+        function stopSendingCommand(button) {
+            clearInterval(intervalId); // Stop the interval
+            intervalId = null;
+            sendMomentaryCommand(button, 'stop'); // Send the stop command
+        }
+
+        let toggleIntervals = {}; // To store interval IDs for each toggle switch
+
+        // Function to send a toggle command repeatedly
+        function startToggleCommand(command) {
+            console.log(`Starting toggle command: ${command}`);
+            sendCommand(command, true); // Send the first "on" command immediately
+            toggleIntervals[command] = setInterval(() => {
+                sendCommand(command, true); // Repeat the "on" command every 500ms
+            }, 500);
+        }
+
+        // Function to stop sending toggle commands
+        function stopToggleCommand(command) {
+            console.log(`Stopping toggle command: ${command}`);
+            clearInterval(toggleIntervals[command]); // Stop the interval
+            delete toggleIntervals[command]; // Remove the interval ID
+            sendCommand(command, false); // Send the "off" command
+        }
+
+        // Function to handle toggle switch changes
+        function handleToggleChange(command, isChecked) {
+            if (isChecked) {
+                startToggleCommand(command); // Start sending commands if toggled on
+            } else {
+                stopToggleCommand(command); // Stop sending commands if toggled off
+            }
+        }
+
+        let initialClickPosition = null; // To store the initial click position
+        const driftThreshold = 10; // Maximum allowed drift in pixels
+
+        // Function to handle the button press
+        function handleButtonPress(event, buttonId) {
+            // Get the initial click position
+            if (event.type === 'mousedown' || event.type === 'touchstart') {
+                const x = event.type === 'mousedown' ? event.clientX : event.touches[0].clientX;
+                const y = event.type === 'mousedown' ? event.clientY : event.touches[0].clientY;
+                initialClickPosition = { x, y };
+                console.log(`Initial click position: (${x}, ${y})`);
+
+                // Start sending the command
+                startSendingCommand(buttonId);
+
+                // Add event listeners to track movement
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('touchmove', handleTouchMove);
+            }
+        }
+
+        // Function to handle mouse movement
+        function handleMouseMove(event) {
+            const currentX = event.clientX;
+            const currentY = event.clientY;
+            checkDrift(currentX, currentY);
+        }
+
+        // Function to handle touch movement
+        function handleTouchMove(event) {
+            const currentX = event.touches[0].clientX;
+            const currentY = event.touches[0].clientY;
+            checkDrift(currentX, currentY);
+        }
+
+        // Function to check if the movement has drifted beyond the threshold
+        function checkDrift(currentX, currentY) {
+            if (!initialClickPosition) return;
+
+            const deltaX = Math.abs(currentX - initialClickPosition.x);
+            const deltaY = Math.abs(currentY - initialClickPosition.y);
+
+            if (deltaX > driftThreshold || deltaY > driftThreshold) {
+                console.log(`Drift detected! Stopping action for button.`);
+                stopSendingCommand('leftFlipOut'); // Stop sending the command
+
+                // Remove event listeners
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('touchmove', handleTouchMove);
+
+                // Reset the initial click position
+                initialClickPosition = null;
+            }
+        }
+
+        // Function to handle the button release
+        function handleButtonRelease(buttonId) {
+            console.log(`Button released: ${buttonId}`);
+            stopSendingCommand(buttonId); // Stop sending the command
+
+            // Remove event listeners
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('touchmove', handleTouchMove);
+
+            // Reset the initial click position
+            initialClickPosition = null;
+        }
+
+        // Function to disable a button
+        function disableButton(buttonId) {
+            const button = document.querySelector(`button[onmousedown*="${buttonId}"]`);
+            if (button) {
+                button.disabled = true;
+                button.style.backgroundColor = '#ccc'; // Optional: Change the button style
+                console.log(`Button ${buttonId} disabled.`);
+            }
+        }
+    </script>
+</body>
+</html>

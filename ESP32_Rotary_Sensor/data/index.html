@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ESP32 Web Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: left;
+      background-color: #f0f0f0;
+      padding: 20px;
+    }
+    h1 { color: #333; }
+    button, input[type="submit"] {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover, input[type="submit"]:hover { background-color: #45a049; }
+    .stop-btn {
+      background-color: #f44336;
+    }
+    .stop-btn:hover {
+      background-color: #d32f2f;
+    }
+    nav {
+      margin-bottom: 20px;
+    }
+    nav a {
+      text-decoration: none;
+      color: #ffffff;
+      padding: 10px 20px;
+      border: 2px solid #020204;
+      background-color: #4CAF50;
+      border-radius: 8px;
+      margin-right: 10px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    nav a:hover {
+      background-color: #45a049;
+      color: white;
+    }
+  </style>
+  <script>
+    let debugData = []; // Store the latest fetched debug variables
+    let debugLog = [];  // Store the entire log of debug variables
+
+    function reboot() {
+      fetch('/reboot')
+        .then(() => alert('Rebooting...'))
+        .catch(error => console.error('Error:', error));
+    }
+
+    function startLogging() {
+      alert('Started logging data.');
+    }
+
+    function stopLogging() {
+      alert('Stopped logging data.');
+    }
+
+    // Function to fetch and update the debug variables
+    function fetchDebugVars() {
+      fetch('/getDebugVars') // Replace with your ESP32 endpoint for debug variables
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch debug variables');
+          }
+          return response.json();
+        })
+        .then(data => {
+          debugData = data; // Store the latest fetched data
+          debugLog.push({ timestamp: new Date().toISOString(), data }); // Append to the log with a timestamp
+          console.log('Fetched debug variables:', data); // Log the debug variables to the console
+
+          // Update the debug list in the UI
+          const debugList = document.getElementById('debugList');
+          debugList.innerHTML = ''; // Clear the current list
+          data.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            debugList.appendChild(li);
+          });
+        })
+        .catch(error => console.error('Error fetching debug variables:', error));
+    }
+
+    // Function to download the entire debug log as a file
+    function downloadDebugLog() {
+      if (debugLog.length === 0) {
+        alert('No debug log available to download.');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(debugLog, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'debug_log.json'; // File name
+      a.click();
+      URL.revokeObjectURL(url); // Clean up the URL object
+    }
+
+    // Periodically fetch debug variables every 1 second
+    setInterval(fetchDebugVars, 500);
+
+    // Fetch debug variables immediately when the page loads
+    window.onload = fetchDebugVars;
+  </script>
+</head>
+<body>
+  <nav>
+    <a href="controls.html">Controls</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <h1>ESP32 Web Server</h1>
+
+  <button onclick="reboot()">Reboot ESP32</button>
+  <button onclick="startLogging()">Start Logging</button>
+  <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+
+  <h1>ESP32 Debug Variables</h1>
+  <ul id="debugList">
+    <!-- Debug variables will be dynamically added here -->
+  </ul>
+
+  <button onclick="downloadDebugLog()">Download Debug Log</button>
+
+  <h1>Files on Device</h1>
+  <ul id="fileList">
+    <!-- File list will be dynamically added here -->
+  </ul>
+
+  <h2>Upload File</h2>
+  <form method="POST" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="upload">
+    <input type="submit" value="Upload">
+  </form>
+
+  <h2>Firmware Update</h2>
+  <form method="POST" action="/update" enctype="multipart/form-data">
+    <input type="file" name="firmware">
+    <input type="submit" value="Update Firmware">
+  </form>
+</body>
+</html>
