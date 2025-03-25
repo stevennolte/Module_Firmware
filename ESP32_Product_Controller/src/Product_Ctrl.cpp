@@ -53,7 +53,18 @@ void Product_Ctrl::continuousLoop(){
         }
         espConfig->rateData.targetFlowRate = espConfig->rateData.targetRowFlowRate * float(_rowsActive);
         espConfig->rateData.actualFlowRate = meter.getFlowRateLiterMinute() * lpmConversion;
-        
+        if(espConfig->rateData.prevPulseCount != espConfig->rateData.pulseCount){
+            
+            uint64_t timedelta = esp_timer_get_time() - espConfig->rateData.pulseTime;
+            espConfig->rateData.frequency = double(espConfig->rateData.pulseCount)/(double(timedelta)/1000000.0);
+            espConfig->rateData.pulseTime = esp_timer_get_time();
+            espConfig->rateData.pulseCount = 0;
+        } else if(esp_timer_get_time() - espConfig->rateData.pulseTime > 1000000){
+            espConfig->rateData.frequency = 0;
+            espConfig->rateData.pulseCount = 0;
+            
+        }
+        espConfig->rateData.prevPulseCount = espConfig->rateData.pulseCount;
         vTaskDelay(500/portTICK_PERIOD_MS);
     }
 }

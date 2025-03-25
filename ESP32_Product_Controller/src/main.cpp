@@ -38,6 +38,13 @@ auto& progCfg = espConfig.progCfg;
 auto& progState = espConfig.progData.state;
 auto& wifiCfg = espConfig.wifiCfg;
 
+
+
+void IRAM_ATTR ISR()
+{
+  espConfig.rateData.pulseCount++;
+}
+
 #pragma region Webserver
 
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
@@ -89,6 +96,7 @@ void updateDebugVars() {
   debugVars.push_back("Sec 3: " + String(espConfig.rateData.sectionStates[2]));
   debugVars.push_back("Sec 4: " + String(espConfig.rateData.sectionStates[3]));
   debugVars.push_back("Sec 5: " + String(espConfig.rateData.sectionStates[4]));
+  debugVars.push_back("Flow Freq: " + String(espConfig.rateData.frequency));
   debugVars.push_back("Target Pressure: " + String(espConfig.rateData.targetPressure));
   debugVars.push_back("Target Flow Rate: " + String(espConfig.rateData.targetFlowRate));
   debugVars.push_back("Actual Flow Rate: " + String(espConfig.rateData.actualFlowRate));
@@ -533,7 +541,8 @@ void setup() {
   espUdp.begin();
   canbus.begin();
   productCtrl.begin();
-    
+  pinMode(espConfig.gpioDefs.FLOW_PIN, INPUT_PULLUP);
+  attachInterrupt(espConfig.gpioDefs.FLOW_PIN, ISR, FALLING);
   
   
   progState = 1;

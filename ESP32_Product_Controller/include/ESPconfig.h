@@ -158,6 +158,7 @@ public:
             uint8_t rightFold = 4;
             uint8_t rightLift = 5;
             uint8_t rightFlip = 6;
+            
             FoldData(){}
     } foldData;
 
@@ -175,6 +176,10 @@ public:
             float actualFlowRate;
             float targetPressure;
             float targetPressureOffset;
+            uint32_t pulseCount;
+            uint32_t prevPulseCount;
+            uint64_t pulseTime;
+            float frequency;
             RateData(){}
     };
     RateData rateData;
