@@ -67,4 +67,23 @@ struct __attribute__ ((packed)) Heartbeat_t{
   Heartbeat_t heartbeat_t;
   uint8_t bytes[sizeof(Heartbeat_t)];
   };
+
+struct __attribute__ ((packed)) Hello_t{
+    uint8_t aogByte1 : 8;
+    uint8_t aogByte2 : 8;
+    uint8_t sourceAddress : 8;
+    uint8_t PGN : 8;
+    uint8_t length : 8;
+    uint8_t placeholder1 : 8;
+    uint8_t placeholder2 : 8;
+    uint8_t placeholder3 : 8;
+    uint8_t placeholder4 : 8;
+    uint8_t placeholder5 : 8;
+    uint8_t checksum : 8;
+  };
+
+  union Hello_u{
+  Hello_t hello_t;
+  uint8_t bytes[sizeof(Hello_t)];
+  };
 #endif

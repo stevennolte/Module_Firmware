@@ -2,7 +2,7 @@
 #include <Update.h>
 
 
-ESPudp::ESPudp(ESPconfig* vars) : udp(), udpNtrip(), udpGPS(){
+ESPudp::ESPudp(ESPconfig* vars) : udp(), udpNtrip(), udpGPS(), udpWAS(){
     espConfig = vars;
 }
 
@@ -32,9 +32,38 @@ void ESPudp::begin(GPS* gps){
       // Serial2.write(packet.data(), packet.length());
       
     });
-    
+    udpWAS.listen(8889);
+    udpWAS.onPacket([this](AsyncUDPPacket packet){
+      if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
+        switch (packet.data()[3]){
+          case 180:
+            //TODO: change pgn
+            espConfig->steerData.lastWAStime = millis();
+            union {
+              uint32_t angle;
+              uint8_t bytes[4];
+            } wirelessWASunion;
+            wirelessWASunion.bytes[0] = packet.data()[5];
+            wirelessWASunion.bytes[1] = packet.data()[6];
+            wirelessWASunion.bytes[2] = packet.data()[7];
+            wirelessWASunion.bytes[3] = packet.data()[8];
+            espConfig->steerData.byte1 = packet.data()[5];
+            espConfig->steerData.byte2 = packet.data()[6];
+            espConfig->steerData.byte3 = packet.data()[7];
+            espConfig->steerData.byte4 = packet.data()[8];
+            if (wirelessWASunion.angle > 2147483647){
+              this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0;
+            } else {
+              this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
+            }
+            // espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle);
+            break;
+        }
+      }
+    });
     udpGPS.listen(9999);
     Serial.println("Setting Up UDP");
+    
     udp.listen(8888);
     udp.onPacket([this](AsyncUDPPacket packet) {
         // Serial.println("Received UDP");
@@ -84,6 +113,7 @@ void ESPudp::begin(GPS* gps){
               ESP.restart();
               break;
             case 251:
+        
               this->espConfig->steerCfg.set0 = packet.data()[5];
               this->espConfig->steerCfg.pulseCount = packet.data()[6];
               this->espConfig->steerCfg.minSpeed = packet.data()[7];
@@ -123,20 +153,23 @@ void ESPudp::begin(GPS* gps){
                 this->espConfig->steerData.status = packet.data()[7];  
         
               break;
-            case 9999:  //Wireless WAS 
+            case 180:  //Wireless WAS 
             //TODO: change pgn
               espConfig->steerData.lastWAStime = millis();
               union {
-                uint16_t angle;
-                uint8_t bytes[2];
+                uint32_t angle;
+                uint8_t bytes[4];
               } wirelessWASunion;
               wirelessWASunion.bytes[0] = packet.data()[5];
               wirelessWASunion.bytes[1] = packet.data()[6];
+              wirelessWASunion.bytes[2] = packet.data()[7];
+              wirelessWASunion.bytes[3] = packet.data()[8];
               if (wirelessWASunion.angle > 32767){
                 this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 65536)/100.0;
               } else {
                 this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
               }
+              break;
           }
         }
     });

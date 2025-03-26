@@ -1,7 +1,7 @@
 #ifndef WAS_H
 #define WAS_H
 
-#define WAS_DEBUG
+// #define WAS_DEBUG
 
 #include "Arduino.h"
 #include "ESPconfig.h"

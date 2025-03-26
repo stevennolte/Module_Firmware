@@ -10,8 +10,8 @@ class MyWifi
         const char* ssid = "";
         const char* password = "";
         
-        const char* ssids[4] = {"NOLTE_FARM", "FERT"};
-        const char* passwords[4] = {"DontLoseMoney89","Fert504!"};
+        const char* ssids[4] = {"NOLTE_FARM", "FERT", "SSEI"};
+        const char* passwords[4] = {"DontLoseMoney89","Fert504!","Nd14il!la"};
         char* hostName;
         static void taskHandler(void *param);  // Task handler
         void continuousLoop();  // Function to run in the background task

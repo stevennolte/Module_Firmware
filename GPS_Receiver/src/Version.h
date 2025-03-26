@@ -3,6 +3,6 @@
 
 #include "Arduino.h"
 
-#define VERSION "1.1.0075"
+#define VERSION "1.1.0077"
 
 #endif

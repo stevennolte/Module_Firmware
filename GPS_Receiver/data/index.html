@@ -3,7 +3,64 @@
 <head>
   <title>ESP32 Web Manager</title>
   <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: left; background-color: #f0f0f0; padding: 20px; }
+    h1 { color: #333; }
+    button, input[type="submit"] { padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
+    button:hover, input[type="submit"]:hover { background-color: #45a049; }
+    form { margin-top: 20px; }
+    .stop-btn { background-color: #f44336; } /* Red button for stop */
+    .stop-btn:hover { background-color: #d32f2f; }
+    .switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+
+  input:checked + .slider {
+    background-color: #4CAF50;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(26px);
+  }
+  </style>
+
   <script>
+    let loggingInterval = null;  // Variable to store the logging interval ID
+
+    // Function to reboot the ESP32
     function reboot() {
         fetch('/reboot')
             .then(response => response.text())
@@ -14,16 +71,73 @@
                 console.error('Error:', error);
             });
     }
-</script>
-  <script>
-    // Function to fetch debug variables
-    function fetchDebugVars() {
+    function getFileList() {
+      fetch('/getFiles')
+        .then(response => response.json())
+        .then(data => {
+          const fileList = document.getElementById('fileList');
+          fileList.innerHTML = '';
+          data.forEach(file => {
+            const option = document.createElement('option');
+            option.value = file.name;
+            option.text = file.name;
+            fileList.appendChild(option);
+          });
+        });
+    }
+    function downloadFile() {
+      const fileList = document.getElementById('fileList');
+      const selectedFile = fileList.value;
+      if (selectedFile) {
+        window.location.href = `/download?filename=${selectedFile}`;
+      } else {
+        alert('Please select a file to download.');
+      }
+    }
+    // Function to fetch the current control variable from the ESP32
+    function fetchControlValue() {
+      fetch('/getControlValue')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('controlSlider').value = data.value; // Set slider to the fetched value
+          document.getElementById('controlValue').textContent = data.value; // Display fetched value
+        })
+        .catch(error => console.error("Error fetching control value:", error));
+    }
+
+    function toggleAPMode() {
+            fetch('/toggleAPMode', { method: 'POST' })
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('toggleStatus').innerText = data;
+                })
+                .catch(error => console.error('Error:', error));
+      }
+
+    // Function to send the updated control value to the ESP32
+    function sendControlValue(value) {
+      fetch('/setControlValue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ value: value })
+      })
+      .then(response => response.text())
+      .then(data => {
+        console.log('Value sent successfully:', data);
+      })
+      .catch(error => console.error('Error sending control value:', error));
+    }
+
+    // Function to fetch debug variables for UI updates
+    function fetchDebugVarsForUI() {
       fetch('/getDebugVars')
         .then(response => response.json())
         .then(data => {
           let debugList = document.getElementById("debugList");
           debugList.innerHTML = "";  // Clear current list
-          data.forEach((item, index) => {
+          data.forEach((item) => {
             let li = document.createElement("li");
             li.textContent = item;
             debugList.appendChild(li);
@@ -32,46 +146,169 @@
         .catch(error => console.log("Error fetching debug variables:", error));
     }
 
-    // Function to fetch file list
-    function fetchFileList() {
-      fetch('/listFiles')
+    // Function to fetch debug variables for logging
+    function fetchDebugVarsForLogging() {
+      return fetch('/getDebugVars')
         .then(response => response.json())
-        .then(data => {
-          let fileList = document.getElementById("fileList");
-          fileList.innerHTML = "";  // Clear current list
-          data.forEach(file => {
-            let li = document.createElement("li");
-            li.innerHTML = file.name + " (" + file.size + " bytes) " +
-              "<a href='/download?filename=" + encodeURIComponent(file.name) + "'>Download</a>";
-            fileList.appendChild(li);
-          });
-        })
-        .catch(error => console.log("Error fetching file list:", error));
+        .catch(error => {
+          console.log("Error fetching debug variables:", error);
+          return [];
+        });
     }
 
-    // Auto-refresh both the debug variables and file list
-    setInterval(fetchDebugVars, 500);
-    setInterval(fetchFileList, 5000);
+    // Function to log data locally
+    function logData() {
+      fetchDebugVarsForLogging().then(debugVars => {
+        let data = {
+          timestamp: new Date().toLocaleString(),
+          debugVars: debugVars
+        };
+
+        // Log to local storage
+        let logs = JSON.parse(localStorage.getItem('logs')) || [];
+        logs.push(data);
+        localStorage.setItem('logs', JSON.stringify(logs));
+
+        console.log('Data logged:', data);
+      });
+    }
+
+    // Function to start logging data continuously
+    function startLogging() {
+      if (!loggingInterval) {  // Ensure only one interval is set
+        loggingInterval = setInterval(logData, 100);  // Log every 2 seconds
+        alert('Started logging data.');
+      } else {
+        alert('Logging is already active.');
+      }
+    }
+
+    // Function to stop logging data
+    function stopLogging() {
+      if (loggingInterval) {
+        clearInterval(loggingInterval);
+        loggingInterval = null;
+        alert('Stopped logging data.');
+      } else {
+        alert('Logging is not active.');
+      }
+    }
+
+    // Function to update the control value displayed and send the new value to ESP32
+    function updateControlValue(val) {
+      document.getElementById('controlValue').textContent = val;
+      sendControlValue(val);  // Send the updated value to the ESP32
+    }
+
+    // Auto-refresh the debug variables in the UI
+    // setInterval(fetchDebugVarsForUI, 500);  // Refresh the debug list every 500ms
+
+    // Fetch the control variable when the page loads
+    window.onload = function() {
+      fetchControlValue();
+    }
+    // Function to fetch file list from the ESP32
+    function fetchFileList() {
+  fetch('/getFiles')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log("Files received:", data);  // Log the received data to check its structure
+      let fileList = document.getElementById("fileList");
+      fileList.innerHTML = "";  // Clear current list
+      data.forEach((file) => {
+        let li = document.createElement("li");
+        li.textContent = JSON.stringify(file);  // Temporarily log the full object
+        fileList.appendChild(li);
+      });
+    })
+    .catch(error => console.error("Error fetching file list:", error));
+  }
+    // Fetch the file list when the page loads
+    window.onload = function() {
+      fetchDebugVarsForUI();  // Load debug vars on page load
+      fetchFileList();        // Load file list on page load
+    }
+    // Auto-refresh the debug variables in the UI
+    setInterval(fetchDebugVarsForUI, 500); 
+    
+    // Refresh the debug list every 500ms
+  
+  function sendToggleState(isChecked) {
+    const value = isChecked ? 1 : 0;  // Convert to 1 for ON, 0 for OFF
+    fetch(`/updateControl?value=${value}`, { method: 'GET' })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.text();  // Assuming ESP32 returns some text response
+      })
+      .then(data => {
+        console.log("Toggle state updated:", data);  // Log the response
+      })
+      .catch(error => console.error("Error updating toggle state:", error));
+  }
+
+  // Function to fetch the current toggle state from the ESP32
+  function fetchToggleState() {
+    fetch('/getControl')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById("controlToggle").checked = data.value === 1;
+      })
+      .catch(error => console.error("Error fetching toggle state:", error));
+  }
+
+  // Fetch the toggle state when the page loads
+  window.onload = function() {
+    fetchToggleState();  // Load the current state on page load
+  };
   </script>
 </head>
 <body>
   <h1>ESP32 Web Server</h1>
   <button onclick="reboot()">Reboot ESP32</button>
-  
+
+  <!-- Button to Start Logging Data Locally -->
+  <button onclick="startLogging()">Start Logging</button>
+
+  <!-- Button to Stop Logging Data Locally -->
+  <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+
+  <!-- Section for Debug Variables -->
   <h1>ESP32 Debug Variables</h1>
   <ul id="debugList">
     <!-- Debug variables will be dynamically added here -->
   </ul>
 
-  <h1>Files on Device</h1>
-  <ul id="fileList">
-    <!-- File list will be dynamically added here -->
-  </ul>
+  <!-- Section for File List -->
+  <h1>ESP32 File Manager</h1>
+  <button onclick="getFileList()">Get File List</button>
+  <select id="fileList"></select>
+  <button onclick="downloadFile()">Download Selected File</button>
 
+
+  <!-- Section for Uploading Regular Files -->
   <h2>Upload File</h2>
   <form method="POST" action="/upload" enctype="multipart/form-data">
     <input type="file" name="upload">
     <input type="submit" value="Upload">
   </form>
+
+  <!-- Section for Firmware Update -->
+  <h2>Firmware Update</h2>
+  <form method="POST" action="/update" enctype="multipart/form-data">
+    <input type="file" name="firmware">
+    <input type="submit" value="Update Firmware">
+  </form>
+  
+  
+  <h1>ESP32 Control</h1>
+    <button onclick="toggleAPMode()">Toggle AP_Mode</button>
+    <p id="toggleStatus">Status: Unknown</p>
 </body>
 </html>

@@ -73,11 +73,16 @@ void MotorDriver::init(){
 
 void MotorDriver::setOutput(float value){
     // Serial.println(value);
+    float minScalar = float(espConfig->steerCfg.minPWM)/255.0;
     if (value > 0.01){
+        
+        value = max(value, minScalar);
         dirCmd = 1;
         enable();
         setCW();
     } else if (value < -0.01){
+        
+        value = max(abs(value), minScalar)*-1.0;
         dirCmd = 2;
         enable();
         setCCW();
@@ -87,9 +92,11 @@ void MotorDriver::setOutput(float value){
         dirCmd = 0;
     }
     
-    
-    cmdValue = uint16_t(float(maxPWM) * abs(value));
-    espConfig->steerData.pwmCmd = cmdValue;
+    float scalar = maxPWM * (float(espConfig->steerCfg.highPWM)/255.0);
+
+
+    cmdValue = uint16_t((float(maxPWM)) * abs(value));
+    espConfig->steerData.pwmCmd = min(float(cmdValue),scalar);
     // Serial.println(cmdValue);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, cmdValue);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);

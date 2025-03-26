@@ -12,6 +12,7 @@
 #include "vector"
 #include "BNO08x_AOG.h"
 #include "BluetoothComms.h"
+#include "driver/temp_sensor.h"
 
 #define SDA_0 5
 #define SCL_0 4
@@ -41,13 +42,30 @@ class UDPMethods{
     int heartbeatTimeTrip=250;
     int flowDataTimePrevious=0;
     int flowDataTimeTrip=1000;
+    
   public:
+    uint32_t ntripTimestamp;
+    uint32_t gpsTimestamp;
     AsyncUDP udp;
     AsyncUDP udpNtrip;
-
+    // Hello_u hello;
     UDPMethods(){
     }
-    
+
+    uint8_t calcChecksum(uint8_t* data, size_t size){
+      // Serial.print("Calculating Checksum: ");
+      // Serial.println(size);  
+      uint8_t checksum = 0;
+      // for (int i = 0; i < size; i++){
+      //   Serial.print(data[i]);
+      //   Serial.print(" ");
+      // }
+      // Serial.println();
+        for (int i = 2; i < data[4] + 5; i++){
+            checksum += data[i];
+        }
+        return checksum;
+    }
     void begin(){
       
       udpNtrip.listen(2233);
@@ -83,24 +101,22 @@ class UDPMethods{
       hbData->length = 10;
       hbData->myPGN = HEARBEAT_PGN;
       
-      udpNtrip.onPacket([](AsyncUDPPacket packet) {
+      udpNtrip.onPacket([this](AsyncUDPPacket packet) {
+        ntripTimestamp = millis();
         char packetBuffer[255];
-        Serial2.write(packet.data(), packet.length());
+        size_t packetLength = packet.length();
+        uint8_t *_data = packet.data();
+        
+        Serial2.write(_data, packetLength);
+        Serial.printf("Received UDP packet of length: %u\n", packetLength);
         Serial.println("Sent Ntrip");
       });
       udp.onPacket([](AsyncUDPPacket packet) {
         if (packet.data()[0]==0x80 & packet.data()[1]==0x81){
           progData.udpTimer = millis();
+          uint8_t checksum = 0;
+          Hello_u hello;
           switch (packet.data()[3]){
-            case 201:
-              
-              progData.ips[0] = packet.data()[7];
-              progData.ips[1] = packet.data()[8];
-              progData.ips[2] = packet.data()[9];
-              config.updateConfig();
-              ESP.restart();
-              break;
-          
             case 149:
               switch (packet.data()[5])
                 {
@@ -122,6 +138,34 @@ class UDPMethods{
                 default:
                   break;
                 }
+            case 200: // Hello from AIO
+                
+                hello.hello_t.aogByte1 = 0x80;
+                hello.hello_t.aogByte2 = 0x81;
+                hello.hello_t.sourceAddress = 120;
+                hello.hello_t.PGN = 120;
+                hello.hello_t.length = 5;
+                
+                for (int i = 2; i < hello.bytes[4] + 5; i++){
+                    checksum += hello.bytes[i];
+                }
+                hello.hello_t.checksum = checksum;
+                Serial.println("Hello from AIO");
+                Serial.print("\t");
+                for (int i = 0; i < sizeof(Hello_t); i++){
+                  Serial.print(hello.bytes[i]);
+                  Serial.print(" ");
+                }
+                Serial.println();
+              break;
+            case 201:
+              progData.ips[0] = packet.data()[7];
+              progData.ips[1] = packet.data()[8];
+              progData.ips[2] = packet.data()[9];
+              config.updateConfig();
+              ESP.restart();
+              break;
+            
                 break;
               }
               
@@ -139,6 +183,8 @@ class UDPMethods{
       }
       
     }
+
+    
 
     void sendHeartbeat(){
       // TODO: add heartbeat
@@ -698,14 +744,18 @@ void updateDebugVars() {
   debugVars.clear(); // Clear the list to update it dynamically
   debugVars.push_back("Timestamp since boot [ms]: " + String(millis()));
   debugVars.push_back("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+  float tempReading;
+  temp_sensor_read_celsius(&tempReading);
+  debugVars.push_back("Temp: " + String(tempReading));
   debugVars.push_back("Version: " + String(VERSION));
-  debugVars.push_back("Wifi IP: " + String("FERT"));
+  debugVars.push_back("Wifi IP: " + String(WiFi.SSID()));
   debugVars.push_back("Wifi State: " + String(progData.wifiConnected));
   debugVars.push_back("IP Address: " + String(progData.ips[0])+"."+String(progData.ips[1])+"."+String(progData.ips[2])+"."+String(progData.ips[3]));
   debugVars.push_back("NMEA: " + String(nmea));
+  debugVars.push_back("Ntrip Timestamp: " + String(udpMethods.ntripTimestamp));
   debugVars.push_back("Program State: " + String(progData.programState));
   std::string ipValue = "Sensor: " + std::to_string(WiFi.localIP());
-  bleRemote.sendIPData(ipValue);
+  // bleRemote.sendIPData(ipValue);d
 }
 
 
@@ -766,7 +816,32 @@ void handleFileDownload(AsyncWebServerRequest *request) {
     request->send(400, "text/plain", "Filename not provided");
   }
 }
+void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (!index) {
+    Serial.printf("Update Start: %s\n", filename.c_str());
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
+      Update.printError(Serial);
+    }
+  }
+  
+  // Write the received data to the flash memory
+  if (Update.write(data, len) != len) {
+    Update.printError(Serial);
+  }
 
+  // If the upload is complete
+  if (final) {
+    if (Update.end(true)) { // True to set the size correctly
+      Serial.printf("Update Success: %u bytes\n", index + len);
+      request->send(200, "text/html", "Update complete! Rebooting...");
+      delay(1000);
+      ESP.restart();
+    } else {
+      Update.printError(Serial);
+      request->send(500, "text/html", "Update failed.");
+    }
+  }
+}
 // File upload handler
 void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
@@ -818,7 +893,8 @@ void setup(){
 
         // Handle file upload
         server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFileUpload);
-
+        server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, 
+        handleFirmwareUpload);
         server.on("/reboot", HTTP_GET, handleReboot);
         // Start server
         server.begin();

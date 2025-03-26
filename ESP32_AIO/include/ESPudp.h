@@ -20,6 +20,7 @@ class ESPudp{
         void sendUDPgps(const char * data);
         AsyncUDP udp;
         AsyncUDP udpGPS;
+        AsyncUDP udpWAS;
         uint8_t calcChecksum(uint8_t* data, size_t size);
         ESPudp(ESPconfig* vars);
     private:

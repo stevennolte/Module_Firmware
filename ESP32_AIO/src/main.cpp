@@ -258,7 +258,26 @@ void updateDebugVars() {
   debugVars.push_back("..Switch State: " + String(espConfig.steerData.switchState));
   debugVars.push_back("..PID Command: " + String(espConfig.steerData.pwmCmd));
   debugVars.push_back("..Status: " + String(espConfig.steerData.status));
-  debugVars.push_back("..Watchdog: " + String(espConfig.steerData.watchdog));
+  debugVars.push_back("..Wireless WAS: " + String(espConfig.steerCfg.wirelessWAS));
+  // debugVars.push_back("..WAS byte1: " + String(espConfig.steerData.byte1));
+  // debugVars.push_back("..WAS byte2: " + String(espConfig.steerData.byte2));
+  // debugVars.push_back("..WAS byte3: " + String(espConfig.steerData.byte3));
+  // debugVars.push_back("..WAS byte4: " + String(espConfig.steerData.byte4));
+  debugVars.push_back("Steer Config: ");
+  debugVars.push_back("..Settings Updated: " + String(espConfig.steerCfg.settingsUpdated));
+  debugVars.push_back("..Gain P: " + String(espConfig.steerCfg.gainP));
+  debugVars.push_back("..High PWM: " + String(espConfig.steerCfg.highPWM));
+  debugVars.push_back("..Low PWM: " + String(espConfig.steerCfg.lowPWM));
+  debugVars.push_back("..Min PWM: " + String(espConfig.steerCfg.minPWM));
+  debugVars.push_back("..Counts per Degree: " + String(espConfig.steerCfg.countsPerDeg));
+  debugVars.push_back("..Steer Offset: " + String(espConfig.steerCfg.steerOffset));
+  debugVars.push_back("..Ackerman Fix: " + String(espConfig.steerCfg.ackermanFix));
+  debugVars.push_back("..Set0: " + String(espConfig.steerCfg.set0));
+  debugVars.push_back("..Pulse Count: " + String(espConfig.steerCfg.pulseCount));
+  debugVars.push_back("..Min Speed: " + String(espConfig.steerCfg.minSpeed));
+  debugVars.push_back("..Set1: " + String(espConfig.steerCfg.set1));
+  debugVars.push_back("..Steer Msg Rate: " + String(espConfig.steerCfg.steerMsgRate));
+  debugVars.push_back("..PID Input Filter: " + String(espConfig.steerCfg.pidInputFilt));
 
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator

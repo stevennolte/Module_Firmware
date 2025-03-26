@@ -99,6 +99,7 @@ void ESPsteer::steerLoop(){
     if (millis() - espConfig->steerData.watchdog > 2000){
         espConfig->steerData.status = 0;
     }
+    
     if (espConfig->steerData.status == 1){
         pid.setSetpoint(espConfig->steerData.targetSteerAngle);
         pid.update(espConfig->steerData.actSteerAngle);
