@@ -1,0 +1,9 @@
+{
+  "Configurations": [
+    {
+      "Config":"Sprayer_Fold_Controller",
+      "Version": "1.0.1",
+      "URL": "http://192.168.0.151:5500/.pio/build/esp32-s3-devkitc-1/firmware.bin"
+    }
+  ]
+}

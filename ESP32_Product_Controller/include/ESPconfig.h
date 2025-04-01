@@ -59,8 +59,8 @@ public:
 
     class WifiConfig {
         public:
-            const char* ssids[4] = {"FERT", "SSEI"};
-            const char* passwords[4] = {"Fert504!", "Nd14il!la"};
+            const char* ssids[4] = {"NOLTE_FARM", "FERT", "SSEI"};
+            const char* passwords[4] = {"DontLoseMoney89","Fert504!", "Nd14il!la"};
             uint8_t ips[4];
             uint8_t state;
             uint8_t apMode;

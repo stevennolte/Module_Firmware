@@ -1,6 +1,6 @@
 {
     "Name": "ESP32_Product_Controller",
-    "ipAddress": ["192","168","0","123"],
+    "ipAddress": ["192","168","5","123"],
     "ssids": ["NOLTE_FARM", "FERT","ss","sss"],
     "passwords": ["DontLoseMoney89","Fert504!","ss","sss"],
     "ledPin": "48",

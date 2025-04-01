@@ -1,0 +1,10 @@
+{
+    "Name": "ESP32_Fold_Controller",
+    "ipAddress": ["192","168","0","124"],
+    "ssids": ["NOLTE_FARM", "FERT","SSEI","sss"],
+    "passwords": ["DontLoseMoney89","Fert504!","Nd14il!la","sss"],
+    "ledPin": "48",
+    "ledBrightness": "100",
+    "targetRate" : "10.1"
+
+}
