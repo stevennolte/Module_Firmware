@@ -96,6 +96,7 @@
         <a href="settings.html">Settings</a>
     </nav>
     <h1>Boom Control</h1>
+    
     <div class="switch-container">
         <label class="switch">
             <input type="checkbox" id="joystick" onchange="handleToggleChange('joystick', this.checked)">
@@ -103,27 +104,49 @@
         </label>
         <span class="switch-label">Joystick Enable</span>
     </div>
+    <hr class="dotted">
+    <!-- #region Fold or Unfold -->
     <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="foldOuterWings" onchange="handleToggleChange('foldOuterWings', this.checked)">
+            <input type="checkbox" id="fold" onchange="handleToggleChange('fold', this.checked)">
             <span class="slider"></span>
         </label>
-        <span class="switch-label">Fold Outer Wings</span>
+        <span class="switch-label">Fold</span>
     </div>
     <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="foldCenterWings" onchange="handleToggleChange('foldCenterWings', this.checked)">
+            <input type="checkbox" id="unfold" onchange="handleToggleChange('unfold', this.checked)">
             <span class="slider"></span>
         </label>
-        <span class="switch-label">Fold Center Wings</span>
+        <span class="switch-label">Unfold</span>
+    </div>
+    <!-- #endregion -->
+    <hr class="dotted">
+    <!-- #region Pick function -->
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="OuterWings" onchange="handleToggleChange('OuterWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Flip Outer Wings</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="CenterWings" onchange="handleToggleChange('CenterWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Fold Wings</span>
     </div>
     <div class="switch-container">
         <label class="switch">
             <input type="checkbox" id="raiseWings" onchange="handleToggleChange('raiseWings', this.checked)">
             <span class="slider"></span>
         </label>
-        <span class="switch-label">Raise Wings</span>
+        <span class="switch-label">Lift/Lower Wings</span>
     </div>
+    <!-- #endregion -->
+    <hr class="dotted">
+    <!-- #region Momentary -->
     <div class="button-grid">
         <button 
             onmousedown="handleButtonPress(event, 'leftFlipOut')" 
@@ -186,6 +209,8 @@
         </button>
         
     </div>
+    <!-- #endregion -->
+
     <script>
         // Function to send a command to the controller
         function sendCommand(command, state) {
