@@ -956,7 +956,7 @@ void setup(){
   Serial2.begin(460800);
   Serial.println("Setup Complete");
   Serial.println(useBNO08x);
-  progData.programState = 1;
+  progData.programState = 2;
 }
 
 

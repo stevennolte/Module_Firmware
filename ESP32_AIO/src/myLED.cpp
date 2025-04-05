@@ -46,7 +46,7 @@ void MyLED::startTask() {
 // Function to run in parallel
 void MyLED::continuousLoop() {
  while (true) {
-    vTaskDelay(500/portTICK_PERIOD_MS);
+    vTaskDelay(10/portTICK_PERIOD_MS);
     // vTaskDelay(500);
     switch (espConfig->progData.state){
       case 0:

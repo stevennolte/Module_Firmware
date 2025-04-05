@@ -15,7 +15,7 @@ void Signal_Gen::taskHandler(void *param) {
 
 void Signal_Gen::continuousLoop() {
     while (true) {
-        vTaskDelay(10/portTICK_PERIOD_MS);
+        vTaskDelay(100/portTICK_PERIOD_MS);
         espConfig->wasData.sigReading = _sensor->getValue();
         // Serial.println(_sensor->getValue());
         // vTaskDelay(500);

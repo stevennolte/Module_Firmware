@@ -362,7 +362,10 @@ void setup(){
   espConfig.progCfg.confRes = espConfig.loadConfig();
   // Start Wifi AP and Webserver for diagnostics
   // espConfig.wifiCfg.state = espWifi.makeAP();
-  wifiCfg.state = espWifi.connect();
+  while (wifiCfg.state != 1){
+    wifiCfg.state = espWifi.connect();
+  }
+  
   espUdp.begin();
   Serial.println("Wifi State: " + String(espConfig.wifiCfg.state));
   #pragma region Server Setup

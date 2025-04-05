@@ -16,11 +16,12 @@ uint8_t ESPWifi::connect(){
             if (WiFi.SSID(i) == espConfig->wifiCfg.ssids[j]){
                 WiFi.begin(espConfig->wifiCfg.ssids[j],espConfig->wifiCfg.passwords[j]);
                 WiFi.config(local_IP,gateway,subnet);
+                startMonitor();
                 return 1;
             }
         }
     }
-    return 1;
+    return 2;
 }
 
 uint8_t ESPWifi::makeAP(){
