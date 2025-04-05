@@ -15,9 +15,11 @@ void ESPudp::begin(){
         
         switch (packet.data()[3]){
             case 162: //Joystick
-              espConfig->joystickData.lastMsgRecieved = millis();
-              for (uint8_t i = 0; i<8; i++){
-                espConfig->joystickData.switchStates[i] = packet.data()[i+5];
+              if(espConfig->joystickData.joyStickActive){
+                    espConfig->joystickData.lastMsgRecieved = millis();
+                  for (uint8_t i = 0; i<8; i++){
+                    espConfig->joystickData.switchStates[i] = packet.data()[i+5];
+                  }
               }
               break;
             case 200:  //Hello from AgIO

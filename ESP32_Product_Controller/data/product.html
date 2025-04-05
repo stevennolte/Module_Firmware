@@ -193,6 +193,67 @@
         border-top: 2px solid #ccc; /* Line color */
         margin: 20px 0; /* Spacing above and below the line */
     }
+    /* Modal styles */
+    .modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.4); /* Black background with opacity */
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: 15% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 300px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .number-pad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .number-pad button {
+        padding: 15px;
+        font-size: 18px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .number-pad button:hover {
+        background-color: #45a049;
+    }
+
+    .modal-footer {
+        margin-top: 10px;
+    }
+
+    .modal-footer button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .modal-footer button:hover {
+        background-color: #45a049;
+    }
 </style>
 <script>
     // Function to handle the "Enable" switch toggle
@@ -292,8 +353,50 @@
                 .catch(error => console.error(`Error sending momentary command for ${button}:`, error));
     }
 
-    
-    
+    // Open the number pad modal
+    function openNumberPad() {
+        const modal = document.getElementById('numberPadModal');
+        const numberPadInput = document.getElementById('numberPadInput');
+        const applicationRateInput = document.getElementById('applicationRateInput');
+
+        numberPadInput.value = applicationRateInput.value || ''; // Pre-fill with the current value
+        modal.style.display = 'block'; // Show the modal
+    }
+
+    // Close the number pad modal
+    function closeNumberPad() {
+        const modal = document.getElementById('numberPadModal'); // Get the modal element
+        modal.style.display = 'none'; // Hide the modal
+    }
+
+    // Append a number to the input
+    function appendNumber(number) {
+        const numberPadInput = document.getElementById('numberPadInput');
+        numberPadInput.value += number;
+    }
+
+    // Clear the input
+    function clearNumber() {
+        const numberPadInput = document.getElementById('numberPadInput');
+        numberPadInput.value = '';
+    }
+
+    // Set the rate from the number pad and close the modal
+    function setRateFromNumberPad() {
+        const numberPadInput = document.getElementById('numberPadInput');
+        const applicationRateInput = document.getElementById('applicationRateInput');
+
+        applicationRateInput.value = numberPadInput.value;
+        closeNumberPad();
+    }
+
+    // Close the modal if the user clicks outside of it
+    window.onclick = function(event) {
+        const modal = document.getElementById('numberPadModal');
+        if (event.target === modal) {
+            closeNumberPad();
+        }
+    };
 
     // Fetch the current states and performance variables when the page loads
     document.addEventListener('DOMContentLoaded', () => {
@@ -377,8 +480,33 @@
     <div class="separator"></div>
     <div class="input-container">
         <label for="applicationRateInput" class="input-label">Application Rate:</label>
-        <input type="number" id="applicationRateInput" step="0.01" placeholder="Enter rate" class="input-box">
+        <input type="text" id="applicationRateInput" readonly placeholder="Enter rate" class="input-box" onclick="openNumberPad()">
         <button onclick="setApplicationRate()" class="input-button">Set</button>
+    </div>
+    <button onclick="openNumberPad()">Open Number Pad</button>
+    <div id="numberPadModal" class="modal">
+        <div class="modal-content">
+            <h3>Enter Application Rate</h3>
+            <input type="text" id="numberPadInput" readonly style="width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px;">
+            <div class="number-pad">
+                <button onclick="appendNumber('1')">1</button>
+                <button onclick="appendNumber('2')">2</button>
+                <button onclick="appendNumber('3')">3</button>
+                <button onclick="appendNumber('4')">4</button>
+                <button onclick="appendNumber('5')">5</button>
+                <button onclick="appendNumber('6')">6</button>
+                <button onclick="appendNumber('7')">7</button>
+                <button onclick="appendNumber('8')">8</button>
+                <button onclick="appendNumber('9')">9</button>
+                <button onclick="appendNumber('.')">.</button>
+                <button onclick="appendNumber('0')">0</button>
+                <button onclick="clearNumber()">C</button>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeNumberPad()">Cancel</button>
+                <button onclick="setRateFromNumberPad()">Set</button>
+            </div>
+        </div>
     </div>
     <div class="separator"></div>
     <div class="progress-container">
@@ -425,10 +553,3 @@
     </div>
     <div class="position-container">
         <div class="position-label">Target Position: <span id="targetPosition">0.00</span></div>
-        <div class="position-label">Current Position: <span id="currentPosition">0.00</span></div>
-    </div>
-    <hr>
-    
-    
-</body>
-</html>
