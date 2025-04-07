@@ -93,7 +93,7 @@ uint8_t ESPconfig::loadConfig(){
     steerCfg.minPWM = doc["minPWM"];
     steerCfg.countsPerDeg = doc["countsPerDeg"];
     steerCfg.steerOffset = doc["wasOffset"];
-
+    steerCfg.useADS = doc["useADS"];
     
     return 1;
 }
