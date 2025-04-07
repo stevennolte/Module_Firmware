@@ -181,7 +181,7 @@ public:
             uint16_t steerMsgRate = 100;
             float pidInputFilt;
             float pidOutputFilt;
-            
+            bool useADS;
             bool wirelessWAS;
             
             SteerConfig(){}
