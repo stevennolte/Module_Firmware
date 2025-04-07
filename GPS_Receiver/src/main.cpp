@@ -157,6 +157,24 @@ class UDPMethods{
                   Serial.print(" ");
                 }
                 Serial.println();
+		// IMU hello
+		hello.hello_t.aogByte1 = 0x80;
+                hello.hello_t.aogByte2 = 0x81;
+                hello.hello_t.sourceAddress = 121;
+                hello.hello_t.PGN = 121;
+                hello.hello_t.length = 5;
+                
+                for (int i = 2; i < hello.bytes[4] + 5; i++){
+                    checksum += hello.bytes[i];
+                }
+                hello.hello_t.checksum = checksum;
+                Serial.println("Hello from AIO");
+                Serial.print("\t");
+                for (int i = 0; i < sizeof(Hello_t); i++){
+                  Serial.print(hello.bytes[i]);
+                  Serial.print(" ");
+                }
+                Serial.println();
               break;
             case 201:
               progData.ips[0] = packet.data()[7];
