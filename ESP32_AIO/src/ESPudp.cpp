@@ -169,6 +169,7 @@ void ESPudp::begin(GPS* gps){
               } else {
                 this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
               }
+              this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle + float(espConfig->steerCfg.steerOffset/espConfig->steerCfg.countsPerDeg);
               break;
           }
         }
