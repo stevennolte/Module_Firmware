@@ -16,7 +16,7 @@
 #include "littlefs.h"
 
 
-
+//TODO: add wifi connect timer to ap mode
 
 TwoWire twoWire = TwoWire(0);
 TwoWire twoWire1 = TwoWire(1);
@@ -191,6 +191,12 @@ void handleFileDownload(AsyncWebServerRequest *request) {
   } else {
     request->send(400, "text/plain", "Filename not provided");
   }
+}
+
+void handleWASzero(AsyncWebServerRequest *request) {
+  espSteer.was.zeroSteerAngle();
+  Serial.println("WAS zeroed");
+  request->send(200, "text/plain", "WAS zeroed");
 }
 
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
@@ -416,7 +422,7 @@ void setup(){
         
         server.on("/toggleAPMode", HTTP_POST, handleToggleAPMode); // Add this line
         // Handle toggle state update
-        
+        server.on("/zeroWAS", HTTP_GET, handleWASzero);
         // Start server
         server.begin();
       #pragma endregion

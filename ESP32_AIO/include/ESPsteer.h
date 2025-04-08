@@ -18,6 +18,7 @@ class ESPsteer{
         uint32_t getCurrent();
         void setPIDgains();
         ESPsteer(ESPconfig* vars, Adafruit_ADS1115* ads, Adafruit_MCP23X17* mcp);
+        WAS was;
     private:
         void steerTestLoop();
         void steerLoop();
@@ -30,7 +31,7 @@ class ESPsteer{
         Adafruit_MCP23X17* mcp;
         ESPudp* espUdp;
         MotorDriver motorDriver;
-        WAS was;
+        
         AutoTunePID pid;
 
 };
