@@ -14,7 +14,7 @@ class WAS{
         WAS(ESPconfig* vars, Adafruit_ADS1115* ads);
         void init();
         void loop();
-        
+        void zeroSteerAngle();
 
     private:
         #ifdef WAS_DEBUG

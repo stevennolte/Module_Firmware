@@ -889,10 +889,15 @@ void setup(){
   myLED.startTask();
   progData.programState = 1;
   bleRemote.initBLE("GPS_Receiver");
-  while (true){
+  while (progData.wifiConnected != 1){
     progData.wifiConnected = myWifi.connect(progData.ips, progData.sketchConfig);
-    if (progData.wifiConnected == 1){
-      
+    if (millis()>60000){
+      Serial.println("Failed to connect to wifi, starting AP");
+      progData.wifiConnected = myWifi.makeAP(progData.ips, progData.sketchConfig);
+      break;
+    }
+  }
+       
       progData.programState = 3;
       softwareUpdate();
       progData.programState = 1;
@@ -917,9 +922,7 @@ void setup(){
         // Start server
         server.begin();
       #pragma endregion
-      break;
-    }
-  }
+   
   twoWire.setPins(SDA_0,SCL_0);
   twoWire.begin();
   uint8_t error;

@@ -16,6 +16,11 @@ void ESPsteer::continuousLoop() {
         vTaskDelay(10);
         if (espConfig->steerCfg.settingsUpdated = 1){
             setPIDgains();
+            if (espConfig->steerCfg.set0 == 1){
+                // TODO: Set steer angle offset
+                
+                espConfig->steerCfg.set0 = 0;
+            }
             espConfig->steerCfg.settingsUpdated = 0;
         }
         was.loop();

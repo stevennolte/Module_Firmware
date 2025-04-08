@@ -364,6 +364,11 @@ void setup(){
   // espConfig.wifiCfg.state = espWifi.makeAP();
   while (wifiCfg.state != 1){
     wifiCfg.state = espWifi.connect();
+    if (millis()>60000){
+      Serial.println("Failed to connect to wifi, starting AP");
+      wifiCfg.state = espWifi.makeAP();
+      break;
+    }
   }
   
   espUdp.begin();

@@ -394,8 +394,14 @@ void setup(){
   espConfig.progCfg.confRes = espConfig.loadConfig();
   // Start Wifi AP and Webserver for diagnostics
   // espConfig.wifiCfg.state = espWifi.connect();
+  
   while (wifiCfg.state != 1){
     wifiCfg.state = espWifi.connect();
+    if (millis() > 60000){
+      Serial.println("Wifi connection timed out");
+      wifiCfg.state = espWifi.makeAP();
+      break;
+    }
   }
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espConfig.wifiCfg.state));

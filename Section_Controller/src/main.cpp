@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Arduino.h>
 #include "ESPconfig.h"
 #include "ESPWifi.h"
 #include "myLED.h"
@@ -7,13 +8,28 @@
 #include "ESP32OTAPull.h"
 #include "ESPudp.h"
 #include "ArduinoJson.h"
+#include "Product_Ctrl.h"
 #include "driver/temp_sensor.h"
+#include "CANBUS.h"
+
+
+// TwoWire twoWire = TwoWire(0);
+// TwoWire twoWire1 = TwoWire(0);
+
+// Variables to store the state of the switches
+bool foldOuterWingsState = true;
+bool foldCenterWingsState = false;
+bool raiseWingsState = false;
+
 
 
 ESPconfig espConfig;
+
+CANBUS canbus(&espConfig);
 MyLED myLED(&espConfig);
 ESPWifi espWifi(&espConfig);
 ESPudp espUdp(&espConfig);
+Product_Ctrl productCtrl(&espConfig, &canbus);
 std::vector<String> debugVars;
 AsyncWebServer server(80);
 
@@ -22,6 +38,12 @@ auto& progCfg = espConfig.progCfg;
 auto& progState = espConfig.progData.state;
 auto& wifiCfg = espConfig.wifiCfg;
 
+
+
+void IRAM_ATTR ISR()
+{
+  espConfig.rateData.pulseCount++;
+}
 
 #pragma region Webserver
 
@@ -66,10 +88,21 @@ void updateDebugVars() {
   debugVars.push_back("IP Address: " + String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]));
   debugVars.push_back("Wifi State: " + String(wifiCfg.state));
   debugVars.push_back("Program State: " + String(progData.state));
-
-  debugVars.push_back("Fold Outer Wings: " + String(espConfig.foldData.foldOuterWingsState));
-  debugVars.push_back("Fold Center Wings: " + String(espConfig.foldData.foldCenterWingsState));
-  debugVars.push_back("Raise Wings: " + String(espConfig.foldData.raiseWingsState));
+  debugVars.push_back("TargetRate: " + String(espConfig.rateData.targetRate));
+  debugVars.push_back("Flow Rate: " + String(espConfig.flowCfg.flowRate));
+  debugVars.push_back("Fold Outer Wings: " + String(foldOuterWingsState ? "ON" : "OFF"));
+  debugVars.push_back("Sec 1: " + String(espConfig.rateData.sectionStates[0]));
+  debugVars.push_back("Sec 2: " + String(espConfig.rateData.sectionStates[1]));
+  debugVars.push_back("Sec 3: " + String(espConfig.rateData.sectionStates[2]));
+  debugVars.push_back("Sec 4: " + String(espConfig.rateData.sectionStates[3]));
+  debugVars.push_back("Sec 5: " + String(espConfig.rateData.sectionStates[4]));
+  debugVars.push_back("Flow Freq: " + String(espConfig.rateData.frequency));
+  debugVars.push_back("Target Pressure: " + String(espConfig.rateData.targetPressure));
+  debugVars.push_back("Target Flow Rate: " + String(espConfig.rateData.targetFlowRate));
+  debugVars.push_back("Actual Flow Rate: " + String(espConfig.rateData.actualFlowRate));
+  debugVars.push_back("Target Row Flow Rate: " + String(espConfig.rateData.targetRowFlowRate));
+  debugVars.push_back("Speed: " + String(espConfig.rateData.speed));
+  debugVars.push_back("Last Section Msg: " + String(espConfig.rateData.lastSectionMsg));
   debugVars.push_back("Fold State 1: " + String(espConfig.foldData.foldStates[0]));
   debugVars.push_back("Fold State 2: " + String(espConfig.foldData.foldStates[1]));
   debugVars.push_back("Fold State 3: " + String(espConfig.foldData.foldStates[2]));
@@ -166,166 +199,8 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t in
   }
 }
 
-void handleMomentaryCommand(AsyncWebServerRequest *request) {
-  if (request->hasParam("button") && request->hasParam("action")) {
-    String button = request->getParam("button")->value();
-    String action = request->getParam("action")->value();
 
-    Serial.printf("Momentary Command: Button=%s, Action=%s\n", button.c_str(), action.c_str());
-
-    // Add your logic here to handle the momentary button actions
-    // LEFT FLIP 
-    if (button == "leftFlipOut") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFlip] = 1;
-        
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFlip] = 0;
-      } else {
-        Serial.println("Unknown action received for LeftFlipOut.");
-      }
-    } else if (button == "leftFlipIn") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFlip] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFlip] = 0;
-      } else {
-        Serial.println("Unknown action received for LeftFlipIn.");
-      }
-    } else if (button == "leftLiftUp") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftLift] = 1;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftLift] = 0;
-      } else {
-        Serial.println("Unknown action received for LeftLiftOut.");
-      }
-    } else if (button == "leftLiftDown") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftLift] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftLift] = 0;
-      } else {
-        Serial.println("Unknown action received for LeftLiftIn.");
-      }
-    } else if (button == "leftFoldOut") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFold] = 1;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFold] = 0;
-      } else {
-        Serial.println("Unknown action received for LeftFoldOut.");
-      }
-    } else if (button == "leftFoldIn") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFold] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.leftFold] = 0;
-      } else {
-        Serial.println("Unknown action received for LeftFoldIn.");
-      }
-    } else if (button == "centerUp") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.center] = 1;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.center] = 0;
-      } else {
-        Serial.println("Unknown action received for CenterOut.");
-      }
-    } else if (button == "centerDown") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.center] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.center] = 0;
-      } else {
-        Serial.println("Unknown action received for CenterIn.");
-      }
-    } else if (button == "rightFoldOut") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFold] = 1;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFold] = 0;
-      } else {
-        Serial.println("Unknown action received for RightFoldOut.");
-      }
-    } else if (button == "rightFoldIn") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFold] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFold] = 0;
-      } else {
-        Serial.println("Unknown action received for RightFoldIn.");
-      }
-    } else if (button == "rightLiftUp") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightLift] = 1;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightLift] = 0;
-      } else {
-        Serial.println("Unknown action received for RightLiftOut.");
-      }
-    } else if (button == "rightLiftDown") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightLift] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightLift] = 0;
-      } else {
-        Serial.println("Unknown action received for RightLiftIn.");
-      }
-    } else if (button == "rightFlipOut") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFlip] = 1;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFlip] = 0;
-      } else {
-        Serial.println("Unknown action received for RightFlipOut.");
-      }
-    } else if (button == "rightFlipIn") {
-      if (action == "start") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFlip] = 2;
-      } else if (action == "stop") {
-        espConfig.foldData.foldStates[espConfig.foldData.rightFlip] = 0;
-      } else {
-        Serial.println("Unknown action received for RightFlipIn.");
-      }
-    } else {
-
-
-      Serial.println("Unknown button received.");
-    }
-
-    request->send(200, "text/plain", "Momentary command processed");
-  } else {
-    request->send(400, "text/plain", "Invalid parameters");
-  }
-}
-
-// Function to handle toggle switch commands
-void handleToggleCommand(const String& command, const String& action) {
-  if (command == "foldOuterWings") {
-      espConfig.foldData.foldOuterWingsState = (action == "on");
-      Serial.printf("Fold Outer Wings: %s\n", espConfig.foldData.foldOuterWingsState ? "ON" : "OFF");
-      // Add your logic here to control hardware for "Fold Outer Wings"
-  } else if (command == "foldCenterWings") {
-      espConfig.foldData.foldCenterWingsState = (action == "on");
-      Serial.printf("Fold Center Wings: %s\n", espConfig.foldData.foldCenterWingsState ? "ON" : "OFF");
-      // Add your logic here to control hardware for "Fold Center Wings"
-  } else if (command == "raiseWings") {
-    espConfig.foldData.raiseWingsState = (action == "on");
-      Serial.printf("Raise Wings: %s\n", espConfig.foldData.raiseWingsState ? "ON" : "OFF");
-      // Add your logic here to control hardware for "Raise Wings"
-  } else if (command == "joystick") {
-      espConfig.foldData.joyStickActive = (action == "on");
-      Serial.printf("Joystick: %s\n", espConfig.foldData.joyStickActive ? "ON" : "OFF");
-      // Add your logic here to control hardware for "Joystick"
-    } else {
-      Serial.println("Unknown command received.");
-  }
-}
-
-
-
-#pragma endregion Webserver
+#pragma endregion
 
 void setup() {
   progData.state = 0;
@@ -338,7 +213,7 @@ void setup() {
   Serial.println("Starting up...");
   espConfig.progData.confRes = espConfig.loadConfig();
   // Start Wifi AP and Webserver for diagnostics
-  // espConfig.wifiCfg.state = espWifi.makeAP();
+  
   while (wifiCfg.state != 1){
     wifiCfg.state = espWifi.connect();
     if (millis()>60000){
@@ -347,14 +222,13 @@ void setup() {
       break;
     }
   }
-  wifiCfg.state = espWifi.connect();
   Serial.println("Wifi State: " + String(espConfig.wifiCfg.state));
   #pragma region Server Setup
         // Serve the main HTML page
         #pragma region Page Handlers
         server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
           Serial.println("getting Home file");
-          request->send(LittleFS, "/boom.html");
+          request->send(LittleFS, "/product.html");
         });
         server.on("/product.html", HTTP_GET, [](AsyncWebServerRequest *request){
           Serial.println("getting Home file");
@@ -416,16 +290,11 @@ void setup() {
             handleToggleCommand("raiseWings", "off");
             request->send(200, "text/plain", "Raise Wings OFF");
         });
-        server.on("/joystick/on", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("joystick", "on");
-            request->send(200, "text/plain", "Joystick ON");
-        });
-        server.on("/joystick/off", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("joystick", "off");
-            request->send(200, "text/plain", "Joystick OFF");
-        });
         server.on("/momentary", HTTP_POST, handleMomentaryCommand);
-        
+        server.on("/setApplicationRate", HTTP_POST, handleSetApplicationRate);
+        server.on("/getApplicationRate", HTTP_GET, handleGetApplicationRate);
+        server.on("/module", HTTP_GET, handleGetModuleState);
+        server.on("/performance", HTTP_GET, handleGetPerformanceVariables);
         
         #pragma endregion
         
@@ -435,16 +304,14 @@ void setup() {
       #pragma endregion
   temp_sensor_start();
   espUdp.begin();
-  
-  
-  
+  canbus.begin();
+  productCtrl.begin();
   progState = 1;
 }
 
 void debugPrint(){
   Serial.printf("Timestamp since boot [ms]: %lu", millis());
-  Serial.println();
-  Serial.printf("\tprogName: %s", espConfig.progCfg.name);
+  Serial.printf(" progName: %s", espConfig.progCfg.name);
   Serial.printf(" progState: %lu", progState);
   Serial.printf(" confRes: %lu", espConfig.progData.confRes);
   Serial.printf(" wifiRes: %lu", espConfig.wifiCfg.state);
@@ -452,14 +319,11 @@ void debugPrint(){
   temp_sensor_read_celsius(&reading);
   Serial.printf(" temp: %f", reading);
   Serial.println();
-  Serial.printf("\tFree Heap: %lu", ESP.getFreeHeap());
-  Serial.printf(" SSID: %s", WiFi.SSID().c_str());
-  Serial.printf(" IP: %d.%d.%d.%d", wifiCfg.ips[0], wifiCfg.ips[1], wifiCfg.ips[2], wifiCfg.ips[3]);
   // Serial.println(twoWire.requestFrom(0x22, 0x01));
   // Serial.printf("Mag x: %.2f mT, y: %.2f mT, z: %.2f mT, Temp: %.2f °C\n", espConfig.magData.x, espConfig.magData.y, espConfig.magData.z, (espConfig.magData.t*1.8)+32);
   // Serial.println();
   // Serial.println(espConfig.progCfg.name);
-  Serial.println();
+  // Serial.println();
 }
 
 void loop(){
@@ -469,3 +333,5 @@ void loop(){
   delay(1000);
   debugPrint();
 }
+
+

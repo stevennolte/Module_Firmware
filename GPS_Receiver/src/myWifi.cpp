@@ -55,7 +55,7 @@ uint8_t MyWifi::makeAP(uint8_t * ipAddr, char * sketchConfig){
     IPAddress gateway(ipAddr[0], ipAddr[1], ipAddr[2], 1);
     IPAddress subnet(255, 255, 255, 0);
     WiFi.mode(WIFI_AP);   
-    WiFi.softAP(sketchConfig, "Fert504!");
+    WiFi.softAP(sketchConfig, "123456789");
     delay(100);
     WiFi.softAPConfig(local_IP, local_IP, subnet);
     return 3;
