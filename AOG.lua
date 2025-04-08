@@ -42,7 +42,7 @@ local AOGFields = {
     ssLowPWM = ProtoField.uint16("SteerSettings.LowPWM", "LowPWM", base.DEC),
     ssMinPWM = ProtoField.uint16("SteerSettings.MinPWM", "MinPWM", base.DEC),
     ssSteerSensorCounts = ProtoField.uint16("SteerSettings.ssCounts", "Steer Sensor Counts", base.DEC),
-    sswasOffset = ProtoField.uint16("SteerSettings.wasOffset", "WAS Offset", base.DEC),
+    sswasOffset = ProtoField.uint16("SteerSettings.wasOffset", "WAS Offset", base.HEX),
     ssAckermanFix = ProtoField.uint16("SteerSettings.AckermanFix", "Ackerman Fix", base.DEC),
 
     fasActualSteerAngle = ProtoField.float("FAS.ActualSteerAngle", "Actual Steer Angle", base.DEC),
@@ -411,7 +411,7 @@ function AOGProtocol_proto.dissector(buffer, pinfo, tree)
                 subtree:add(AOGFields.PGN252_LowPWM, buffer(7,1))
                 subtree:add(AOGFields.PGN252_MinPWM, buffer(8,1))
                 subtree:add(AOGFields.PGN252_CPD, buffer(9,1))
-                subtree:add(AOGFields.PGN252_WasOffset, buffer(10,2))
+                subtree:add(AOGFields.PGN252_WasOffset, buffer(10,2):le_int())
                 subtree:add(AOGFields.PGN252_Ackerman, buffer(12,1))
 
                 pinfo.cols.info = "Steer settings (from AgIO)"
@@ -437,7 +437,7 @@ function AOGProtocol_proto.dissector(buffer, pinfo, tree)
                     subtree:add(AOGFields.asWorkSwitch, "Unset")
                 end
                 subtree:add(AOGFields.asRollK, cooked)
-
+                subtree:add(AOGFields.sswasOffset, buffer(offset, 2):le_int())
             end
             if MinorPGN == 0xfe then -- 254
                 subtree:add(AOGFields.PGN254_SpeedKM ,buffer(5,2):le_uint() / 10)
