@@ -15,6 +15,8 @@ class CANBUS{
         void handle_tx_message(twai_message_t message);
         void transmit_normal_message(uint32_t identifier, uint8_t data[], uint8_t data_length_code);
     private:
+        uint32_t previousSendTime;
+        uint32_t regID;
         ESPconfig* espConfig;
         twai_message_t rx_message;
         twai_message_t tx_message;

@@ -13,6 +13,7 @@ void CANBUS::taskHandler(void *param) {
 
 void CANBUS::continuousLoop() {
     while (true) {
+        
         receiveCAN();
         vTaskDelay(10/portTICK_PERIOD_MS);
     }
@@ -59,11 +60,13 @@ uint8_t CANBUS::begin(){
       twai_get_status_info(&status);
       Serial.print("TWAI state ");
       Serial.println(status.state);
-      uint8_t ack[] = {1,255,0,0,0,0,0,0};
-      for (int i=0; i<25;i++){
-        sendCAN(0x18EC0001,ack,8);
-        delay(100);
-      }
+     
+      while (espConfig->regData.regID.regID_Struct.id == 0){    
+          uint8_t ack[] = {1,255,0,0,0,0,0,0};
+          sendCAN(0x18EC0001,ack,8);
+          receiveCAN();
+          delay(50);
+       }
       delay(1000);
       espConfig->regData.regCommand.regCommandStruct.byte_1 = 0x22;
       espConfig->regData.regCommand.regCommandStruct.dic_index_1 = 0x07;
@@ -71,7 +74,7 @@ uint8_t CANBUS::begin(){
       espConfig->regData.regCommand.regCommandStruct.sub_index = 0x00;
       espConfig->regData.regCommand.regCommandStruct.byte_5 = 0x04;
       espConfig->regData.regCommand.regCommandStruct.movement_speed = espConfig->regData.speed;
-      espConfig->regData.regCommand.regCommandStruct.target = 01;
+      espConfig->regData.regCommand.regCommandStruct.target = 100;
       sendCAN(espConfig->regData.cmdID, espConfig->regData.regCommand.bytes, 8);
       return 1;
       // transmit_normal_message(0x06FF3A01, ack);
@@ -85,7 +88,6 @@ void CANBUS::receiveCAN()
     twai_message_t message;
     if (twai_receive(&message, pdMS_TO_TICKS(10)) == ESP_OK) {
       espConfig->regData.regID.regID_Struct.id = message.identifier;
-      
       if (espConfig->regData.regID.bytes[1]==56 & espConfig->regData.regID.bytes[2] == 255){
         
         for (int i = 0; i<sizeof(espConfig->regData.regReport);i++){

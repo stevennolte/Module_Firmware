@@ -51,12 +51,14 @@ void ESPudp::begin(GPS* gps){
             espConfig->steerData.byte2 = packet.data()[6];
             espConfig->steerData.byte3 = packet.data()[7];
             espConfig->steerData.byte4 = packet.data()[8];
+            espConfig->steerData.wasZeroAngle = float(espConfig->steerCfg.steerOffset)/float(espConfig->steerCfg.countsPerDeg);
             if (wirelessWASunion.angle > 2147483647){
-              this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0;
+              this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0 - espConfig->steerData.wasZeroAngle;
             } else {
-              this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
+              this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0 - espConfig->steerData.wasZeroAngle;
             }
-            // espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle);
+            
+            
             break;
         }
       }
@@ -134,6 +136,7 @@ void ESPudp::begin(GPS* gps){
               this->espConfig->steerCfg.settingsUpdated = 1;
               Serial.print("Got Steer Settings ");
               Serial.println(packet.data()[3]);
+             
               espConfig->updateSteer();
               break;
             case 254:  //GPS reply to Hello Message, disable AIO GPS

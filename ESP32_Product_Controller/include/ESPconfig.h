@@ -95,7 +95,7 @@ public:
             uint8_t state;
             uint16_t currentPosition;
             uint16_t targetPosition;
-            uint8_t speed;
+            uint8_t speed = 99;
             uint32_t lastMsgRecieved;
             uint32_t cmdID = 0x18EFB480;
             

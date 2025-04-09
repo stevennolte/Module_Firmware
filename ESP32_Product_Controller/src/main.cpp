@@ -103,14 +103,12 @@ void updateDebugVars() {
   debugVars.push_back("Target Row Flow Rate: " + String(espConfig.rateData.targetRowFlowRate));
   debugVars.push_back("Speed: " + String(espConfig.rateData.speed));
   debugVars.push_back("Last Section Msg: " + String(espConfig.rateData.lastSectionMsg));
-  debugVars.push_back("Fold State 1: " + String(espConfig.foldData.foldStates[0]));
-  debugVars.push_back("Fold State 2: " + String(espConfig.foldData.foldStates[1]));
-  debugVars.push_back("Fold State 3: " + String(espConfig.foldData.foldStates[2]));
-  debugVars.push_back("Fold State 4: " + String(espConfig.foldData.foldStates[3]));
-  debugVars.push_back("Fold State 5: " + String(espConfig.foldData.foldStates[4]));
-  debugVars.push_back("Fold State 6: " + String(espConfig.foldData.foldStates[5]));
-  debugVars.push_back("Fold State 7: " + String(espConfig.foldData.foldStates[6]));
-  debugVars.push_back("Fold State 8: " + String(espConfig.foldData.foldStates[7]));
+  debugVars.push_back("Regulator Info:");
+  debugVars.push_back("Regulator State: " + String(espConfig.regData.state));
+  debugVars.push_back("Regulator ID: " + String(espConfig.regData.regID.regID_Struct.id));
+  debugVars.push_back("Regulator Position: " + String(espConfig.regData.regReport.regReport_Struct.position));
+  debugVars.push_back("Regulator Target Position: " + String(espConfig.regData.targetPosition));  
+  debugVars.push_back("Regulator Speed: " + String(espConfig.regData.speed));
   
 
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
