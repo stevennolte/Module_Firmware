@@ -11,6 +11,8 @@
 #include "Product_Ctrl.h"
 #include "driver/temp_sensor.h"
 #include "CANBUS.h"
+#include <Adafruit_ADS1X15.h>
+
 
 
 // TwoWire twoWire = TwoWire(0);
@@ -24,12 +26,12 @@ bool raiseWingsState = false;
 
 
 ESPconfig espConfig;
-
+Adafruit_ADS1015 ads;
 CANBUS canbus(&espConfig);
 MyLED myLED(&espConfig);
 ESPWifi espWifi(&espConfig);
 ESPudp espUdp(&espConfig);
-Product_Ctrl productCtrl(&espConfig, &canbus);
+Product_Ctrl productCtrl(&espConfig, &canbus, &ads);
 std::vector<String> debugVars;
 AsyncWebServer server(80);
 
@@ -442,11 +444,51 @@ void handleGetPerformanceVariables(AsyncWebServerRequest *request) {
 }
 #pragma endregion
 
+
+bool I2Csetup(){
+  if(!Wire.setPins(espConfig.gpioDefs.SDA_PIN, espConfig.gpioDefs.SCL_PIN)){
+    Serial.println("Wire failed to set pins");
+    return false;
+  }
+  // if(!twoWire.setClock(1000000)){
+  //   Serial.println("Wire failed to set clock");
+  //   return false;
+  // }
+  if(!Wire.begin()){
+    Serial.println("Wire failed to begin");
+    return false;
+  }
+  byte error, address;
+  int nDevices;
+
+  Serial.println("Scanning...");
+
+ 
+  Wire.beginTransmission(0x48);
+  error = Wire.endTransmission();
+  if (error == 0)
+  {
+    Serial.println("ADS1115 found at address 0x48  !");
+    progData.adsState = 1;
+  }
+  else 
+  {
+    Serial.println("Unknown error at address 0x48");
+    progData.adsState = 2;
+  }
+  if (progData.adsState == 2){
+    return false;
+  } else {
+    return true;
+  }
+  
+}
+
 void setup() {
   progData.state = 0;
   myLED.startTask();
   progData.state = 2;
-
+  espConfig.progData.canState = canbus.begin();
   // Start USB Serial Port
   Serial.begin(115200);
   delay(5000);   // Wait for the usb to connect so you can see the outputs at startup
@@ -544,7 +586,10 @@ void setup() {
       #pragma endregion
   temp_sensor_start();
   espUdp.begin();
-  canbus.begin();
+  if (I2Csetup()){
+    ads.begin();
+  }
+  
   productCtrl.begin();
   pinMode(espConfig.gpioDefs.FLOW_PIN, INPUT_PULLUP);
   attachInterrupt(espConfig.gpioDefs.FLOW_PIN, ISR, FALLING);

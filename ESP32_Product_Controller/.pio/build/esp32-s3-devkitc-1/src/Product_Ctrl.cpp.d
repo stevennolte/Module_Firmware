@@ -184,9 +184,11 @@
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson.h \
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson.hpp \
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson/Configuration.hpp \
- include/Version.h \
- .pio/libdeps/esp32-s3-devkitc-1/PulseFlowMeter/src/PulseFlowMeter.h \
- include/CANBUS.h \
+ include/Version.h include/CANBUS.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/include/driver/twai.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/hal/include/hal/twai_types.h \
- include/Regulator.h
+ include/Regulator.h \
+ .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ ADS1X15/Adafruit_ADS1X15.h \
+ .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ BusIO/Adafruit_I2CDevice.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h

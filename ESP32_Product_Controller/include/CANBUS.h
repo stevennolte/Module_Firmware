@@ -14,6 +14,7 @@ class CANBUS{
         void receiveCAN();
         void handle_tx_message(twai_message_t message);
         void transmit_normal_message(uint32_t identifier, uint8_t data[], uint8_t data_length_code);
+        void sendRegCmd(uint16_t _target, uint8_t _speed);
     private:
         uint32_t previousSendTime;
         uint32_t regID;

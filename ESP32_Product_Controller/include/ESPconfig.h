@@ -95,6 +95,7 @@ public:
             uint8_t state;
             uint16_t currentPosition;
             uint16_t targetPosition;
+            uint16_t targetPositionPrev;
             uint8_t speed = 99;
             uint32_t lastMsgRecieved;
             uint32_t cmdID = 0x18EFB480;
@@ -174,8 +175,13 @@ public:
             float targetFlowRate;
             float targetRowFlowRate;
             float actualFlowRate;
+            
             float targetPressure;
             float targetPressureOffset;
+            float actualPressure;
+            uint16_t adsReading;
+            uint8_t pressState;
+            
             uint32_t pulseCount;
             uint32_t prevPulseCount;
             uint64_t pulseTime;

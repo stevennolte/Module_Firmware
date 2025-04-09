@@ -1,4 +1,4 @@
-bblanchon/ArduinoJson@^7.1.0
 adafruit/Adafruit NeoPixel@^1.12.3
-https://github.com/lysek01/PulseFlowMeter
 ESP32Async/ESPAsyncWebServer @ 3.6.0
+bblanchon/ArduinoJson@^7.1.0
+adafruit/Adafruit ADS1X15@^2.5.0

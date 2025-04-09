@@ -264,11 +264,11 @@
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_rom/include/esp_rom_md5.h \
  include/ESPudp.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src/AsyncUDP.h \
- include/Product_Ctrl.h \
- .pio/libdeps/esp32-s3-devkitc-1/PulseFlowMeter/src/PulseFlowMeter.h \
- include/CANBUS.h \
+ include/Product_Ctrl.h include/CANBUS.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/include/driver/twai.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/hal/include/hal/twai_types.h \
  include/Regulator.h \
+ .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ ADS1X15/Adafruit_ADS1X15.h \
+ .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ BusIO/Adafruit_I2CDevice.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/esp32s3/include/driver/temp_sensor.h \
  include/CANBUS.h
