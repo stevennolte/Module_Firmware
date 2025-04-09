@@ -92,7 +92,8 @@ public:
 
     class RegData {
         public:
-            uint8_t state;
+            uint8_t state;   //0: not connected, 1: connected, 2: error
+            uint8_t regControl; //0: off, 1: auto, 2: manual control
             uint16_t currentPosition;
             uint16_t targetPosition;
             uint16_t targetPositionPrev;
@@ -166,6 +167,7 @@ public:
 
     class RateData {
         public:
+            uint8_t systemState;
             uint32_t lastSectionMsg;
             float speed;
             uint8_t sectionStates[65];

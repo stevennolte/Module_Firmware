@@ -339,7 +339,11 @@ void handleToggleCommand(const String& command, const String& action) {
       foldOuterWingsState = (action == "on");
       Serial.printf("Fold Outer Wings: %s\n", foldOuterWingsState ? "ON" : "OFF");
       // Add your logic here to control hardware for "Fold Outer Wings"
-  } else if (command == "foldCenterWings") {
+    } else if (command == "sysEnable") {
+      espConfig.rateData.systemState = (action == "on");
+      Serial.printf("System Enable: %s\n", espConfig.rateData.systemState ? "ON" : "OFF");
+      // Add your logic here to control hardware for "System Enable"
+    } else if (command == "foldCenterWings") {
       foldCenterWingsState = (action == "on");
       Serial.printf("Fold Center Wings: %s\n", foldCenterWingsState ? "ON" : "OFF");
       // Add your logic here to control hardware for "Fold Center Wings"
@@ -350,6 +354,22 @@ void handleToggleCommand(const String& command, const String& action) {
   } else {
       Serial.println("Unknown command received.");
   }
+}
+
+// Function to handle setting the application rate
+void handleSetRegulatorPosition(AsyncWebServerRequest *request) {
+  Serial.println("Received regulator target");
+  if (request->hasParam("value")){
+    String regPos = request->getParam("value")->value();
+    espConfig.regData.targetPosition = regPos.toFloat();
+    
+    Serial.printf("Received regPos: %f\n", espConfig.regData.targetPosition);
+    
+    request->send(200, "text/plain", "Regulator Position Set Successfully");
+    
+    
+  }
+   
 }
 
 // Function to handle setting the application rate
@@ -572,12 +592,33 @@ void setup() {
             handleToggleCommand("raiseWings", "off");
             request->send(200, "text/plain", "Raise Wings OFF");
         });
+        server.on("/systemEnable/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.rateData.systemState = 1;
+          request->send(200, "text/plain", "Regulator enabled");
+        });
+        server.on("/SystemEnable/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.rateData.systemState = 0;
+          request->send(200, "text/plain", "Regulator disabled");
+        });
+        server.on("regulatorManualControl/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.regData.regControl = 2;
+          request->send(200, "text/plain", "");
+        });
+        server.on("regulatorManualControl/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.regData.regControl = 1;
+          request->send(200, "text/plain", "");
+        });
+        //-------------Server Template----------------
+        // server.on("", HTTP_POST, [](AsyncWebServerRequest *request) {
+          
+        //   request->send(200, "text/plain", "");
+        // });
         server.on("/momentary", HTTP_POST, handleMomentaryCommand);
         server.on("/setApplicationRate", HTTP_POST, handleSetApplicationRate);
         server.on("/getApplicationRate", HTTP_GET, handleGetApplicationRate);
         server.on("/module", HTTP_GET, handleGetModuleState);
         server.on("/performance", HTTP_GET, handleGetPerformanceVariables);
-        
+        server.on("/setRegulatorPosition", HTTP_POST, handleSetRegulatorPosition);
         #pragma endregion
         
         

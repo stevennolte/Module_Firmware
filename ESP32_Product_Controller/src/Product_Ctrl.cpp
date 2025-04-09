@@ -87,6 +87,7 @@ void Product_Ctrl::continuousLoop(){
 
         #pragma region Regulator Control
         //TODO:  regulator logic
+        //TODO:  set manual control mode
         #pragma endregion
 
        
