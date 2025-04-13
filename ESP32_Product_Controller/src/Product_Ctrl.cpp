@@ -3,9 +3,11 @@
 
 Product_Ctrl::Product_Ctrl(ESPconfig* vars, CANBUS* canbus, Adafruit_ADS1015* ads) {
     espConfig = vars;
+    this->ads = ads;
 }
 
 void Product_Ctrl::begin(){
+    Serial.println("Starting Product Controller");
     // meter.begin(espConfig->gpioDefs.FLOW_PIN, espConfig->flowCfg.flowCalNumber);  
     // meter.setTresholds(espConfig->flowCfg.maxFlow, espConfig->flowCfg.maxFlow);
     for (uint8_t i = 1; i<6; i++){

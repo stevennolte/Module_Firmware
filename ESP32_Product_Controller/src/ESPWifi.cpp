@@ -2,6 +2,7 @@
 #include "WiFi.h"
 
 
+
 ESPWifi::ESPWifi(ESPconfig* vars){
     espConfig = vars;
 }
@@ -16,23 +17,26 @@ uint8_t ESPWifi::connect(){
             if (WiFi.SSID(i) == espConfig->wifiCfg.ssids[j]){
                 WiFi.begin(espConfig->wifiCfg.ssids[j],espConfig->wifiCfg.passwords[j]);
                 WiFi.config(local_IP,gateway,subnet);
+                MDNS.begin(NAME);
+                startMonitor();
                 return 1;
             }
         }
     }
-    return 1;
+    return 2;
 }
 
 uint8_t ESPWifi::makeAP(){
     IPAddress local_IP(espConfig->wifiCfg.ips[0],espConfig->wifiCfg.ips[1],espConfig->wifiCfg.ips[2],espConfig->wifiCfg.ips[3]);
     IPAddress gateway(espConfig->wifiCfg.ips[0],espConfig->wifiCfg.ips[1],espConfig->wifiCfg.ips[2],1);
     IPAddress subnet(255,255,255,0);
-    WiFi.setHostname(NAME);
+    
     WiFi.mode(WIFI_AP_STA);   
     WiFi.softAP(NAME, "1234567890");
     delay(100);
     WiFi.softAPConfig(local_IP, local_IP, subnet);
-    startMonitor();
+    MDNS.begin(NAME);
+    // startMonitor();
     return 3;
 }
 

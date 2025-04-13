@@ -10,9 +10,9 @@ void ESPudp::begin(){
     
     udp.listen(8888);
     udp.onPacket([this](AsyncUDPPacket packet) {
-      Serial.println("message received1");
+      // Serial.println("message received1");
         if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
-          Serial.println("message received");
+          // Serial.println("message received");
         //   espConfig.udpTimer = millis();
           switch (packet.data()[3]){
             case 200:  //Hello from AgIO
@@ -43,7 +43,7 @@ void ESPudp::sendSteerData(){
   angleUDP[4] = 4;
   // Serial.println("41");
   // Convert sensorAngle to a 32-bit integer (scaled)
-  int32_t sensorAngleInt = static_cast<int32_t>(espConfig->wasData.sensorAngle * 100);
+  int32_t sensorAngleInt = static_cast<int32_t>((espConfig->wasData.sensorAngle - espConfig->wasData.zeroValue) * 100);
   // Split the 32-bit integer into bytes (little-endian format)
   // Serial.println("44");
   angleUDP[5] = sensorAngleInt & 0xFF;         // LSB (byte 0)

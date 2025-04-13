@@ -53,9 +53,9 @@ void ESPudp::begin(GPS* gps){
             espConfig->steerData.byte4 = packet.data()[8];
             espConfig->steerData.wasZeroAngle = float(espConfig->steerCfg.steerOffset)/float(espConfig->steerCfg.countsPerDeg);
             if (wirelessWASunion.angle > 2147483647){
-              this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0 - espConfig->steerData.wasZeroAngle;
+              this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0;
             } else {
-              this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0 - espConfig->steerData.wasZeroAngle;
+              this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
             }
             
             
@@ -172,7 +172,7 @@ void ESPudp::begin(GPS* gps){
               } else {
                 this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
               }
-              this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle + float(espConfig->steerCfg.steerOffset/espConfig->steerCfg.countsPerDeg);
+              // this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle + float(espConfig->steerCfg.steerOffset/espConfig->steerCfg.countsPerDeg);
               break;
           }
         }

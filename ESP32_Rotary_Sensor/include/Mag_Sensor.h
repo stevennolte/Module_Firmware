@@ -21,7 +21,7 @@ class Mag_Sensor{
         ESPconfig* espConfig;
         static void taskHandler(void *param);  // Task handler
         void continuousLoop();  // Function to run in the background task
-        float alpha = 0.05;
+        float alpha = 0.3;
     };
 
 #endif

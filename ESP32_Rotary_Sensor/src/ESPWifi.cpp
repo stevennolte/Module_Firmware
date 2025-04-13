@@ -59,9 +59,9 @@ void ESPWifi::continuousLoop(){
             case 0:
                 break;
             case 1:
-                if (!WiFi.isConnected()){
-                    connect();
-                }
+                // if (!WiFi.isConnected()){
+                //     connect();
+                // }
                 break;
             case 2:
                 break;

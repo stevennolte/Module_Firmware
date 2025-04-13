@@ -74,15 +74,18 @@ void MotorDriver::init(){
 void MotorDriver::setOutput(float value){
     // Serial.println(value);
     float minScalar = float(espConfig->steerCfg.minPWM)/255.0;
+    float maxScalar = float(espConfig->steerCfg.highPWM)/255.0;
+    uint16_t minCMD = maxPWM * maxScalar;
+    uint16_t maxCMD = maxPWM * minScalar;
     if (value > 0.01){
         
-        value = max(value, minScalar);
+        // value = max(value, minScalar);
         dirCmd = 1;
         enable();
         setCW();
     } else if (value < -0.01){
         
-        value = max(abs(value), minScalar)*-1.0;
+        value = abs(value);
         dirCmd = 2;
         enable();
         setCCW();
@@ -92,11 +95,15 @@ void MotorDriver::setOutput(float value){
         dirCmd = 0;
     }
     
-    float scalar = maxPWM * (float(espConfig->steerCfg.highPWM)/255.0);
+    
+    // Scale value to range [minCMD, maxCMD]
+    uint16_t scaledValue = minCMD + value * (maxCMD - minCMD);
 
-
-    cmdValue = uint16_t((float(maxPWM)) * abs(value));
-    espConfig->steerData.pwmCmd = min(float(cmdValue),scalar);
+    // cmdValue = uint16_t((float(maxPWM)) * abs(value));
+    // espConfig->steerData.pwmCmd = min(float(cmdValue),scalar);
+    cmdValue = scaledValue;
+    espConfig->steerData.pwmCmd = scaledValue;
+    
     // Serial.println(cmdValue);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, cmdValue);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);

@@ -98,6 +98,18 @@
         .catch(error => console.error('Error fetching debug variables:', error));
     }
 
+
+    function zeroSensor() {
+      fetch('/zeroSensor')
+        .then(() => alert('Sensor zeroed.'))
+        .catch(error => console.error('Error:', error));
+    }
+
+    function resetZero() {
+      fetch('/resetZero')
+        .then(() => alert('Zero reset.'))
+        .catch(error => console.error('Error:', error));
+    }
     // Function to download the entire debug log as a file
     function downloadDebugLog() {
       if (debugLog.length === 0) {
@@ -141,6 +153,8 @@
   </ul>
 
   <button onclick="downloadDebugLog()">Download Debug Log</button>
+  <button onclick="zeroSensor()">Zero Sensor</button>
+  <button onclick="resetZero()">Reset Zero</button>
 
   <h1>Files on Device</h1>
   <ul id="fileList">
@@ -158,5 +172,6 @@
     <input type="file" name="firmware">
     <input type="submit" value="Update Firmware">
   </form>
+
 </body>
 </html>

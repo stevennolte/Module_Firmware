@@ -16,6 +16,7 @@ class ESPudp{
     public:
         void begin();
         void sendUDP();
+        void sendUPDdata();
         ESPudp(ESPconfig* vars);
     private:
         AsyncUDP udp;

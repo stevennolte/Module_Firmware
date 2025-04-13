@@ -304,7 +304,7 @@
             <div class="progress-bar target-bar" id="PressureTarget">
                 <span class="bar-label">Target</span>
             </div>
-            <div class="progress-bar actual-bar" id="PressureProgress">
+            <div class="progress-bar actual-bar" id="PressureActual">
                 <span class="bar-label">Actual</span>
             </div>
         </div>
@@ -331,278 +331,224 @@
             </div>
         </div>
     </div>
+    <div class="progress-container">
+        <div class="progress-label">Regulator</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar target-bar" id="RegulatorTarget">
+                <span class="bar-label">Target</span>
+            </div>
+            <div class="progress-bar actual-bar" id="RegulatorActual">
+                <span class="bar-label">Actual</span>
+            </div>
+        </div>
+    </div>
 
     <!-- Regulator Section -->
     <div class="separator"></div>
     <h3>Regulator:</h3>
-    <div>
-        <span id="moduleStateIndicator" class="state-indicator good"></span>
-        <span id="moduleStateText" class="state-text">Good</span>
-    </div>
-    <div class="position-container">
-        <div class="position-label">Target Position: <span id="targetPosition">0.00</span></div>
-    </div>
+    
 
     <!-- Slider -->
     <div class="separator"></div>
     <div class="slider-container">
-        <label for="customSlider" class="slider-label">Custom Slider:</label>
+        <label for="customSlider" class="slider-label">Regulator Position Control:</label>
         <input type="range" id="customSlider" min="0" max="100" value="50" class="slider-input" oninput="updateSliderValue(this.value)">
         <span id="sliderValue" class="slider-value">50</span>
     </div>
 
     <!-- Scripts -->
     <script>
-        // Function to handle the "Enable" switch toggle
-        function toggleEnable(event) {
-            const isChecked = event.target.checked;
-            console.log(`Enable is now ${isChecked ? 'ON' : 'OFF'}`);
-            const endpoint = `/systemEnable/${isChecked ? 'on' : 'off'}`;
-            fetch(endpoint, { method: 'POST' })
-                .then(response => response.text())
-                .then(data => console.log(`Response from controller: ${data}`))
-                .catch(error => console.error('Error sending command:', error));
-        }
+    
+    // Create an EventSource to listen for SSE events
+    const eventSource = new EventSource('/events');
 
-        // Function to handle the "Narrow Boom" switch toggle
-        function toggleNarrowBoom(event) {
-            const isChecked = event.target.checked;
-            console.log(`Narrow Boom is now ${isChecked ? 'ON' : 'OFF'}`);
-            const endpoint = `/narrowBoom/${isChecked ? 'on' : 'off'}`;
-            fetch(endpoint, { method: 'POST' })
-                .then(response => response.text())
-                .then(data => console.log(`Response from controller: ${data}`))
-                .catch(error => console.error('Error sending command:', error));
-        }
+    // Listen for "performanceData" events
+    eventSource.addEventListener('moduleData', (event) => {
+        const data = JSON.parse(event.data); // Parse the JSON data
+        document.getElementById('PressureActual').textContent = data.actPressure.toFixed(2);
+        document.getElementById('PressureActual').style.width = data.actPressure.toFixed(2) + '%';
+        document.getElementById('PressureTarget').textContent = data.tarPressure.toFixed(2);
+        document.getElementById('PressureTarget').style.width = data.tarPressure.toFixed(2) + '%';
+        document.getElementById('RegulatorTarget').textContent = data.tarRegulatorPosition.toFixed(2);
+        document.getElementById('RegulatorTarget').style.width = data.tarRegulatorPosition.toFixed(2) + '%';
+        document.getElementById('RegulatorActual').textContent = data.actRegulatorPosition.toFixed(2);
+        document.getElementById('RegulatorActual').style.width = data.actRegulatorPosition.toFixed(2) + '%';
+        // const stateIndicator = document.getElementById('moduleStateIndicator');
+        // document.getElementById('flowRate').textContent = data.flowRate.toFixed(2);
+        // document.getElementById('level').textContent = data.level.toFixed(2);
+    });
 
-        // Function to fetch the current state of the "Enable" variable
-        function getEnableState() {
-            fetch('/enable/state')
-                .then(response => response.json())
-                .then(data => {
-                    const enableSwitch = document.getElementById('enableSwitch');
-                    enableSwitch.checked = data.state;
-                    console.log(`Enable state fetched: ${data.state ? 'ON' : 'OFF'}`);
-                })
-                .catch(error => console.error('Error fetching enable state:', error));
-        }
+    // Handle connection errors
+    eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+    };
 
-        // Function to fetch the current state of the "Narrow Boom" variable
-        function getNarrowBoomState() {
-            fetch('/narrowBoom/state')
-                .then(response => response.json())
-                .then(data => {
-                    const narrowBoomSwitch = document.getElementById('narrowBoomSwitch');
-                    narrowBoomSwitch.checked = data.state;
-                    console.log(`Narrow Boom state fetched: ${data.state ? 'ON' : 'OFF'}`);
-                })
-                .catch(error => console.error('Error fetching narrow boom state:', error));
-        }
+    // Function to handle the "Enable" switch toggle
+    function toggleEnable(event) {
+        const isChecked = event.target.checked;
+        console.log(`Enable is now ${isChecked ? 'ON' : 'OFF'}`);
+        const endpoint = `/systemEnable/${isChecked ? 'on' : 'off'}`;
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => console.log(`Response from controller: ${data}`))
+            .catch(error => console.error('Error sending command:', error));
+    }
 
-        // Function to fetch and update performance variables and their targets
-        function updatePerformanceVariables() {
-            console.log('Fetching performance variables...');
-            fetch('/performance/variables') // Replace with the correct endpoint
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.text(); // Read the response as text
-                })
-                .then(text => {
-                    if (!text) {
-                        throw new Error('Empty response from server');
-                    }
-                    const data = JSON.parse(text); // Parse the JSON manually
-                    console.log('Performance variables fetched:', data);
-                    // Update each progress bar dynamically
-                    Object.keys(data).forEach(variable => {
-                        const progressBar = document.getElementById(`${variable}Progress`);
-                        const targetBar = document.getElementById(`${variable}Target`);
-
-                        if (progressBar && targetBar) {
-                            // Update the actual progress bar
-                            progressBar.style.width = `${data[variable].current}%`;
-                            progressBar.textContent = `${data[variable].current}%`;
-
-                            // Update the target progress bar
-                            targetBar.style.width = `${data[variable].target}%`;
-                        }
-                    });
-                })
-                .catch(error => console.error('Error fetching performance variables:', error));
-        }
-
-        // Function to send the "Application Rate" to the controller
-        function setApplicationRate() {
-            const applicationRateInput = document.getElementById('applicationRateInput');
-            const applicationRate = parseFloat(applicationRateInput.value);
-
-            if (isNaN(applicationRate)) {
-                alert('Please enter a valid number for the Application Rate.');
-                return;
-            }
-
-            console.log(`Setting Application Rate to: ${applicationRate}`);
-            fetch(`/setApplicationRate?rate=${applicationRate}`, { method: 'POST' })
-                    .then(response => response.text())
-                    .then(data => console.log(`Response from controller: ${data}`))
-                    .catch(error => console.error(`Error sending momentary command for ${button}:`, error));
-        }
-
-        // Open the number pad modal
-        function openNumberPad() {
-            const modal = document.getElementById('numberPadModal');
-            const numberPadInput = document.getElementById('numberPadInput');
-            const applicationRateInput = document.getElementById('applicationRateInput');
-
-            numberPadInput.value = applicationRateInput.value || ''; // Pre-fill with the current value
-            modal.style.display = 'block'; // Show the modal
-        }
-
-        // Close the number pad modal
-        function closeNumberPad() {
-            const modal = document.getElementById('numberPadModal'); // Get the modal element
-            modal.style.display = 'none'; // Hide the modal
-        }
-
-        // Append a number to the input
-        function appendNumber(number) {
-            const numberPadInput = document.getElementById('numberPadInput');
-            numberPadInput.value += number;
-        }
-
-        // Clear the input
-        function clearNumber() {
-            const numberPadInput = document.getElementById('numberPadInput');
-            numberPadInput.value = '';
-        }
-
-        // Set the rate from the number pad and close the modal
-        function setRateFromNumberPad() {
-            const numberPadInput = document.getElementById('numberPadInput');
-            const applicationRateInput = document.getElementById('applicationRateInput');
-
-            applicationRateInput.value = numberPadInput.value;
-            closeNumberPad();
-        }
-
-        // Close the modal if the user clicks outside of it
-        window.onclick = function(event) {
-            const modal = document.getElementById('numberPadModal');
-            if (event.target === modal) {
-                closeNumberPad();
-            }
-        };
-
-        // Fetch the current states and performance variables when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            getEnableState();
-            getNarrowBoomState();
-            updatePerformanceVariables();
-            const intervalId = setInterval(updatePerformanceVariables, 1000); // Refresh every second
-            console.log('Interval ID:', intervalId);
-        });
-    </script>
-    <script>
-        // Function to fetch and update the module state, target position, and current position
-        function updateModuleState() {
-            fetch('/module/state') // Replace with the correct endpoint
-                .then(response => response.json())
-                .then(data => {
-                    // Update the state indicator
-                    const stateIndicator = document.getElementById('moduleStateIndicator');
-                    const stateText = document.getElementById('moduleStateText');
-
-                    if (data.state === 'good') {
-                        stateIndicator.classList.remove('disconnected');
-                        stateIndicator.classList.add('good');
-                        stateText.textContent = 'Good';
-                    } else if (data.state === 'disconnected') {
-                        stateIndicator.classList.remove('good');
-                        stateIndicator.classList.add('disconnected');
-                        stateText.textContent = 'Disconnected';
-                    }
-
-                    // Update the target position and current position
-                    const targetPosition = document.getElementById('targetPosition');
-                    const currentPosition = document.getElementById('currentPosition');
-
-                    targetPosition.textContent = data.targetPosition.toFixed(2); // Format to 2 decimal places
-                    currentPosition.textContent = data.currentPosition.toFixed(2); // Format to 2 decimal places
-                })
-                .catch(error => console.error('Error fetching module state:', error));
-        }
-
-        // Fetch the module state when the page loads and periodically update it
-        document.addEventListener('DOMContentLoaded', () => {
-            updateModuleState();
-            setInterval(updateModuleState, 5000); // Refresh every 5 seconds
-        });
-    </script>
-    <script>
-        // Function to fetch the current application rate from the device
-        function getApplicationRate() {
-            fetch('/getApplicationRate') // Replace with the correct endpoint
-                .then(response => response.json())
-                .then(data => {
-                    const applicationRateInput = document.getElementById('applicationRateInput');
-                    applicationRateInput.value = data.rate.toFixed(2); // Set the input field with the fetched rate
-                    console.log(`Application Rate fetched: ${data.rate}`);
-                })
-                .catch(error => console.error('Error fetching application rate:', error));
-        }
-
-        // Fetch the current application rate when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            getApplicationRate();
-        });
-    </script>
-    <script>
-        // Function to update the displayed slider value
-        function updateSliderValue(value) {
-            const sliderValue = document.getElementById('sliderValue');
-            sliderValue.textContent = value;
-        }
-    </script>
-    <script>
-        // Function to handle the "Regulator Manual Control" switch toggle
-        function toggleRegulatorManualControl(event) {
-            const isChecked = event.target.checked;
-            console.log(`Regulator Manual Control is now ${isChecked ? 'ON' : 'OFF'}`);
-            const endpoint = `/regulatorManualControl/${isChecked ? 'on' : 'off'}`;
-            fetch(endpoint, { method: 'POST' })
-                .then(response => response.text())
-                .then(data => {
-                    console.log(`Response from controller: ${data}`);
-                    if (isChecked) {
-                        sendSliderValue(); // Send the slider value when the switch is enabled
-                    }
-                })
-                .catch(error => console.error('Error sending command:', error));
-        }
-
-        // Function to send the slider value to the server
-        function sendSliderValue() {
-            const slider = document.getElementById('customSlider');
-            const sliderValue = slider.value;
-            console.log(`Sending slider value: ${sliderValue}`);
-            fetch(`/setRegulatorPosition?value=${sliderValue}`, { method: 'POST' })
-                .then(response => response.text())
-                .then(data => console.log(`Response from controller: ${data}`))
-                .catch(error => console.error('Error sending slider value:', error));
-        }
-
-        // Add event listeners after the DOM content is fully loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            const slider = document.getElementById('customSlider');
-            slider.addEventListener('input', () => {
-                const regulatorSwitch = document.getElementById('regulatorManualControlSwitch');
-                if (regulatorSwitch.checked) {
-                    sendSliderValue(); // Only send the value if the switch is enabled
+    // Function to handle the "Regulator Manual Control" switch toggle
+    function toggleRegulatorManualControl(event) {
+        const isChecked = event.target.checked;
+        console.log(`Regulator Manual Control is now ${isChecked ? 'ON' : 'OFF'}`);
+        const endpoint = `/regulatorManualControl/${isChecked ? 'on' : 'off'}`;
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => {
+                console.log(`Response from controller: ${data}`);
+                if (isChecked) {
+                    sendSliderValue(); // Send the slider value when the switch is enabled
                 }
-            });
+            })
+            .catch(error => console.error('Error sending command:', error));
+    }
+
+    // Function to send the slider value to the server
+    function sendSliderValue() {
+        const slider = document.getElementById('customSlider');
+        const sliderValue = slider.value;
+        console.log(`Sending slider value: ${sliderValue}`);
+        fetch(`/setRegulatorPosition?value=${sliderValue}`, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => console.log(`Response from controller: ${data}`))
+            .catch(error => console.error('Error sending slider value:', error));
+    }
+
+    // Function to fetch and update the module state
+    function updateModuleState() {
+        fetch('/module/state')
+            .then(response => response.json())
+            .then(data => {
+                const stateIndicator = document.getElementById('moduleStateIndicator');
+                const stateText = document.getElementById('moduleStateText');
+                const targetPosition = document.getElementById('targetPosition');
+                const currentPosition = document.getElementById('currentPosition');
+
+                if (data.state === 'good') {
+                    stateIndicator.classList.remove('disconnected');
+                    stateIndicator.classList.add('good');
+                    stateText.textContent = 'Good';
+                } else {
+                    stateIndicator.classList.remove('good');
+                    stateIndicator.classList.add('disconnected');
+                    stateText.textContent = 'Disconnected';
+                }
+
+                targetPosition.textContent = data.targetPosition.toFixed(2);
+                currentPosition.textContent = data.currentPosition.toFixed(2);
+            })
+            .catch(error => console.error('Error fetching module state:', error));
+    }
+
+    // Function to fetch and update performance variables
+    function updatePerformanceVariables() {
+        fetch('/performance/variables')
+            .then(response => response.json())
+            .then(data => {
+                Object.keys(data).forEach(variable => {
+                    const progressBar = document.getElementById(`${variable}Progress`);
+                    const targetBar = document.getElementById(`${variable}Target`);
+
+                    if (progressBar && targetBar) {
+                        progressBar.style.width = `${data[variable].current}%`;
+                        progressBar.textContent = `${data[variable].current}%`;
+                        targetBar.style.width = `${data[variable].target}%`;
+                    }
+                });
+            })
+            .catch(error => console.error('Error fetching performance variables:', error));
+    }
+
+    // Function to fetch the current application rate
+    function getApplicationRate() {
+        fetch('/getApplicationRate')
+            .then(response => response.json())
+            .then(data => {
+                const applicationRateInput = document.getElementById('applicationRateInput');
+                applicationRateInput.value = data.rate.toFixed(2);
+                console.log(`Application Rate fetched: ${data.rate}`);
+            })
+            .catch(error => console.error('Error fetching application rate:', error));
+    }
+
+    // Function to update the slider value display
+    function updateSliderValue(value) {
+        const sliderValue = document.getElementById('sliderValue');
+        sliderValue.textContent = value;
+    }
+
+    // Function to open the number pad modal
+    function openNumberPad() {
+        const modal = document.getElementById('numberPadModal');
+        modal.style.display = 'block'; // Show the modal
+    }
+
+    // Function to close the number pad modal
+    function closeNumberPad() {
+        const modal = document.getElementById('numberPadModal');
+        modal.style.display = 'none'; // Hide the modal
+    }
+
+    // Function to append a number to the input field
+    function appendNumber(number) {
+        const input = document.getElementById('numberPadInput');
+        input.value += number; // Append the clicked number to the input field
+    }
+
+    // Function to clear the input field
+    function clearNumber() {
+        const input = document.getElementById('numberPadInput');
+        input.value = ''; // Clear the input field
+    }
+
+    // Function to set the application rate from the number pad
+    function setRateFromNumberPad() {
+        const input = document.getElementById('numberPadInput');
+        const applicationRateInput = document.getElementById('applicationRateInput');
+        const rate = parseFloat(input.value);
+
+        if (!isNaN(rate)) {
+            applicationRateInput.value = rate.toFixed(2); // Update the application rate input
+            console.log(`Application rate set to: ${rate.toFixed(2)}`);
+            // Optionally, send the rate to the server
+            fetch(`/setApplicationRate?rate=${rate}`, { method: 'POST' })
+                .then(response => response.text())
+                .then(data => console.log(`Response from server: ${data}`))
+                .catch(error => console.error('Error setting application rate:', error));
+        } else {
+            console.error('Invalid rate entered');
+        }
+
+        closeNumberPad(); // Close the modal
+    }
+
+    // Event listeners for DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize switches and performance variables
+        updateModuleState();
+        updatePerformanceVariables();
+        getApplicationRate();
+
+        // Set intervals for periodic updates
+        // setInterval(updateModuleState, 5000); // Update module state every 5 seconds
+        // setInterval(updatePerformanceVariables, 1000); // Update performance variables every second
+
+        // Add slider input event listener
+        const slider = document.getElementById('customSlider');
+        slider.addEventListener('input', () => {
+            const regulatorSwitch = document.getElementById('regulatorManualControlSwitch');
+            if (regulatorSwitch.checked) {
+                sendSliderValue();
+            }
         });
-    </script>
+    });
+</script>
 </body>
 </html>

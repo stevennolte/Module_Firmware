@@ -54,7 +54,13 @@ void ESPudp::begin(){
     
 }
 
-
+void ESPudp::sendUPDdata(){
+   espConfig->controllerData.controllerData_t.aogByte1 = 0x80;
+   espConfig->controllerData.controllerData_t.aogByte2 = 0x81;
+    espConfig->controllerData.controllerData_t.sourceAddress = espConfig->wifiCfg.ips[3];
+    espConfig->controllerData.controllerData_t.PGN = espConfig->wifiCfg.ips[3];
+    espConfig->controllerData.controllerData_t.length = sizeof(espConfig->controllerData.controllerData_t);
+}
 
 void ESPudp::sendUDP() {
 }

@@ -13,7 +13,7 @@ ESPsteer::ESPsteer(ESPconfig* vars, Adafruit_ADS1115* ads, Adafruit_MCP23X17* mc
 
 void ESPsteer::continuousLoop() {
     while (true) {
-        vTaskDelay(10);
+        vTaskDelay(3);
         if (espConfig->steerCfg.settingsUpdated = 1){
             setPIDgains();
             if (espConfig->steerCfg.set0 == 1){
@@ -43,11 +43,22 @@ void ESPsteer::continuousLoop() {
             testdata[8] = 9999 >> 8;
             testdata[9] = 8888 & 0xFF;
             testdata[10] = 8888 >> 8;
-            testdata[11] = 101;
-            testdata[12] = 100;
+            testdata[11] = 0;
+            testdata[12] = static_cast<uint8_t>((espConfig->steerData.pwmCmd * 255) / 8109);
             testdata[13] = espUdp->calcChecksum(testdata, sizeof(testdata));
             espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espConfig->wifiCfg.ips[0], espConfig->wifiCfg.ips[1], espConfig->wifiCfg.ips[2], 255), 9999);
             // espUdp->sendUDP(testdata, sizeof(testdata));
+            delay(3);
+            // Current Message
+            uint8_t currentData[14];
+            currentData[0] = 0x80;
+            currentData[1] = 0x81;
+            currentData[2] = espConfig->wifiCfg.ips[3];
+            currentData[3] = 250;
+            currentData[4] = 8;
+            currentData[5] = static_cast<uint8_t>((espConfig->steerData.steerCurrent * 255) / 65535);
+            currentData[13] = espUdp->calcChecksum(currentData, sizeof(currentData));
+            espUdp->udp.writeTo(currentData, sizeof(currentData), IPAddress(espConfig->wifiCfg.ips[0], espConfig->wifiCfg.ips[1], espConfig->wifiCfg.ips[2], 255), 9999);
         }
         
         
@@ -125,7 +136,7 @@ void ESPsteer::taskHandler(void *param) {
 }
 
 void ESPsteer::setPIDgains(){
-    pid.setManualGains(float(espConfig->steerCfg.gainP)/100.0, 0, 0);
+    pid.setManualGains(float(espConfig->steerCfg.gainP)/200.0, 0, 0);
 }
 
 void ESPsteer::begin(ESPudp* espUdp) {
@@ -139,11 +150,11 @@ void ESPsteer::begin(ESPudp* espUdp) {
     was.init();
 
     // *********Start PID Setup**********
-    pid.enableOutputFilter(espConfig->steerCfg.pidOutputFilt);
+    // pid.enableOutputFilter(espConfig->steerCfg.pidOutputFilt);
     setPIDgains();
     pid.setSetpoint(0); // Target setpoint
-    pid.enableInputFilter(espConfig->steerCfg.pidInputFilt); // Optional input filtering
-    pid.enableAntiWindup(true, 0.8); // Enable anti-windup with 80% threshold
+    // pid.enableInputFilter(espConfig->steerCfg.pidInputFilt); // Optional input filtering
+    // pid.enableAntiWindup(true, 0.8); // Enable anti-windup with 80% threshold
     // pid.setOscillationMode(OscillationMode::Normal); // Set oscillation mode to Normal
     // pid.setOperationalMode(OperationalMode::Tune); // Set operational mode to Tune
     // ********End PID Setup**********

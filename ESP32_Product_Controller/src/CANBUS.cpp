@@ -13,7 +13,11 @@ void CANBUS::taskHandler(void *param) {
 
 void CANBUS::continuousLoop() {
     while (true) {
-        
+        if(millis()-espConfig->regData.lastMsgRecieved > 2000){
+          espConfig->regData.state = 0;
+        } else {
+          espConfig->regData.state = 1;
+        }
         receiveCAN();
         vTaskDelay(10/portTICK_PERIOD_MS);
     }
@@ -87,6 +91,11 @@ uint8_t CANBUS::begin(){
 }
 
 void CANBUS::sendRegCmd(uint16_t _target, uint8_t _speed) {
+  if (_target < 100){
+    _target = 100;
+  } else if (_target > 9900){
+    _target = 9900;
+  }
   espConfig->regData.regCommand.regCommandStruct.byte_1 = 0x22;
   espConfig->regData.regCommand.regCommandStruct.dic_index_1 = 0x07;
   espConfig->regData.regCommand.regCommandStruct.dic_index_2 = 0x20;

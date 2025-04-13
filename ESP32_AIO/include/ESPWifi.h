@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "ESPconfig.h"
+#include "ESPmDNS.h"
 
 class ESPWifi
  {

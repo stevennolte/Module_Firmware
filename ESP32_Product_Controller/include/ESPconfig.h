@@ -14,6 +14,22 @@ public:
     uint8_t getStrapping();
     uint8_t updateRate();
 
+    struct __attribute__ ((packed)) ControllerData_t{
+        uint8_t aogByte1 : 8;
+        uint8_t aogByte2 : 8;
+        uint8_t sourceAddress : 8;
+        uint8_t PGN : 8;
+        uint8_t length : 8;
+        uint8_t myPGN : 8;
+        uint8_t confirm : 8;
+        uint8_t checksum : 8;
+      };
+    
+      union ControllerData_u{
+        ControllerData_t controllerData_t;
+        uint8_t bytes[sizeof(ControllerData_t)];
+      } controllerData;
+
     class GPIO_Definitions{
         public:
             uint8_t LED_PIN = 48;
@@ -42,7 +58,8 @@ public:
             String name2;
             uint8_t version[3];
             uint8_t ledBrht;
-            
+            uint16_t debugPrintDelay = 1000;
+            uint32_t debugPrintTimestamp;
             ProgramConfig(){}
     };
     ProgramConfig progCfg;
@@ -173,7 +190,10 @@ public:
             uint8_t sectionStates[65];
             uint8_t state;
             uint8_t regState;
+
             float targetRate;
+            float actualRate;
+            
             float targetFlowRate;
             float targetRowFlowRate;
             float actualFlowRate;

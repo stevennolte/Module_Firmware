@@ -183,14 +183,17 @@
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson.h \
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson.hpp \
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson/Configuration.hpp \
- include/Version.h include/ESPWifi.h include/ESPconfig.h include/myLED.h \
+ include/Version.h include/ESPWifi.h include/ESPconfig.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/ESPmDNS/src/ESPmDNS.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/IPv6Address.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/mdns/include/mdns.h \
+ include/myLED.h \
  .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ NeoPixel/Adafruit_NeoPixel.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h \
  .pio/libdeps/esp32-s3-devkitc-1/ESPAsyncWebServer/src/ESPAsyncWebServer.h \
  .pio/libdeps/esp32-s3-devkitc-1/AsyncTCP/src/AsyncTCP.h \
  .pio/libdeps/esp32-s3-devkitc-1/AsyncTCP/src/AsyncTCPVersion.h \
- C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/IPv6Address.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/lwip/lwip/src/include/lwip/pbuf.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFi.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/Print.h \

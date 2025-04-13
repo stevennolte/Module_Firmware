@@ -185,9 +185,11 @@
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson.hpp \
  .pio/libdeps/esp32-s3-devkitc-1/ArduinoJson/src/ArduinoJson/Configuration.hpp \
  include/Version.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/ESPmDNS/src/ESPmDNS.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/IPv6Address.h \
+ C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/mdns/include/mdns.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFi.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/Print.h \
- C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/cores/esp32/IPv6Address.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFiType.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFiSTA.h \
  C:/Users/NolteS/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFiGeneric.h \

@@ -84,7 +84,7 @@ public:
 
     class WasData {
         public:
-            uint16_t udpFreq = 100;
+            uint16_t udpFreq = 50;
             uint32_t udpTimestamp;
             uint8_t state;
             uint8_t mode;
@@ -92,6 +92,8 @@ public:
             uint16_t angle;   // Angle in degrees x 100
             uint16_t sigReading;
             float sensorAngle;
+            float zeroValue;
+            float outputAngle;
             float x;
             float y;
             float z;

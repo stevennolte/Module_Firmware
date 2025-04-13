@@ -1,6 +1,8 @@
 #include "ESPconfig.h"
 
-ESPconfig::ESPconfig() : progCfg(), wifiCfg(), otaCfg() {}
+ESPconfig::ESPconfig() : progCfg(), wifiCfg(), otaCfg() {
+    // ControllerData_u controllerData;
+}
 
 uint8_t ESPconfig::getStrapping(){
     pinMode(4, INPUT);

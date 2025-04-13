@@ -33,6 +33,8 @@ ESPWifi espWifi(&espConfig);
 ESPudp espUdp(&espConfig);
 Product_Ctrl productCtrl(&espConfig, &canbus, &ads);
 std::vector<String> debugVars;
+
+AsyncEventSource events("/events");
 AsyncWebServer server(80);
 
 auto& progData = espConfig.progData;
@@ -48,6 +50,30 @@ void IRAM_ATTR ISR()
 }
 
 #pragma region Webserver
+
+void sendServerData() {
+  // Send the server data to the client
+  StaticJsonDocument<256> doc;
+        doc["name"] = NAME;
+        doc["version"] = VERSION;
+        doc["timestamp"] = millis()/1000;
+        doc["actPressure"] = espConfig.rateData.actualPressure;
+        doc["tarPressure"] = espConfig.rateData.targetPressure;
+        doc["actFlowRate"] = espConfig.rateData.actualFlowRate;
+        doc["tarFlowRate"] = espConfig.rateData.targetFlowRate;
+        doc["actApplicationRate"] = espConfig.rateData.targetRate;
+        doc["tarApplicationRate"] = espConfig.rateData.actualRate;
+        doc["actRegulatorPosition"] = float(espConfig.regData.regReport.regReport_Struct.position)/100.0;
+        doc["tarRegulatorPosition"] = espConfig.regData.targetPosition;
+        doc["regulatorState"] = espConfig.regData.state;
+        // Serialize the JSON object to a string
+        String jsonMessage;
+        serializeJson(doc, jsonMessage);
+
+        // Send the JSON string as an SSE message
+        // Serial.println("Sent data");
+        events.send(jsonMessage.c_str(), "moduleData", millis());
+}
 
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
@@ -102,6 +128,7 @@ void updateDebugVars() {
   debugVars.push_back("Target Pressure: " + String(espConfig.rateData.targetPressure));
   debugVars.push_back("Target Flow Rate: " + String(espConfig.rateData.targetFlowRate));
   debugVars.push_back("Actual Flow Rate: " + String(espConfig.rateData.actualFlowRate));
+  debugVars.push_back("Pulse Count: " + String(espConfig.rateData.pulseCount));
   debugVars.push_back("Target Row Flow Rate: " + String(espConfig.rateData.targetRowFlowRate));
   debugVars.push_back("Speed: " + String(espConfig.rateData.speed));
   debugVars.push_back("Last Section Msg: " + String(espConfig.rateData.lastSectionMsg));
@@ -361,7 +388,11 @@ void handleSetRegulatorPosition(AsyncWebServerRequest *request) {
   Serial.println("Received regulator target");
   if (request->hasParam("value")){
     String regPos = request->getParam("value")->value();
-    espConfig.regData.targetPosition = regPos.toFloat();
+    if (espConfig.regData.regControl = 2){
+      espConfig.regData.targetPosition = regPos.toFloat();
+      canbus.sendRegCmd(espConfig.regData.targetPosition*100, espConfig.regData.speed);
+    }
+    
     
     Serial.printf("Received regPos: %f\n", espConfig.regData.targetPosition);
     
@@ -594,19 +625,23 @@ void setup() {
         });
         server.on("/systemEnable/on", HTTP_POST, [](AsyncWebServerRequest *request) {
           espConfig.rateData.systemState = 1;
-          request->send(200, "text/plain", "Regulator enabled");
+          Serial.println("System Enabled");
+          request->send(200, "text/plain", "System enabled");
         });
-        server.on("/SystemEnable/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+        server.on("/systemEnable/off", HTTP_POST, [](AsyncWebServerRequest *request) {
           espConfig.rateData.systemState = 0;
-          request->send(200, "text/plain", "Regulator disabled");
+          Serial.println("System Disabled");
+          request->send(200, "text/plain", "System disabled");
         });
-        server.on("regulatorManualControl/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+        server.on("/regulatorManualControl/on", HTTP_POST, [](AsyncWebServerRequest *request) {
           espConfig.regData.regControl = 2;
-          request->send(200, "text/plain", "");
+          Serial.println("regmanualctr on");
+          request->send(200, "text/plain", "Regulator Manual Control Enabled");
         });
-        server.on("regulatorManualControl/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+        server.on("/regulatorManualControl/off", HTTP_POST, [](AsyncWebServerRequest *request) {
           espConfig.regData.regControl = 1;
-          request->send(200, "text/plain", "");
+          Serial.println("regmanualctrl off");
+          request->send(200, "text/plain", "Regulator Manual Control Disabled");
         });
         //-------------Server Template----------------
         // server.on("", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -621,6 +656,7 @@ void setup() {
         server.on("/setRegulatorPosition", HTTP_POST, handleSetRegulatorPosition);
         #pragma endregion
         
+        server.addHandler(&events);
         
         // Start server
         server.begin();
@@ -630,7 +666,7 @@ void setup() {
   if (I2Csetup()){
     ads.begin();
   }
-  
+  Serial.println("654");
   productCtrl.begin();
   pinMode(espConfig.gpioDefs.FLOW_PIN, INPUT_PULLUP);
   attachInterrupt(espConfig.gpioDefs.FLOW_PIN, ISR, FALLING);
@@ -659,9 +695,13 @@ void debugPrint(){
 void loop(){
   
   // please note that the value of status should be checked and properly handler
-  
-  delay(1000);
-  debugPrint();
+  sendServerData();
+  if (millis()-progCfg.debugPrintTimestamp > progCfg.debugPrintDelay){
+    progCfg.debugPrintTimestamp = millis();
+    debugPrint();
+  }
+  delay(200);
+  // debugPrint();
 }
 
 

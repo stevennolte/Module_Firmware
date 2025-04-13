@@ -408,7 +408,13 @@ void setup(){
         
         server.on("/toggleAPMode", HTTP_POST, handleToggleAPMode); // Add this line
         // Handle toggle state update
-        
+        server.on("/zeroSensor", HTTP_POST, [](AsyncWebServerRequest *request) {
+          // Handle the zero sensor request here
+          espConfig.wasData.zeroValue = espConfig.wasData.sensorAngle;
+          // For example, you can call a function to zero the sensor
+          Serial.println("Zeroing sensor...");
+          request->send(200, "text/plain", "Sensor zeroed");
+        });
         // Start server
         server.begin();
       #pragma endregion

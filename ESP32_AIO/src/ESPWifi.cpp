@@ -21,6 +21,7 @@ uint8_t ESPWifi::connect(){
                 Serial.println(espConfig->wifiCfg.passwords[j]);
                 WiFi.begin(espConfig->wifiCfg.ssids[j],espConfig->wifiCfg.passwords[j]);
                 WiFi.config(local_IP,gateway,subnet);
+                MDNS.begin(NAME);
                 startMonitor();
                 return 1;
             }
@@ -38,7 +39,8 @@ uint8_t ESPWifi::makeAP(){
     WiFi.softAP(NAME, "1234567890");
     delay(100);
     WiFi.softAPConfig(local_IP, local_IP, subnet);
-    startMonitor();
+    MDNS.begin(NAME);
+    // startMonitor();
     return 3;
 }
 
