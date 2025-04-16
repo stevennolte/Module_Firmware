@@ -8,6 +8,7 @@
 #include "ESPudp.h"
 #include "ArduinoJson.h"
 #include "driver/temp_sensor.h"
+#include "FoldControl.h"
 
 
 ESPconfig espConfig;
@@ -16,6 +17,7 @@ ESPWifi espWifi(&espConfig);
 ESPudp espUdp(&espConfig);
 std::vector<String> debugVars;
 AsyncWebServer server(80);
+FoldControl foldControl(&espConfig);
 
 auto& progData = espConfig.progData;
 auto& progCfg = espConfig.progCfg;
@@ -78,6 +80,12 @@ void updateDebugVars() {
   debugVars.push_back("Fold State 6: " + String(espConfig.foldData.foldStates[5]));
   debugVars.push_back("Fold State 7: " + String(espConfig.foldData.foldStates[6]));
   debugVars.push_back("Fold State 8: " + String(espConfig.foldData.foldStates[7]));
+  for (int i = 0; i < 7; i++){
+    debugVars.push_back("FoldPin1_" + String(i) + " State: " + String(espConfig.gpioStates.foldPins1[i]));
+  }
+  for (int i = 0; i < 7; i++){
+    debugVars.push_back("FoldPin2_" + String(i) + " State: " + String(espConfig.gpioStates.foldPins2[i]));
+  }
   
 
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
@@ -172,7 +180,7 @@ void handleMomentaryCommand(AsyncWebServerRequest *request) {
     String action = request->getParam("action")->value();
 
     Serial.printf("Momentary Command: Button=%s, Action=%s\n", button.c_str(), action.c_str());
-
+    espConfig.foldData.lastMsgRecieved = millis();
     // Add your logic here to handle the momentary button actions
     // LEFT FLIP 
     if (button == "leftFlipOut") {
@@ -302,6 +310,7 @@ void handleMomentaryCommand(AsyncWebServerRequest *request) {
 
 // Function to handle toggle switch commands
 void handleToggleCommand(const String& command, const String& action) {
+  espConfig.foldData.lastMsgRecieved = millis();
   if (command == "foldOuterWings") {
       espConfig.foldData.foldOuterWingsState = (action == "on");
       Serial.printf("Fold Outer Wings: %s\n", espConfig.foldData.foldOuterWingsState ? "ON" : "OFF");
@@ -315,8 +324,8 @@ void handleToggleCommand(const String& command, const String& action) {
       Serial.printf("Raise Wings: %s\n", espConfig.foldData.raiseWingsState ? "ON" : "OFF");
       // Add your logic here to control hardware for "Raise Wings"
   } else if (command == "joystick") {
-      espConfig.foldData.joyStickActive = (action == "on");
-      Serial.printf("Joystick: %s\n", espConfig.foldData.joyStickActive ? "ON" : "OFF");
+      espConfig.joystickData.joyStickActive = (action == "on");
+      Serial.printf("Joystick: %s\n", espConfig.joystickData.joyStickActive ? "ON" : "OFF");
       // Add your logic here to control hardware for "Joystick"
     } else {
       Serial.println("Unknown command received.");
@@ -329,6 +338,8 @@ void handleToggleCommand(const String& command, const String& action) {
 
 void setup() {
   progData.state = 0;
+  pinMode(espConfig.gpioDefs.POWER_PIN, OUTPUT);
+  digitalWrite(espConfig.gpioDefs.POWER_PIN, LOW);
   myLED.startTask();
   progData.state = 2;
 
@@ -435,7 +446,9 @@ void setup() {
       #pragma endregion
   temp_sensor_start();
   espUdp.begin();
+  foldControl.begin();
   
+  digitalWrite(espConfig.gpioDefs.POWER_PIN, HIGH);
   
   
   progState = 1;
@@ -464,7 +477,7 @@ void debugPrint(){
 
 void loop(){
   
-  // please note that the value of status should be checked and properly handler
+
   
   delay(1000);
   debugPrint();

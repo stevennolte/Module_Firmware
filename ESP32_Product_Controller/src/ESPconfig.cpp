@@ -16,7 +16,7 @@ uint8_t ESPconfig::loadConfig(){
     wifiCfg.ips[0] = 192;
     wifiCfg.ips[1] = 168;
     wifiCfg.ips[2] = 5;
-    wifiCfg.ips[3] = 11;
+    wifiCfg.ips[3] = 189;
     if (!LittleFS.begin(true)){
         return 2;
     }

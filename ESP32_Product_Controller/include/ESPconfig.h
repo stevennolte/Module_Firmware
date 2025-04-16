@@ -45,6 +45,8 @@ public:
     };
     GPIO_Definitions gpioDefs;
 
+    
+
     class I2C_Definitions{
         public:
             uint8_t ADS_ADDRESS = 0x48;
@@ -202,6 +204,7 @@ public:
             float targetPressureOffset;
             float actualPressure;
             uint16_t adsReading;
+            float adsMVreading;
             uint8_t pressState;
             
             uint32_t pulseCount;

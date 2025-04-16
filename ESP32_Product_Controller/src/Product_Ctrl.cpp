@@ -84,7 +84,8 @@ void Product_Ctrl::continuousLoop(){
         #pragma region Pressure Sensor
         //TODO: check reading to psi conversion
         espConfig->rateData.adsReading = ads->readADC_SingleEnded(0);
-        espConfig->rateData.actualPressure = (espConfig->rateData.adsReading * 0.1875)/1000.0; // convert to psi
+        espConfig->rateData.adsMVreading = float(espConfig->rateData.adsReading) * 0.003;
+        espConfig->rateData.actualPressure = (espConfig->rateData.adsMVreading * 0.1875)/1000.0; // convert to psi
         #pragma endregion
 
         #pragma region Regulator Control

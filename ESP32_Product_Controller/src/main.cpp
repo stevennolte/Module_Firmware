@@ -124,9 +124,18 @@ void updateDebugVars() {
   debugVars.push_back("Sec 3: " + String(espConfig.rateData.sectionStates[2]));
   debugVars.push_back("Sec 4: " + String(espConfig.rateData.sectionStates[3]));
   debugVars.push_back("Sec 5: " + String(espConfig.rateData.sectionStates[4]));
+  for (int i = 0; i < 5; i++){
+    debugVars.push_back("Sec "+String(i+1)+" GPIO " + String(espConfig.gpioDefs.sectionPins[i]) +": " + String(digitalRead(espConfig.gpioDefs.sectionPins[i])));
+  }
   debugVars.push_back("Flow Freq: " + String(espConfig.rateData.frequency));
+  debugVars.push_back("------Pressure-------");
+  debugVars.push_back("Pressure Sensor State: " + String(espConfig.rateData.pressState));
+  debugVars.push_back("Press Reading Raw: " + String(espConfig.rateData.adsReading));
+
+  debugVars.push_back("Press Reading mV: " + String(espConfig.rateData.adsMVreading));
   debugVars.push_back("Target Pressure: " + String(espConfig.rateData.targetPressure));
   debugVars.push_back("Target Flow Rate: " + String(espConfig.rateData.targetFlowRate));
+  debugVars.push_back("------Flowrate--------");
   debugVars.push_back("Actual Flow Rate: " + String(espConfig.rateData.actualFlowRate));
   debugVars.push_back("Pulse Count: " + String(espConfig.rateData.pulseCount));
   debugVars.push_back("Target Row Flow Rate: " + String(espConfig.rateData.targetRowFlowRate));

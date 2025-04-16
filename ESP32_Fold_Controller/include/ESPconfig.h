@@ -16,6 +16,7 @@ public:
 
     class GPIO_Definitions{
         public:
+            uint8_t POWER_PIN = 14;
             uint8_t LED_PIN = 48;
             uint8_t SDA_PIN = 41;
             uint8_t SCL_PIN = 42;
@@ -27,6 +28,13 @@ public:
             GPIO_Definitions(){}
     };
     GPIO_Definitions gpioDefs;
+
+    class GPIO_States {
+        public:
+            uint8_t foldPins1[7];
+            uint8_t foldPins2[7];
+            GPIO_States(){}
+    } gpioStates;
 
     class I2C_Definitions{
         public:
@@ -81,6 +89,7 @@ public:
     class JoystickData {
         public:
             uint8_t state;
+            bool joyStickActive = false;
             uint32_t lastMsgRecieved;
             uint8_t switchStates[8];
             JoystickData(){}
@@ -89,9 +98,10 @@ public:
 
     class FoldData {
         public:
-            bool joyStickActive = false;
+            
             uint8_t state;
             uint32_t lastMsgRecieved;
+            uint8_t directionalValveState = 0;
             uint8_t foldStates[7];
             uint8_t leftFlip = 0;
             uint8_t leftLift = 1;
