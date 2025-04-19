@@ -73,17 +73,17 @@ void MotorDriver::init(){
 
 void MotorDriver::setOutput(float value){
     // Serial.println(value);
-    float minScalar = float(espConfig->steerCfg.minPWM)/255.0;
-    float maxScalar = float(espConfig->steerCfg.highPWM)/255.0;
-    uint16_t minCMD = maxPWM * maxScalar;
-    uint16_t maxCMD = maxPWM * minScalar;
-    if (value > 0.01){
+    espConfig->steerData.minScalar = float(espConfig->steerCfg.minPWM)/255.0;
+    espConfig->steerData.maxScalar = float(espConfig->steerCfg.highPWM)/255.0;
+    espConfig->steerData.minCmd = maxPWM * espConfig->steerData.minScalar;
+    espConfig->steerData.maxCmd = maxPWM * espConfig->steerData.maxScalar;
+    if (value > 0.001){
         
         // value = max(value, minScalar);
         dirCmd = 1;
         enable();
         setCW();
-    } else if (value < -0.01){
+    } else if (value < -0.001){
         
         value = abs(value);
         dirCmd = 2;
@@ -91,13 +91,13 @@ void MotorDriver::setOutput(float value){
         setCCW();
     } else {
         disable();
-        
+        value = 0;
         dirCmd = 0;
     }
     
     
     // Scale value to range [minCMD, maxCMD]
-    uint16_t scaledValue = minCMD + value * (maxCMD - minCMD);
+    uint16_t scaledValue = espConfig->steerData.minCmd + value * (espConfig->steerData.maxCmd - espConfig->steerData.minCmd);
 
     // cmdValue = uint16_t((float(maxPWM)) * abs(value));
     // espConfig->steerData.pwmCmd = min(float(cmdValue),scalar);

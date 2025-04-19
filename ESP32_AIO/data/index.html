@@ -59,7 +59,7 @@
 
   <script>
     let loggingInterval = null;  // Variable to store the logging interval ID
-
+    
     // Function to reboot the ESP32
     function reboot() {
         fetch('/reboot')
@@ -71,6 +71,43 @@
                 console.error('Error:', error);
             });
     }
+    function isConnected() {
+    const statusImage = document.getElementById("connectionStatusImage");
+
+    // Set a timeout to handle pending requests
+    const timeout = setTimeout(() => {
+        console.warn("Request timed out. Setting to disconnected.");
+        statusImage.src = "/Module_Disconnected"; // Set to disconnected if the request is pending too long
+    }, 2000); // Timeout after 5 seconds
+
+    fetch('/Module_Connected')
+        .then(response => {
+            clearTimeout(timeout); // Clear the timeout if the response is received
+            if (response.ok) {
+                // If the response is successful, set the image source to the connected image
+                statusImage.src = "/Module_Connected";
+            } else {
+                // If the response fails, set the image source to the disconnected image
+                statusImage.src = "/Module_Disconnected";
+            }
+        })
+        .catch(error => {
+            clearTimeout(timeout); // Clear the timeout in case of an error
+            // alert('ESP32 is disconnected!');
+            console.error('Error fetching connection status:', error);
+            // On error, set the image source to the disconnected image
+            statusImage.src = "/Module_Disconnected";
+        });
+}
+    function updateConnectionStatus(isConnected) {
+    const statusImage = document.getElementById("connectionStatusImage");
+    if (isConnected) {
+        statusImage.src = "Module_Connected.svg"; // Path to the "connected" image
+    } else {
+        // alert('ESP32 is disconnected!');
+        statusImage.src = "Module_Disconnected.svg"; // Path to the "disconnected" image
+    }
+}
     function getFileList() {
       fetch('/getFiles')
         .then(response => response.json())
@@ -212,8 +249,8 @@
     }
 
     // Auto-refresh the debug variables in the UI
-    setInterval(fetchDebugVarsForUI, 500);  // Refresh the debug list every 500ms
-
+    setInterval(fetchDebugVarsForUI, 250);  // Refresh the debug list every 500ms
+    setInterval(isConnected, 1000);  // Check connection status every second
     // Fetch the control variable when the page loads
     window.onload = function() {
       fetchControlValue();
@@ -245,7 +282,7 @@
       fetchFileList();        // Load file list on page load
     }
     // Auto-refresh the debug variables in the UI
-    setInterval(fetchDebugVarsForUI, 500); 
+    //setInterval(fetchDebugVarsForUI, 500); 
     
     // Refresh the debug list every 500ms
   
@@ -281,23 +318,27 @@
   </script>
 </head>
 <body>
-  <h1>ESP32 Web Server</h1>
-  <button onclick="reboot()">Reboot ESP32</button>
+  <!-- Heading and Connection Status -->
+  <div style="display: flex; align-items: center; margin-bottom: 20px;">
+    <img id="connectionStatusImage" src="Module_Disconnected" alt="Connection Status" width="50" style="vertical-align: middle; margin-right: 20px;">
+    <h1 style="display: inline-block;">ESP32_AIO</h1>
+  </div>
 
-  <!-- Button to Start Logging Data Locally -->
-  <button onclick="startLogging()">Start Logging</button>
-
-  <!-- Button to Stop Logging Data Locally -->
-  <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+  <!-- Buttons -->
+  <div>
+    <button onclick="reboot()">Reboot ESP32</button>
+    <button onclick="startLogging()">Start Logging</button>
+    <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+  </div>
 
   <!-- Section for Debug Variables -->
-  <h1>ESP32 Debug Variables</h1>
+  <h1>Debug Variables</h1>
   <ul id="debugList">
     <!-- Debug variables will be dynamically added here -->
   </ul>
 
   <!-- Section for File List -->
-  <h1>ESP32 File Manager</h1>
+  <h1>File Manager</h1>
   <button onclick="getFileList()">Get File List</button>
   <select id="fileList"></select>
   <button onclick="downloadFile()">Download Selected File</button>

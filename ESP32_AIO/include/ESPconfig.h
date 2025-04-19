@@ -33,6 +33,8 @@ public:
             uint8_t ENA = 14;
             uint8_t ENB = 15;
             uint8_t STEER_TEST_PIN = 6;
+            uint8_t STEER_SWITCH_PIN = 5;
+            uint8_t WORK_SWITCH_PIN = 4;
             GPIO_Definitions(){}
     };
     GPIO_Definitions gpioDefs;
@@ -62,6 +64,7 @@ public:
             uint8_t mcpState;
             uint8_t adsState;
             uint8_t steerDriverState;
+            uint32_t lastDebugRequest;
             ProgramData(){}
     };
     ProgramData progData;
@@ -188,8 +191,20 @@ public:
     };
     SteerConfig steerCfg;
 
+    class SwitchData{
+        public:
+            bool steerSwitch;
+            bool workSwitch;
+            
+            uint32_t steerSwitchLastTime;
+            uint32_t workSwitchLastTime;
+            SwitchData(){}
+    } switchData;
+
     class SteerData{
         public:
+            bool steerSwitch;
+            uint32_t steerSwitchLastTime;
             uint16_t speed;
             uint8_t status;
             float targetSteerAngle;
@@ -203,6 +218,10 @@ public:
             uint32_t steerCurrent;
             float pidOutput;
             float pidInput;
+            uint16_t minCmd;
+            uint16_t maxCmd;
+            float minScalar;
+            float maxScalar;
             uint32_t lastWAStime;
             uint32_t watchdog;
             float pidCmd;
@@ -211,6 +230,7 @@ public:
             uint8_t byte3;
             uint8_t byte4;
             float wasZeroAngle;
+
             SteerData(){}
     };
     SteerData steerData;

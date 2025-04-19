@@ -8,20 +8,29 @@ ESPWifi::ESPWifi(ESPconfig* vars){
 
 uint8_t ESPWifi::connect(){
     // WiFi.disconnect();
-    IPAddress local_IP(espConfig->wifiCfg.ips[0],espConfig->wifiCfg.ips[1],espConfig->wifiCfg.ips[2],espConfig->wifiCfg.ips[3]);
-    IPAddress gateway(espConfig->wifiCfg.ips[0],espConfig->wifiCfg.ips[1],espConfig->wifiCfg.ips[2],1);
-    IPAddress subnet(255,255,255,0);
+    
     uint8_t numNetworks = WiFi.scanNetworks();
     for (int i = 0; i < numNetworks; i++){
         for (int j = 0; j < 4; j++){
-            Serial.println(espConfig->wifiCfg.ssids[j]);
+            // Serial.println(espConfig->wifiCfg.ssids[j]);
             if (WiFi.SSID(i) == espConfig->wifiCfg.ssids[j]){
                 Serial.println("Found network");
                 Serial.println(espConfig->wifiCfg.ssids[j]);
                 Serial.println(espConfig->wifiCfg.passwords[j]);
                 WiFi.begin(espConfig->wifiCfg.ssids[j],espConfig->wifiCfg.passwords[j]);
+                while(WiFi.status() != WL_CONNECTED){
+                    Serial.print(".");
+                    delay(100);
+                }
+                Serial.println();
+                Serial.println(WiFi.localIP().toString());
+                IPAddress ip = WiFi.localIP();
+                IPAddress local_IP(ip[0],ip[1],ip[2],espConfig->wifiCfg.ips[3]);
+                IPAddress gateway(ip[0],ip[1],ip[2],1);
+                IPAddress subnet(255,255,255,0);
                 WiFi.config(local_IP,gateway,subnet);
                 MDNS.begin(NAME);
+                Serial.println(WiFi.localIP().toString());
                 startMonitor();
                 return 1;
             }
@@ -67,9 +76,12 @@ void ESPWifi::continuousLoop(){
             case 0:
                 break;
             case 1:
-                if (!WiFi.isConnected()){
-                    connect();
-                }
+            if (WiFi.status() != WL_CONNECTED) {
+                // Serial.print(millis());
+                Serial.println("Reconnecting to WiFi...");
+                WiFi.disconnect();
+                WiFi.reconnect();
+              }
                 break;
             case 2:
                 break;

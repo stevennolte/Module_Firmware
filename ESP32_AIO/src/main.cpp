@@ -262,7 +262,8 @@ void updateDebugVars() {
   debugVars.push_back("..Test State: " + String(espConfig.steerData.testState));
   debugVars.push_back("..Steer Current: " + String(espConfig.steerData.steerCurrent));
   debugVars.push_back("..Switch State: " + String(espConfig.steerData.switchState));
-  debugVars.push_back("..PID Command: " + String(espConfig.steerData.pwmCmd));
+  debugVars.push_back("..PWM Command: " + String(espConfig.steerData.pwmCmd));
+  debugVars.push_back("..PID Input: " + String(espConfig.steerData.pidCmd));
   debugVars.push_back("..Status: " + String(espConfig.steerData.status));
   debugVars.push_back("..Wireless WAS: " + String(espConfig.steerCfg.wirelessWAS));
   // debugVars.push_back("..WAS byte1: " + String(espConfig.steerData.byte1));
@@ -284,7 +285,9 @@ void updateDebugVars() {
   debugVars.push_back("..Set1: " + String(espConfig.steerCfg.set1));
   debugVars.push_back("..Steer Msg Rate: " + String(espConfig.steerCfg.steerMsgRate));
   debugVars.push_back("..PID Input Filter: " + String(espConfig.steerCfg.pidInputFilt));
-
+  debugVars.push_back("Switches: ");
+  debugVars.push_back("..Steer Switch: " + String(espConfig.switchData.steerSwitch));
+  debugVars.push_back("..Work Switch: " + String(espConfig.switchData.workSwitch)); 
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
   char  CharArray[ArrayLength];
@@ -382,6 +385,34 @@ void handleToggleAPMode(AsyncWebServerRequest *request) {
 
 #pragma endregion
 
+#pragma region Buttons
+void IRAM_ATTR handleSteerSwitch() {
+  unsigned long currentTime = millis();
+  if (currentTime - espConfig.switchData.steerSwitchLastTime > 100) {
+      espConfig.switchData.steerSwitch = true; // Set the flag
+      espConfig.switchData.steerSwitchLastTime = currentTime; // Update the debounce timestamp
+  }
+}
+
+void IRAM_ATTR handleWorkSwitch() {
+  unsigned long currentTime = millis();
+  if (currentTime - espConfig.switchData.workSwitchLastTime > 100) {
+      espConfig.switchData.workSwitch = true; // Set the flag
+      espConfig.switchData.workSwitchLastTime = currentTime; // Update the debounce timestamp
+  }
+}
+
+void buttonSetup(){
+  // Set up the GPIO pins for the buttons
+  pinMode(espConfig.gpioDefs.STEER_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(espConfig.gpioDefs.WORK_SWITCH_PIN, INPUT_PULLUP);
+  
+  // Attach interrupts to the buttons
+  attachInterrupt(digitalPinToInterrupt(espConfig.gpioDefs.STEER_SWITCH_PIN), handleSteerSwitch, FALLING);
+  attachInterrupt(digitalPinToInterrupt(espConfig.gpioDefs.WORK_SWITCH_PIN), handleWorkSwitch, FALLING);
+}
+#pragma endregion
+
 void setup(){
   progData.state = 0;
   myLED.startTask();
@@ -430,6 +461,16 @@ void setup(){
         // Handle toggle state update
         server.on("/zeroWAS", HTTP_GET, handleWASzero);
         // Start server
+        server.on("/Module_Disconnected", HTTP_GET, [](AsyncWebServerRequest *request){
+          Serial.println("Sending Module_Disconnected.svg");
+          request->send(LittleFS, "/Module_Disconnected.svg", "image/svg+xml");
+        });
+        server.on("/Module_Connected", HTTP_GET, [](AsyncWebServerRequest *request){
+          request->send(LittleFS, "/Module_Connected.svg", "image/svg+xml");
+        });
+        // server.on("/isConnected", HTTP_GET, [](AsyncWebServerRequest *request){
+        //   request->send(LittleFS, "/Modu.svg", "image/svg+xml");
+        // });
         server.begin();
       #pragma endregion
 
