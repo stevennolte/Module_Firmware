@@ -5,6 +5,7 @@
 #include "ArduinoJson.h"
 #include "Version.h"
 
+
 class ESPconfig
 {
 public:
@@ -13,6 +14,7 @@ public:
     uint8_t updateServer();
     uint8_t updateSteer();
     uint8_t getStrapping();
+    uint8_t saveWASzero();
   
     class GPIO_Definitions{
         public:
@@ -200,6 +202,16 @@ public:
             uint32_t workSwitchLastTime;
             SwitchData(){}
     } switchData;
+
+    class JoystickData {
+        public:
+            uint8_t state;
+            bool joyStickActive = false;
+            uint32_t lastMsgRecieved;
+            uint8_t switchStates[8];
+            JoystickData(){}
+    };
+    JoystickData joystickData;
 
     class SteerData{
         public:

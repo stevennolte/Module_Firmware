@@ -123,16 +123,33 @@
     <!-- #endregion -->
     <hr class="dotted">
     <!-- #region Pick function -->
+    <div class="button-grid">
+
+ 
     <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="OuterWings" onchange="handleToggleChange('OuterWings', this.checked)">
+            <input type="checkbox" id="flipOutWings" onchange="handleToggleChange('flipOutWings', this.checked)">
             <span class="slider"></span>
         </label>
-        <span class="switch-label">Flip Outer Wings</span>
+        <span class="switch-label">Flip Out Wings</span>
     </div>
     <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="CenterWings" onchange="handleToggleChange('CenterWings', this.checked)">
+            <input type="checkbox" id="flipInWings" onchange="handleToggleChange('flipInWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Flip In Wings</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="unfoldWings" onchange="handleToggleChange('unfoldWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Unfold Wings</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="foldWings" onchange="handleToggleChange('foldWings', this.checked)">
             <span class="slider"></span>
         </label>
         <span class="switch-label">Fold Wings</span>
@@ -142,8 +159,16 @@
             <input type="checkbox" id="raiseWings" onchange="handleToggleChange('raiseWings', this.checked)">
             <span class="slider"></span>
         </label>
-        <span class="switch-label">Lift/Lower Wings</span>
+        <span class="switch-label">Raise Wings</span>
     </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="lowerWings" onchange="handleToggleChange('lowerWings', this.checked)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Lower Wings</span>
+    </div>
+</div>
     <!-- #endregion -->
     <hr class="dotted">
     <!-- #region Momentary -->
@@ -163,16 +188,16 @@
                 ontouchstart="startSendingCommand('leftLiftUp')" ontouchend="stopSendingCommand('leftLiftUp')">
             Left Lift
         </button>
-        <button onmousedown="startSendingCommand('leftLowerUp')" onmouseup="stopSendingCommand('leftLowerUp')" 
-                ontouchstart="startSendingCommand('leftLowerUp')" ontouchend="stopSendingCommand('leftLowerUp')">
+        <button onmousedown="startSendingCommand('leftLiftDown')" onmouseup="stopSendingCommand('leftLiftDown')" 
+                ontouchstart="startSendingCommand('leftLiftDown')" ontouchend="stopSendingCommand('leftLiftDown')">
             Left Lower
-        </button>
-        <button onmousedown="startSendingCommand('leftFoldIn')" onmouseup="stopSendingCommand('leftFoldIn')" 
-                ontouchstart="startSendingCommand('leftFoldIn')" ontouchend="stopSendingCommand('leftFoldIn')">
-            Left Fold Out
         </button>
         <button onmousedown="startSendingCommand('leftFoldOut')" onmouseup="stopSendingCommand('leftFoldOut')" 
                 ontouchstart="startSendingCommand('leftFoldOut')" ontouchend="stopSendingCommand('leftFoldOut')">
+            Left Fold Out
+        </button>
+        <button onmousedown="startSendingCommand('leftFoldIn')" onmouseup="stopSendingCommand('leftFoldIn')" 
+                ontouchstart="startSendingCommand('leftFoldIn')" ontouchend="stopSendingCommand('leftFoldIn')">
             Left Fold In
         </button>
         <button onmousedown="startSendingCommand('centerUp')" onmouseup="stopSendingCommand('centerUp')" 
@@ -183,28 +208,28 @@
                 ontouchstart="startSendingCommand('centerDown')" ontouchend="stopSendingCommand('centerDown')">
             Center Lower
         </button>
-        <button onmousedown="startSendingCommand('RightFoldIn')" onmouseup="stopSendingCommand('RightFoldIn')" 
-                ontouchstart="startSendingCommand('RightFoldIn')" ontouchend="stopSendingCommand('RightFoldIn')">
+        <button onmousedown="startSendingCommand('rightFoldOut')" onmouseup="stopSendingCommand('rightFoldOut')" 
+                ontouchstart="startSendingCommand('rightFoldOut')" ontouchend="stopSendingCommand('rightFoldOut')">
             Right Fold Out
         </button>
-        <button onmousedown="startSendingCommand('RightFoldOut')" onmouseup="stopSendingCommand('RightFoldOut')" 
-                ontouchstart="startSendingCommand('RightFoldOut')" ontouchend="stopSendingCommand('RightFoldOut')">
+        <button onmousedown="startSendingCommand('rightFoldIn')" onmouseup="stopSendingCommand('rightFoldIn')" 
+                ontouchstart="startSendingCommand('rightFoldIn')" ontouchend="stopSendingCommand('rightFoldIn')">
             Right Fold In
         </button>
-        <button onmousedown="startSendingCommand('RightLiftUp')" onmouseup="stopSendingCommand('RightLiftUp')" 
-                ontouchstart="startSendingCommand('RightLiftUp')" ontouchend="stopSendingCommand('RightLiftUp')">
+        <button onmousedown="startSendingCommand('rightLiftUp')" onmouseup="stopSendingCommand('rightLiftUp')" 
+                ontouchstart="startSendingCommand('rightLiftUp')" ontouchend="stopSendingCommand('rightLiftUp')">
             Right Lift
         </button>
-        <button onmousedown="startSendingCommand('RightLiftDown')" onmouseup="stopSendingCommand('RightLiftDown')" 
-                ontouchstart="startSendingCommand('RightLiftDown')" ontouchend="stopSendingCommand('RightLiftDown')">
+        <button onmousedown="startSendingCommand('rightLiftDown')" onmouseup="stopSendingCommand('rightLiftDown')" 
+                ontouchstart="startSendingCommand('rightLiftDown')" ontouchend="stopSendingCommand('rightLiftDown')">
             Right Lower
         </button>
-        <button onmousedown="startSendingCommand('RightFlipOut')" onmouseup="stopSendingCommand('RightFlipOut')" 
-                ontouchstart="startSendingCommand('RightFlipOut')" ontouchend="stopSendingCommand('RightFlipOut')">
+        <button onmousedown="startSendingCommand('rightFlipOut')" onmouseup="stopSendingCommand('rightFlipOut')" 
+                ontouchstart="startSendingCommand('rightFlipOut')" ontouchend="stopSendingCommand('rightFlipOut')">
             Right Flip Out
         </button>
-        <button onmousedown="startSendingCommand('RightFlipIn')" onmouseup="stopSendingCommand('RightFlipIn')" 
-                ontouchstart="startSendingCommand('RightFlipIn')" ontouchend="stopSendingCommand('RightFlipIn')">
+        <button onmousedown="startSendingCommand('rightFlipIn')" onmouseup="stopSendingCommand('rightFlipIn')" 
+                ontouchstart="startSendingCommand('rightFlipIn')" ontouchend="stopSendingCommand('rightFlipIn')">
             Right Flip In
         </button>
         

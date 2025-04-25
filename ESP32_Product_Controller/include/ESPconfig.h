@@ -190,9 +190,15 @@ public:
             uint32_t lastSectionMsg;
             float speed;
             uint8_t sectionStates[65];
+            float sectonWidth[5] = {200.0, 200.0, 160.0, 200.0, 200.0};
+            uint8_t sectionsActive;
+            float sectionWidthSum = 0.0;
+            float distanceTraveled = 0.0;
+            float areaCovered = 0.0;
+            uint32_t distanceTraveledPrevTime = 0;
             uint8_t state;
             uint8_t regState;
-
+            uint32_t timeDelta;
             float targetRate;
             float actualRate;
             
@@ -207,10 +213,13 @@ public:
             float adsMVreading;
             uint8_t pressState;
             
+           
             uint32_t pulseCount;
             uint32_t prevPulseCount;
             uint64_t pulseTime;
             float frequency;
+            uint16_t pulsePerGallon = 200;
+            float totalGallons;
             RateData(){}
     };
     RateData rateData;

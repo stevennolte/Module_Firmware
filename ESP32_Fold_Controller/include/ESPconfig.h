@@ -104,11 +104,11 @@ public:
             uint8_t directionalValveState = 0;
             uint8_t foldStates[7];
             uint8_t leftFlip = 0;
-            uint8_t leftLift = 1;
-            uint8_t leftFold = 2;
+            uint8_t leftLift = 2;
+            uint8_t leftFold = 1;
             uint8_t center = 3;
-            uint8_t rightFold = 4;
-            uint8_t rightLift = 5;
+            uint8_t rightFold = 5;
+            uint8_t rightLift = 4;
             uint8_t rightFlip = 6;
             bool foldOuterWingsState = false;
             bool foldCenterWingsState = false;

@@ -40,7 +40,7 @@ void WAS::loop(){
 }
 
 void WAS::zeroSteerAngle() {
-    
+    espConfig->steerData.wasZeroAngle = espConfig->steerData.actSteerAngle;
 }
 
 #ifdef WAS_DEBUG

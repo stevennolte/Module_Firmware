@@ -18,6 +18,7 @@ uint8_t ESPconfig::loadConfig(){
     if (!LittleFS.begin(true)){
         return 2;
     }
+    
     File file = LittleFS.open("/config.json","r");
     if (!file) {
         return 3;
@@ -32,6 +33,7 @@ uint8_t ESPconfig::loadConfig(){
     if (error){
         return 4;
     }
+    steerData.wasZeroAngle = float(doc["wasZero"]);
 #pragma region NAME_VERIFICATION
     // Verify the name of the program, config, and board matches
     strlcpy(progCfg.name, doc["Name"],sizeof(progCfg.name));
@@ -230,4 +232,51 @@ uint8_t ESPconfig::updateSteer(){
     
       
     return 1;
+}
+
+uint8_t ESPconfig::saveWASzero() {
+    // Open the file in read mode to load the existing JSON
+    File file = LittleFS.open("/config.json", "r");
+    if (!file) {
+        Serial.println(F("Failed to open file for reading"));
+        return 3;
+    }
+
+    // Read the existing JSON data
+    String jsonString;
+    while (file.available()) {
+        jsonString += char(file.read());
+        yield(); // Yield control to reset the watchdog
+    }
+    file.close(); // Close the file after reading
+
+    // Parse the JSON data
+    StaticJsonDocument<512> doc; // Ensure the size is sufficient for your JSON
+    DeserializationError error = deserializeJson(doc, jsonString);
+    if (error) {
+        Serial.println(F("Failed to parse JSON"));
+        return 4;
+    }
+
+    // Update the "ipAddress" field
+    doc["wasZero"] = steerData.wasZeroAngle;
+
+    // Open the file in write mode to save the updated JSON
+    file = LittleFS.open("/config.json", "w");
+    if (!file) {
+        Serial.println(F("Failed to open file for writing"));
+        return 3;
+    }
+
+    // Serialize the updated JSON and write it to the file
+    if (serializeJson(doc, file) == 0) {
+        Serial.println(F("Failed to write to file"));
+        file.close();
+        return 5;
+    }
+
+    // Close the file
+    file.close();
+    Serial.println(F("Successfully updated ipAddress in config.json"));
+    return 1; // Success
 }

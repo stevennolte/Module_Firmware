@@ -756,6 +756,7 @@ void softwareUpdate(){
 }
 
 #pragma endregion
+
 #pragma region Webserver
 
 void updateDebugVars() {
@@ -891,7 +892,7 @@ void setup(){
   bleRemote.initBLE("GPS_Receiver");
   while (progData.wifiConnected != 1){
     progData.wifiConnected = myWifi.connect(progData.ips, progData.sketchConfig);
-    if (millis()>60000){
+    if (millis()>120000){
       Serial.println("Failed to connect to wifi, starting AP");
       progData.wifiConnected = myWifi.makeAP(progData.ips, progData.sketchConfig);
       break;

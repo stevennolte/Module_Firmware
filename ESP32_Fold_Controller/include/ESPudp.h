@@ -19,6 +19,7 @@ class ESPudp{
         ESPudp(ESPconfig* vars);
     private:
         AsyncUDP udp;
+        AsyncUDP joystickUdp;
         ESPconfig* espConfig;
        
     

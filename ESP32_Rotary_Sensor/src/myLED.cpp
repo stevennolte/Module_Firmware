@@ -32,7 +32,7 @@ void MyLED::taskHandler(void *param) {
 void MyLED::startTask() {
   
   pixel.begin();
-  pixel.setBrightness(25);
+  pixel.setBrightness(254);
   xTaskCreate(
         taskHandler,   // Task function
         "TaskA",       // Name of the task

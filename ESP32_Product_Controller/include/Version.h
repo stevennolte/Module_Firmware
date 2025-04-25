@@ -3,7 +3,12 @@
 
 #include "Arduino.h"
 
-#define VERSION "1.1.001"
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 1
+#define VERSION_PATCH 1
+
 #define NAME "ESP32_Product_Controller"
+
+
 
 #endif

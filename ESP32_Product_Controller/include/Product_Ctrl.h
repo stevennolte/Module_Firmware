@@ -14,12 +14,20 @@ class Product_Ctrl{
         void begin();
         
     private:
+        
         float lpmConversion = 0.26417287472922;    
         static void taskHandler(void *param);  // Task handler
         void continuousLoop();  // Function to run in the background task
 
         ESPconfig* espConfig;
         Adafruit_ADS1015* ads;
+        uint8_t* sectionStates; // Pointer to sectionStates array
+        uint8_t* sectionPins;
+        uint8_t* pressState; // Pointer to pressState
+        uint32_t* lastSectionMsg;
+        float* targetRowFlowRate;
+        float* targetPressure;
+        uint8_t* sectionsActive;
 };
 
 #endif

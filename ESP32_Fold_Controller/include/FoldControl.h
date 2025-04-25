@@ -23,9 +23,11 @@ class FoldControl
         void unfoldRightWing();
 
     private:
+        
         ESPconfig* espConfig;
         static void taskHandler(void *param);  // Task handler
         void continuousLoop();  // Function to run in the background task
+        
 };
 
 

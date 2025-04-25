@@ -2,12 +2,39 @@
 #include <Update.h>
 
 
-ESPudp::ESPudp(ESPconfig* vars) : udp() {
+ESPudp::ESPudp(ESPconfig* vars) : udp(), joystickUdp() {
     espConfig = vars;
 }
 
 void ESPudp::begin(){
     
+    joystickUdp.listen(8887);
+    joystickUdp.onPacket([this](AsyncUDPPacket packet) {
+      if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
+        //   espConfig.udpTimer = millis();
+        
+        switch (packet.data()[3]){
+          case 162:
+            // Joystick
+            espConfig->foldData.lastMsgRecieved = millis();
+            if(espConfig->joystickData.joyStickActive){
+              espConfig->joystickData.lastMsgRecieved = millis();
+              for (uint8_t i = 0; i<8; i++){
+                espConfig->joystickData.switchStates[i] = packet.data()[i+5];
+              }
+            }
+            break;
+          // if(espConfig->joystickData.joyStickActive){
+              espConfig->joystickData.lastMsgRecieved = millis();
+            for (uint8_t i = 0; i<8; i++){
+              espConfig->joystickData.switchStates[i] = packet.data()[i+5];
+            }
+          // }
+            break;
+        }}
+    });
+  
+
     udp.listen(8888);
     udp.onPacket([this](AsyncUDPPacket packet) {
         if (packet.data()[0]==0x80 && packet.data()[1]==0x81){

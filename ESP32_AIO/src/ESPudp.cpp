@@ -23,6 +23,25 @@ uint8_t ESPudp::calcChecksum(uint8_t* data, size_t size){
 
 void ESPudp::begin(GPS* gps){
     _gps = gps;
+
+    udpJoystick.listen(8887);
+    udpJoystick.onPacket([this](AsyncUDPPacket packet) {
+      if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
+        //   espConfig.udpTimer = millis();
+        
+        switch (packet.data()[3]){
+          case 162:
+          // if(espConfig->joystickData.joyStickActive){
+              espConfig->joystickData.lastMsgRecieved = millis();
+            for (uint8_t i = 0; i<8; i++){
+              espConfig->joystickData.switchStates[i] = packet.data()[i+5];
+            }
+          // }
+            break;
+        }}
+    });
+    
+
     Serial.println("Setting up NTRIP");
     udpNtrip.listen(2233);
     udpNtrip.onPacket([this](AsyncUDPPacket packet) {
@@ -51,13 +70,13 @@ void ESPudp::begin(GPS* gps){
             espConfig->steerData.byte2 = packet.data()[6];
             espConfig->steerData.byte3 = packet.data()[7];
             espConfig->steerData.byte4 = packet.data()[8];
-            espConfig->steerData.wasZeroAngle = float(espConfig->steerCfg.steerOffset)/float(espConfig->steerCfg.countsPerDeg);
+            // espConfig->steerData.wasZeroAngle = float(espConfig->steerCfg.steerOffset)/float(espConfig->steerCfg.countsPerDeg);
             if (wirelessWASunion.angle > 2147483647){
               this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0;
             } else {
               this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
             }
-            
+            this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle - this->espConfig->steerData.wasZeroAngle;
             
             break;
         }
@@ -172,6 +191,7 @@ void ESPudp::begin(GPS* gps){
               } else {
                 this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
               }
+              this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle - this->espConfig->steerData.wasZeroAngle;
               // this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle + float(espConfig->steerCfg.steerOffset/espConfig->steerCfg.countsPerDeg);
               break;
           }

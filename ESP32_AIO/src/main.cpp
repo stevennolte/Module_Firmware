@@ -194,9 +194,17 @@ void handleFileDownload(AsyncWebServerRequest *request) {
 }
 
 void handleWASzero(AsyncWebServerRequest *request) {
-  espSteer.was.zeroSteerAngle();
+  // espSteer.was.zeroSteerAngle();
+  espConfig.steerData.wasZeroAngle = espConfig.steerData.actSteerAngle;
+  Serial.println(espConfig.steerData.actSteerAngle);
+  Serial.println(espConfig.steerData.wasZeroAngle);
   Serial.println("WAS zeroed");
-  request->send(200, "text/plain", "WAS zeroed");
+  uint8_t res = espConfig.saveWASzero();
+  if (res == 1){
+    request->send(200, "text/plain", "WAS zeroed and saved to config.json");
+  } else {
+    request->send(200, "text/plain", "WAS zeroed");
+  }
 }
 
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
@@ -259,6 +267,7 @@ void updateDebugVars() {
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Steer Angle: " + String(espConfig.steerData.targetSteerAngle));
   debugVars.push_back("..Steer Angle: " + String(espConfig.steerData.actSteerAngle));
+  debugVars.push_back("..ZeroValue: " + String(espConfig.steerData.wasZeroAngle));
   debugVars.push_back("..Test State: " + String(espConfig.steerData.testState));
   debugVars.push_back("..Steer Current: " + String(espConfig.steerData.steerCurrent));
   debugVars.push_back("..Switch State: " + String(espConfig.steerData.switchState));
@@ -288,6 +297,10 @@ void updateDebugVars() {
   debugVars.push_back("Switches: ");
   debugVars.push_back("..Steer Switch: " + String(espConfig.switchData.steerSwitch));
   debugVars.push_back("..Work Switch: " + String(espConfig.switchData.workSwitch)); 
+  for (int i = 0; i < 8; i++){
+    debugVars.push_back("..Joystick switch " + String(i) + ": " + String(espConfig.joystickData.switchStates[i]));
+
+  }
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
   char  CharArray[ArrayLength];
@@ -428,7 +441,7 @@ void setup(){
   
   while (wifiCfg.state != 1){
     wifiCfg.state = espWifi.connect();
-    if (millis() > 60000){
+    if (millis() > 120000){
       Serial.println("Wifi connection timed out");
       wifiCfg.state = espWifi.makeAP();
       break;

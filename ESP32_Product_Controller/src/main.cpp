@@ -55,7 +55,7 @@ void sendServerData() {
   // Send the server data to the client
   StaticJsonDocument<256> doc;
         doc["name"] = NAME;
-        doc["version"] = VERSION;
+        doc["version"] = 2;
         doc["timestamp"] = millis()/1000;
         doc["actPressure"] = espConfig.rateData.actualPressure;
         doc["tarPressure"] = espConfig.rateData.targetPressure;
@@ -111,7 +111,7 @@ void updateDebugVars() {
   float tempReading;
   temp_sensor_read_celsius(&tempReading);
   debugVars.push_back("Temp: " + String(tempReading));
-  debugVars.push_back("Version: " + String(VERSION));
+  debugVars.push_back("Version: " + String(VERSION_MAJOR) + "." + String(VERSION_MINOR) + "." + String(VERSION_PATCH));
   debugVars.push_back("Wifi SSID: " + WiFi.SSID());
   debugVars.push_back("IP Address: " + String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]));
   debugVars.push_back("Wifi State: " + String(wifiCfg.state));
@@ -124,6 +124,7 @@ void updateDebugVars() {
   debugVars.push_back("Sec 3: " + String(espConfig.rateData.sectionStates[2]));
   debugVars.push_back("Sec 4: " + String(espConfig.rateData.sectionStates[3]));
   debugVars.push_back("Sec 5: " + String(espConfig.rateData.sectionStates[4]));
+  debugVars.push_back("Sections Active: " + String(espConfig.rateData.sectionsActive));
   for (int i = 0; i < 5; i++){
     debugVars.push_back("Sec "+String(i+1)+" GPIO " + String(espConfig.gpioDefs.sectionPins[i]) +": " + String(digitalRead(espConfig.gpioDefs.sectionPins[i])));
   }
@@ -147,8 +148,9 @@ void updateDebugVars() {
   debugVars.push_back("Regulator Position: " + String(espConfig.regData.regReport.regReport_Struct.position));
   debugVars.push_back("Regulator Target Position: " + String(espConfig.regData.targetPosition));  
   debugVars.push_back("Regulator Speed: " + String(espConfig.regData.speed));
-  
-
+  debugVars.push_back("Distance Traveled: " + String(espConfig.rateData.distanceTraveled));
+  debugVars.push_back("Area Covered: " + String(espConfig.rateData.areaCovered));
+  debugVars.push_back("timedelta: " + String(espConfig.rateData.timeDelta));
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
   char  CharArray[ArrayLength];
@@ -558,7 +560,7 @@ void setup() {
   // espConfig.wifiCfg.state = espWifi.makeAP();
   while (wifiCfg.state != 1){
     wifiCfg.state = espWifi.connect();
-    if (millis()>60000){
+    if (millis()>120000){
       Serial.println("Failed to connect to wifi, starting AP");
       wifiCfg.state = espWifi.makeAP();
       break;

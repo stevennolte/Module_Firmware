@@ -15,7 +15,7 @@ uint8_t ESPconfig::loadConfig(){
     
     wifiCfg.ips[0] = 192;
     wifiCfg.ips[1] = 168;
-    wifiCfg.ips[2] = 5;
+    wifiCfg.ips[2] = 0;
     wifiCfg.ips[3] = 189;
     if (!LittleFS.begin(true)){
         return 2;
@@ -53,26 +53,26 @@ uint8_t ESPconfig::loadConfig(){
     //     // strlcpy(wifiCfg.ssids[i],doc["ssids"][i],sizeof(wifiCfg.ssids[i]));
     //     // strlcpy(wifiCfg.passwords[i],doc["passwords"][i],sizeof(wifiCfg.passwords[i]));
     // }
-    char version[64];
-    strcpy(version, VERSION);
-    char *token = strtok(version, ".");
-    int i = 0;
-    while (token != NULL) {
-        int intValue = atoi(token);
-        switch (i){
-        case 0:
-            progCfg.version[0] = intValue;
-            break;
-        case 1:
-            progCfg.version[1] = intValue;
-            break;
-        case 2:
-            progCfg.version[2] = intValue;
-            break;
-        }
-        i++;
-        token = strtok(NULL, ".");
-    }
+    // char version[64];
+    // strcpy(version, VERSION);
+    // char *token = strtok(version, ".");
+    // int i = 0;
+    // while (token != NULL) {
+    //     int intValue = atoi(token);
+    //     switch (i){
+    //     case 0:
+    //         progCfg.version[0] = intValue;
+    //         break;
+    //     case 1:
+    //         progCfg.version[1] = intValue;
+    //         break;
+    //     case 2:
+    //         progCfg.version[2] = intValue;
+    //         break;
+    //     }
+    //     i++;
+    //     token = strtok(NULL, ".");
+    // }
     // i2cDefs.ADS_ADDRESS = uint8_t(doc["adsAddress"]);
     rateData.targetRate = doc["targetRate"];
     return 1;

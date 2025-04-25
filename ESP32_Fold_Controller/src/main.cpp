@@ -86,7 +86,10 @@ void updateDebugVars() {
   for (int i = 0; i < 7; i++){
     debugVars.push_back("FoldPin2_" + String(i) + " State: " + String(espConfig.gpioStates.foldPins2[i]));
   }
-  
+  for (int i = 0; i < 8; i++){
+    debugVars.push_back("Joystick state" + String(i) + ": " + String(espConfig.joystickData.switchStates[i]));
+
+  }
 
   String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
@@ -352,7 +355,7 @@ void setup() {
   // espConfig.wifiCfg.state = espWifi.makeAP();
   while (wifiCfg.state != 1){
     wifiCfg.state = espWifi.connect();
-    if (millis()>60000){
+    if (millis()>120000){
       Serial.println("Failed to connect to wifi, starting AP");
       wifiCfg.state = espWifi.makeAP();
       break;
@@ -435,6 +438,66 @@ void setup() {
             handleToggleCommand("joystick", "off");
             request->send(200, "text/plain", "Joystick OFF");
         });
+        server.on("/fold/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // set direction valve to fold
+            request->send(200, "text/plain", "Fold Outer Wings ON");
+        });
+        server.on("/fold/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // set direction valve to fold off
+            request->send(200, "text/plain", "Fold Outer Wings OFF");
+        });
+        server.on("/unfold/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // set direction valve to unfold
+            request->send(200, "text/plain", "Unfold Outer Wings ON");
+        });
+        server.on("/unfold/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // set direction valve to unfold off
+            request->send(200, "text/plain", "Unfold Outer Wings OFF");
+        });
+        server.on("/OuterWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // activate outer wings
+            request->send(200, "text/plain", "Outer Wings ON");
+        });
+        server.on("/OuterWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // deactivate outer wings
+            request->send(200, "text/plain", "Outer Wings OFF");
+        });
+        server.on("/CenterWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // activate rotate valves
+            request->send(200, "text/plain", "Center Wings ON");
+        });
+        server.on("/CenterWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // deactivate rotate valves
+            request->send(200, "text/plain", "Center Wings OFF");
+        });
+        server.on("/raiseWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // activate raise wings
+            request->send(200, "text/plain", "Raise Wings ON");
+        });
+        server.on("/raiseWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+            // deactivate raise wings
+            request->send(200, "text/plain", "Raise Wings OFF");
+        });
+        server.on("/lowerWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 2;
+          espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 2;
+          request->send(200, "text/plain", "Lowering wings");
+      });
+      server.on("/lowerWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+        espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 0;
+        espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 0;
+        request->send(200, "text/plain", "stopping lowering wings");
+      });
+      server.on("/raiseWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+        espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 1;
+        espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 1;
+        request->send(200, "text/plain", "raising wings");
+    });
+    server.on("/raiseWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 0;
+      espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 0;
+      request->send(200, "text/plain", "stopping raising wings");
+  });
         server.on("/momentary", HTTP_POST, handleMomentaryCommand);
         
         

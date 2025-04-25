@@ -16,6 +16,40 @@ void FoldControl::taskHandler(void *param){
 }
 void FoldControl::continuousLoop(){
     while (true){
+        // Set fold states based on joystick data
+        // 0 = lh lift
+        // 1 = lh lower
+        // 2 = center lift
+        // 3 = center lower
+        // 4 = rh lift
+        // 5 = rh lower
+        
+        if (espConfig->joystickData.joyStickActive){
+            if (espConfig->joystickData.switchStates[0] == 1){
+                espConfig->foldData.foldStates[espConfig->foldData.leftLift] = 1;
+            } else if (espConfig->joystickData.switchStates[1] == 1){
+                espConfig->foldData.foldStates[espConfig->foldData.leftLift] = 2;
+            } else {
+                espConfig->foldData.foldStates[espConfig->foldData.leftLift] = 0;
+            }
+            
+            if (espConfig->joystickData.switchStates[2] == 1){
+                espConfig->foldData.foldStates[espConfig->foldData.center] = 1;
+            } else if (espConfig->joystickData.switchStates[3] == 1){
+                espConfig->foldData.foldStates[espConfig->foldData.center] = 2;
+            } else {
+                espConfig->foldData.foldStates[espConfig->foldData.center] = 0;
+            }
+            if(espConfig->joystickData.switchStates[4] == 1){
+                espConfig->foldData.foldStates[espConfig->foldData.rightLift] = 1;
+            } else if (espConfig->joystickData.switchStates[5] == 1){
+                espConfig->foldData.foldStates[espConfig->foldData.rightLift] = 2;
+            } else {
+                espConfig->foldData.foldStates[espConfig->foldData.rightLift] = 0;
+            }
+        }
+
+        // Check if the last message was received more than 2 seconds ago
         if (millis()-espConfig->foldData.lastMsgRecieved > 2000){
             for (int i = 0; i < 7; i++){
                 espConfig->foldData.foldStates[i] = 0;

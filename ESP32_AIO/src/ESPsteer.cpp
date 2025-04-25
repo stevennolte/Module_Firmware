@@ -43,7 +43,19 @@ void ESPsteer::continuousLoop() {
             testdata[8] = 9999 >> 8;
             testdata[9] = 8888 & 0xFF;
             testdata[10] = 8888 >> 8;
-            testdata[11] = 0;
+            if (espConfig->joystickData.switchStates[6] == 1) {
+                testdata[11] |= 0x01; // Set the first bit to 1
+            } else {
+                testdata[11] &= ~0x01; // Clear the first bit to 0
+            }
+                        
+            // Set the second bit of testdata[11] to switchStates[7]
+            if (espConfig->joystickData.switchStates[7] == 1) {
+                testdata[11] |= 0x02; // Set the second bit to 1
+            } else {
+                testdata[11] &= ~0x02; // Clear the second bit to 0
+            }
+            // testdata[11] = 0;
             testdata[12] = static_cast<uint8_t>((espConfig->steerData.pwmCmd * 255) / 8109);
             testdata[13] = espUdp->calcChecksum(testdata, sizeof(testdata));
             espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espConfig->wifiCfg.ips[0], espConfig->wifiCfg.ips[1], espConfig->wifiCfg.ips[2], 255), 9999);
@@ -56,7 +68,7 @@ void ESPsteer::continuousLoop() {
             currentData[2] = espConfig->wifiCfg.ips[3];
             currentData[3] = 250;
             currentData[4] = 8;
-            currentData[5] = static_cast<uint8_t>((espConfig->steerData.steerCurrent * 255) / 65535);
+            currentData[5] = static_cast<uint8_t>((espConfig->steerData.steerCurrent * 255) / (65535/4));
             currentData[13] = espUdp->calcChecksum(currentData, sizeof(currentData));
             espUdp->udp.writeTo(currentData, sizeof(currentData), IPAddress(espConfig->wifiCfg.ips[0], espConfig->wifiCfg.ips[1], espConfig->wifiCfg.ips[2], 255), 9999);
         }
@@ -112,6 +124,7 @@ void ESPsteer::steerTestLoop(){
 }
 
 void ESPsteer::steerLoop(){
+    
     if (millis() - espConfig->steerData.watchdog > 2000){
         espConfig->steerData.status = 0;
     }

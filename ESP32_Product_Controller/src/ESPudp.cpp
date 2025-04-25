@@ -12,7 +12,7 @@ void ESPudp::begin(){
     udp.onPacket([this](AsyncUDPPacket packet) {
         if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
         //   espConfig.udpTimer = millis();
-        
+        uint32_t timeDelta;
         switch (packet.data()[3]){
             // case 162: //Joystick
             //   espConfig->joystickData.lastMsgRecieved = millis();
@@ -33,12 +33,28 @@ void ESPudp::begin(){
               break;
             case 254:
               //TODO: Set Speed
-              espConfig->rateData.speed = (float((packet.data()[6] << 8) |  packet.data()[5])/10.0)*0.621371;
+              timeDelta = millis() - espConfig->rateData.distanceTraveledPrevTime;
+              // if (timeDelta > 1000){
+             // Limit the time delta to 1 second
+                espConfig->rateData.timeDelta = timeDelta; // Update the time delta
+                espConfig->rateData.distanceTraveledPrevTime = millis(); // Update the previous time
+                espConfig->rateData.distanceTraveled = (espConfig->rateData.speed * 17.6)*(float(timeDelta)/1000.0); // 17.6 is the conversion factor from mph to m/s
+                espConfig->rateData.sectionWidthSum = 0.0;
+                for (uint8_t i = 1; i<5; i++){
+                    if (espConfig->rateData.sectionStates[i] == 1){
+                        espConfig->rateData.sectionWidthSum += espConfig->rateData.sectonWidth[i];
+                    }
+                }
+                espConfig->rateData.areaCovered += float(espConfig->rateData.distanceTraveled * espConfig->rateData.sectionWidthSum)/6272640.0; // in square inches
+                espConfig->rateData.speed = (float((packet.data()[6] << 8) |  packet.data()[5])/10.0)*0.621371;
+              // }
               break;
             case 229:
+              uint32_t messageDelta = millis() - espConfig->rateData.lastSectionMsg;
               espConfig->rateData.lastSectionMsg = millis();
               uint8_t _length = packet.data()[4];
               uint8_t bitIndex = 0;
+              
               for (size_t i = 5; i<7; i++){
                 
                 uint8_t _byte = packet.data()[i];
@@ -47,6 +63,8 @@ void ESPudp::begin(){
                   bitIndex++;
                 }
               }
+             
+
               break;
           }
         }

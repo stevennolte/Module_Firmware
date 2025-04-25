@@ -146,7 +146,7 @@
         fetch('/zeroWAS')
             .then(response => response.text())
             .then(data => {
-                alert('Zeroing WAS...');
+                console.info('Zeroing WAS...');
             })
             .catch(error => {
                 console.error('Error:', error);
