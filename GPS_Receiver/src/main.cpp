@@ -773,7 +773,13 @@ void updateDebugVars() {
   debugVars.push_back("NMEA: " + String(nmea));
   debugVars.push_back("Ntrip Timestamp: " + String(udpMethods.ntripTimestamp));
   debugVars.push_back("Program State: " + String(progData.programState));
+  debugVars.push_back("useBNO08x: " + String(useBNO08x));
+  debugVars.push_back("BNO08x Address: " + String(bno08xAddress));
+  debugVars.push_back("pitch: " + String(pitch));
+  debugVars.push_back("roll: " + String(roll));
+  debugVars.push_back("yaw: " + String(yaw));
   std::string ipValue = "Sensor: " + std::to_string(WiFi.localIP());
+
   // bleRemote.sendIPData(ipValue);d
 }
 
