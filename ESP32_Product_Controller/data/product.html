@@ -232,6 +232,21 @@
             font-weight: bold;
             color: #333;
         }
+        .indicator {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-left: 10px;
+            background-color: gray; /* Default color */
+            border: 1px solid #ccc;
+        }
+        .indicator.green {
+            background-color: green;
+        }
+        .indicator.red {
+            background-color: red;
+        }
     </style>
 </head>
 <body>
@@ -260,6 +275,15 @@
             <span class="slider"></span>
         </label>
         <span class="switch-label">Regulator Manual Control</span>
+    </div>
+    <div class="switch-container">
+        <span id="threeSectionIndicator" class="indicator"></span>
+        <label class="switch">
+            <input type="checkbox" id="3sectiontoggle" onchange="toggle3section(event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">3 Section Mode</span>
+        
     </div>
 
     <!-- Input Section -->
@@ -373,6 +397,18 @@
         document.getElementById('RegulatorTarget').style.width = data.tarRegulatorPosition.toFixed(2) + '%';
         document.getElementById('RegulatorActual').textContent = data.actRegulatorPosition.toFixed(2);
         document.getElementById('RegulatorActual').style.width = data.actRegulatorPosition.toFixed(2) + '%';
+        const threeSectionToggle = document.getElementById('3sectiontoggle');
+        const indicator = document.getElementById('threeSectionIndicator');
+
+        // Update the toggle and indicator based on the state
+        threeSectionToggle.checked = data.threeSectionMode;
+        if (data.threeSectionMode) {
+            indicator.classList.remove('red');
+            indicator.classList.add('green');
+        } else {
+            indicator.classList.remove('green');
+            indicator.classList.add('red');
+        }
         // const stateIndicator = document.getElementById('moduleStateIndicator');
         // document.getElementById('flowRate').textContent = data.flowRate.toFixed(2);
         // document.getElementById('level').textContent = data.level.toFixed(2);
@@ -410,6 +446,38 @@
             .catch(error => console.error('Error sending command:', error));
     }
 
+    // Function to handle the "Regulator Manual Control" switch toggle
+    function toggle3section(event) {
+        const isChecked = event.target.checked;
+        console.log(`3 Section is now ${isChecked ? 'ON' : 'OFF'}`);
+        const endpoint = `/threeSection/${isChecked ? 'on' : 'off'}`;
+        const indicator = document.getElementById('threeSectionIndicator');
+
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log(`Response from controller: ${data}`);
+                if (data.success) {
+                    // Update the indicator based on the state
+                    if (data.threeSectionMode) {
+                        indicator.classList.remove('red');
+                        indicator.classList.add('green');
+                    } else {
+                        indicator.classList.remove('green');
+                        indicator.classList.add('red');
+                    }
+                } else {
+                    console.error('Failed to update 3 Section Mode state');
+                    indicator.classList.remove('green');
+                    indicator.classList.add('red');
+                }
+            })
+            .catch(error => {
+                console.error('Error sending command:', error);
+                indicator.classList.remove('green');
+                indicator.classList.add('red');
+            });
+    }
     // Function to send the slider value to the server
     function sendSliderValue() {
         const slider = document.getElementById('customSlider');
@@ -548,6 +616,24 @@
                 sendSliderValue();
             }
         });
+
+        fetch('/threeSectionState') // Replace with your backend endpoint
+            .then(response => response.json())
+            .then(data => {
+                const threeSectionToggle = document.getElementById('3sectiontoggle');
+                const indicator = document.getElementById('threeSectionIndicator');
+
+                // Update the toggle and indicator based on the state
+                threeSectionToggle.checked = data.threeSectionMode;
+                if (data.threeSectionMode) {
+                    indicator.classList.remove('red');
+                    indicator.classList.add('green');
+                } else {
+                    indicator.classList.remove('green');
+                    indicator.classList.add('red');
+                }
+            })
+            .catch(error => console.error('Error fetching 3 Section Mode state:', error));
     });
 </script>
 </body>

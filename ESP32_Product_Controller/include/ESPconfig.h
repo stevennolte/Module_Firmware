@@ -189,6 +189,7 @@ public:
             uint8_t systemState;
             uint32_t lastSectionMsg;
             float speed;
+            uint8_t threeSection = 0;
             uint8_t sectionStates[65];
             float sectonWidth[5] = {200.0, 200.0, 160.0, 200.0, 200.0};
             uint8_t sectionsActive;

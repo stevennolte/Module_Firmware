@@ -14,6 +14,9 @@ void MainPower::startTask()
 {
     _mcp->pinMode(_powerOn, OUTPUT);
     pinMode(_config->gpioDefs.mainPowerPin, OUTPUT);
+    pinMode(_config->gpioDefs.mainPowerDen, OUTPUT);
+    digitalWrite(_config->gpioDefs.mainPowerDen, LOW);
+
     digitalWrite(_config->gpioDefs.mainPowerPin, HIGH);
     _mcp->digitalWrite(_powerOn, HIGH);
     xTaskCreatePinnedToCore(

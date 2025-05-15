@@ -195,8 +195,8 @@ void handleFileDownload(AsyncWebServerRequest *request) {
 
 void handleWASzero(AsyncWebServerRequest *request) {
   // espSteer.was.zeroSteerAngle();
-  espConfig.steerData.wasZeroAngle = espConfig.steerData.actSteerAngle;
-  Serial.println(espConfig.steerData.actSteerAngle);
+  espConfig.steerData.wasZeroAngle = espConfig.steerData.absAngle;
+  Serial.println(espConfig.steerData.absAngle);
   Serial.println(espConfig.steerData.wasZeroAngle);
   Serial.println("WAS zeroed");
   uint8_t res = espConfig.saveWASzero();
@@ -267,6 +267,7 @@ void updateDebugVars() {
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Steer Angle: " + String(espConfig.steerData.targetSteerAngle));
   debugVars.push_back("..Steer Angle: " + String(espConfig.steerData.actSteerAngle));
+  debugVars.push_back("..Absolute Angle: " + String(espConfig.steerData.absAngle));
   debugVars.push_back("..ZeroValue: " + String(espConfig.steerData.wasZeroAngle));
   debugVars.push_back("..Test State: " + String(espConfig.steerData.testState));
   debugVars.push_back("..Steer Current: " + String(espConfig.steerData.steerCurrent));
@@ -518,7 +519,7 @@ void setup(){
   
   
   // Start GPS
-  // gps.init(&espUdp);
+  gps.init(&espUdp);
 
   // If everything is good, turn on power to autosteer
   mainPower.startTask();

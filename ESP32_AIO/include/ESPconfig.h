@@ -242,6 +242,7 @@ public:
             uint8_t byte3;
             uint8_t byte4;
             float wasZeroAngle;
+            float absAngle;
 
             SteerData(){}
     };

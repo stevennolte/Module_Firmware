@@ -72,11 +72,11 @@ void ESPudp::begin(GPS* gps){
             espConfig->steerData.byte4 = packet.data()[8];
             // espConfig->steerData.wasZeroAngle = float(espConfig->steerCfg.steerOffset)/float(espConfig->steerCfg.countsPerDeg);
             if (wirelessWASunion.angle > 2147483647){
-              this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 4294967295)/100.0;
+              this->espConfig->steerData.absAngle  = float(wirelessWASunion.angle - 4294967295)/100.0;
             } else {
-              this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
+              this->espConfig->steerData.absAngle = float(wirelessWASunion.angle)/100.0;
             }
-            this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle - this->espConfig->steerData.wasZeroAngle;
+            this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.absAngle - this->espConfig->steerData.wasZeroAngle;
             
             break;
         }
@@ -187,11 +187,11 @@ void ESPudp::begin(GPS* gps){
               wirelessWASunion.bytes[2] = packet.data()[7];
               wirelessWASunion.bytes[3] = packet.data()[8];
               if (wirelessWASunion.angle > 32767){
-                this->espConfig->steerData.actSteerAngle  = float(wirelessWASunion.angle - 65536)/100.0;
+                this->espConfig->steerData.absAngle  = float(wirelessWASunion.angle - 65536)/100.0;
               } else {
-                this->espConfig->steerData.actSteerAngle = float(wirelessWASunion.angle)/100.0;
+                this->espConfig->steerData.absAngle = float(wirelessWASunion.angle)/100.0;
               }
-              this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle - this->espConfig->steerData.wasZeroAngle;
+              this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.absAngle - this->espConfig->steerData.wasZeroAngle;
               // this->espConfig->steerData.actSteerAngle = this->espConfig->steerData.actSteerAngle + float(espConfig->steerCfg.steerOffset/espConfig->steerCfg.countsPerDeg);
               break;
           }

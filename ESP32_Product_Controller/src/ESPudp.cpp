@@ -40,9 +40,9 @@ void ESPudp::begin(){
                 espConfig->rateData.distanceTraveledPrevTime = millis(); // Update the previous time
                 espConfig->rateData.distanceTraveled = (espConfig->rateData.speed * 17.6)*(float(timeDelta)/1000.0); // 17.6 is the conversion factor from mph to m/s
                 espConfig->rateData.sectionWidthSum = 0.0;
-                for (uint8_t i = 1; i<5; i++){
-                    if (espConfig->rateData.sectionStates[i] == 1){
-                        espConfig->rateData.sectionWidthSum += espConfig->rateData.sectonWidth[i];
+                for (uint8_t i = 0; i<5; i++){
+                    if (espConfig->rateData.sectionStates[i+espConfig->rateData.threeSection] == 1){
+                        espConfig->rateData.sectionWidthSum += espConfig->rateData.sectonWidth[i+espConfig->rateData.threeSection];
                     }
                 }
                 espConfig->rateData.areaCovered += float(espConfig->rateData.distanceTraveled * espConfig->rateData.sectionWidthSum)/6272640.0; // in square inches

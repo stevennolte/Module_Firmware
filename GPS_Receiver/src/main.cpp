@@ -494,11 +494,11 @@ void BuildNmea(void)
     strcat(nmea, ",");
 
     //13
-    strcat(nmea, imuRoll);
+    strcat(nmea, imuPitch);
     strcat(nmea, ",");
 
     //14
-    strcat(nmea, imuPitch);
+    strcat(nmea, imuRoll);
     strcat(nmea, ",");
 
     //15

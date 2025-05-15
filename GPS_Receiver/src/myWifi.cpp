@@ -11,9 +11,9 @@ MyWifi::MyWifi()
 
 uint8_t MyWifi::connect(uint8_t * ipAddr, char * sketchConfig){
     // IPAddress local_IP(192, 168, 0, getAddress());
-    IPAddress local_IP(ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3]);
-    IPAddress gateway(ipAddr[0], ipAddr[1], ipAddr[2], 1);
-    IPAddress subnet(255, 255, 255, 0);
+    // IPAddress local_IP(ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3]);
+    // IPAddress gateway(ipAddr[0], ipAddr[1], ipAddr[2], 1);
+    // IPAddress subnet(255, 255, 255, 0);
     hostName = sketchConfig;
     int n = WiFi.scanNetworks();
     for (int i=0; i<min(n,25); i++){
@@ -33,17 +33,23 @@ uint8_t MyWifi::connect(uint8_t * ipAddr, char * sketchConfig){
         return 2;
     }
     
-    if (!WiFi.config(local_IP, gateway, subnet)) {
-              Serial.println("STA Failed to configure");
-    }
+    // if (!WiFi.config(local_IP, gateway, subnet)) {
+    //           Serial.println("STA Failed to configure");
+    // }
     // WiFi.mode(WIFI_AP);
     WiFi.begin(ssid, password);
     while (WiFi.waitForConnectResult() != WL_CONNECTED) {
         delay(1000);
     }
+    Serial.println(WiFi.localIP().toString());
+    IPAddress ip = WiFi.localIP();
+    IPAddress local_IP(ip[0],ip[1],ip[2],ipAddr[3]);
+    IPAddress gateway(ip[0],ip[1],ip[2],1);
+    IPAddress subnet(255,255,255,0);
+    WiFi.config(local_IP,gateway,subnet);
     Serial.print("\tIP Address: ");
     Serial.println(WiFi.localIP());
-    if(!MDNS.begin("esp32")) {
+    if(!MDNS.begin("GPS_Receiver")) {
       Serial.println("Error starting mDNS");
     }
     startMonitor();
@@ -82,18 +88,11 @@ void MyWifi::startMonitor() {
 // Function to run in parallel
 void MyWifi::continuousLoop() {
   while (true) {
-    if (!WiFi.isConnected()){
+    if (WiFi.status() != WL_CONNECTED){
       // ESP.restart();
-      Serial.println("Reconnecting Wifi");
-      byte ipBytes[4];
-
-      // Store each octet in the byte array
-      for (int i = 0; i < 4; i++) {
-        ipBytes[i] = WiFi.localIP()[i];
-      }
-      
-      connect(ipBytes, hostName);
-      Serial.println(WiFi.localIP().toString());
+      Serial.println("Reconnecting to WiFi...");
+      WiFi.disconnect();
+      WiFi.reconnect();
     }
     vTaskDelay(1000);
     }

@@ -132,7 +132,7 @@ void updateDebugVars() {
   debugVars.push_back("------Pressure-------");
   debugVars.push_back("Pressure Sensor State: " + String(espConfig.rateData.pressState));
   debugVars.push_back("Press Reading Raw: " + String(espConfig.rateData.adsReading));
-
+  debugVars.push_back("Press Reading psi: " + String(espConfig.rateData.actualPressure)); // Convert to mV
   debugVars.push_back("Press Reading mV: " + String(espConfig.rateData.adsMVreading));
   debugVars.push_back("Target Pressure: " + String(espConfig.rateData.targetPressure));
   debugVars.push_back("Target Flow Rate: " + String(espConfig.rateData.targetFlowRate));
@@ -653,6 +653,16 @@ void setup() {
           espConfig.regData.regControl = 1;
           Serial.println("regmanualctrl off");
           request->send(200, "text/plain", "Regulator Manual Control Disabled");
+        });
+        server.on("/threeSection/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.rateData.threeSection = 1;
+          
+          request->send(200, "text/plain", "Three Section Enabled");
+        });
+        server.on("/threeSection/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+          espConfig.rateData.threeSection = 0;
+       
+          request->send(200, "text/plain", "Three Section Disabled");
         });
         //-------------Server Template----------------
         // server.on("", HTTP_POST, [](AsyncWebServerRequest *request) {

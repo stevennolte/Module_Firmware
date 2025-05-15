@@ -15,7 +15,7 @@ void Product_Ctrl::begin(){
     Serial.println("Starting Product Controller");
     // meter.begin(espConfig->gpioDefs.FLOW_PIN, espConfig->flowCfg.flowCalNumber);  
     // meter.setTresholds(espConfig->flowCfg.maxFlow, espConfig->flowCfg.maxFlow);
-    for (uint8_t i = 1; i<6; i++){
+    for (uint8_t i = 0; i<5; i++){
         pinMode(sectionPins[i], OUTPUT);
     }
     espConfig->rateData.adsReading = ads->readADC_SingleEnded(0);
@@ -48,7 +48,7 @@ void Product_Ctrl::continuousLoop(){
                 sectionStates[i] = 0;
             }
         }
-        for (uint8_t i = 1; i<6; i++){
+        for (uint8_t i = 0; i<5; i++){
             if (sectionStates[i] == 1){
                 digitalWrite(sectionPins[i], HIGH);
 
