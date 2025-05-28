@@ -49,7 +49,14 @@ void ESPudp::begin(GPS* gps){
       Serial.println("Sent Ntrip");
       _gps->sendNTRIP(packet.data(), packet.length());
       // Serial2.write(packet.data(), packet.length());
-      
+       String ntripStr;
+       espConfig->gpsData.lastNtripDataLen = packet.length();
+      for (size_t i = 0; i < packet.length() && i < 64; i++) {
+        char buf[4];
+        sprintf(buf, "%02X ", packet.data()[i]);
+        ntripStr += buf;
+      }
+      espConfig->gpsData.lastNtripData = ntripStr;
     });
     udpWAS.listen(8889);
     udpWAS.onPacket([this](AsyncUDPPacket packet){

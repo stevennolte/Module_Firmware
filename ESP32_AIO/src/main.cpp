@@ -264,6 +264,8 @@ void updateDebugVars() {
   debugVars.push_back("..HDOP: " + String(espConfig.gpsData.HDOP));
   debugVars.push_back("..Age of DGPS: " + String(espConfig.gpsData.ageDGPS));
   debugVars.push_back("..NMEA: " + String(espConfig.gpsData.nmea));
+  debugVars.push_back("..Last Ntrip Data: " + String(espConfig.gpsData.lastNtripData));
+  debugVars.push_back("..Last Ntrip Data Length: " + String(espConfig.gpsData.lastNtripDataLen));
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Steer Angle: " + String(espConfig.steerData.targetSteerAngle));
   debugVars.push_back("..Steer Angle: " + String(espConfig.steerData.actSteerAngle));

@@ -286,6 +286,7 @@
         
     </div>
 
+    
     <!-- Input Section -->
     <div class="separator"></div>
     <div class="input-container">
@@ -378,6 +379,44 @@
         <label for="customSlider" class="slider-label">Regulator Position Control:</label>
         <input type="range" id="customSlider" min="0" max="100" value="50" class="slider-input" oninput="updateSliderValue(this.value)">
         <span id="sliderValue" class="slider-value">50</span>
+    </div>
+    <!-- Section Control -->
+    <div class="separator"></div>
+    <h3>Section Control</h3>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="section1toggle" onchange="toggleSection(1, event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Section 1</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="section2toggle" onchange="toggleSection(2, event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Section 2</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="section3toggle" onchange="toggleSection(3, event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Section 3</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="section4toggle" onchange="toggleSection(4, event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Section 4</span>
+    </div>
+    <div class="switch-container">
+        <label class="switch">
+            <input type="checkbox" id="section5toggle" onchange="toggleSection(5, event)">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label">Section 5</span>
     </div>
 
     <!-- Scripts -->
@@ -634,7 +673,29 @@
                 }
             })
             .catch(error => console.error('Error fetching 3 Section Mode state:', error));
+
+            // Initialize section toggles state
+    for (let i = 1; i <= 5; i++) {
+        fetch(`/section/${i}/state`)
+            .then(response => response.json())
+            .then(data => {
+                const toggle = document.getElementById(`section${i}toggle`);
+                toggle.checked = data.enabled;
+            })
+            .catch(error => console.error(`Error fetching section ${i} state:`, error));
+    }
     });
+
+
+    // Add this JS function to handle section toggles
+function toggleSection(sectionNumber, event) {
+    const isChecked = event.target.checked;
+    console.log(`Section ${sectionNumber} is now ${isChecked ? 'ENABLED' : 'DISABLED'}`);
+    fetch(`/section/${sectionNumber}/${isChecked ? 'enable' : 'disable'}`, { method: 'POST' })
+        .then(response => response.text())
+        .then(data => console.log(`Response from controller: ${data}`))
+        .catch(error => console.error(`Error toggling section ${sectionNumber}:`, error));
+}
 </script>
 </body>
 </html>

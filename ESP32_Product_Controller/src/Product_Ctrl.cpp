@@ -49,12 +49,10 @@ void Product_Ctrl::continuousLoop(){
             }
         }
         for (uint8_t i = 0; i<5; i++){
-            if (sectionStates[i] == 1){
+            if (sectionStates[i] == 1 || espConfig->rateData.webserverSectionStates[i]){ // Check if section is active or webserver state is true
                 digitalWrite(sectionPins[i], HIGH);
-
             } else {
                 digitalWrite(sectionPins[i], LOW);
-
             }
         }
         #pragma endregion
@@ -100,7 +98,7 @@ void Product_Ctrl::continuousLoop(){
         //TODO: check reading to psi conversion
         espConfig->rateData.adsReading = ads->readADC_SingleEnded(0);
         espConfig->rateData.adsMVreading = float(espConfig->rateData.adsReading) * 0.003;
-        espConfig->rateData.actualPressure = (espConfig->rateData.adsMVreading * 0.1875)/1000.0; // convert to psi
+        espConfig->rateData.actualPressure = ((espConfig->rateData.adsMVreading-500) * 0.03); // convert to psi
         #pragma endregion
 
         #pragma region Regulator Control
@@ -110,7 +108,7 @@ void Product_Ctrl::continuousLoop(){
 
         
 
-        vTaskDelay(500/portTICK_PERIOD_MS);
+        vTaskDelay(50/portTICK_PERIOD_MS);
     }
 }
 

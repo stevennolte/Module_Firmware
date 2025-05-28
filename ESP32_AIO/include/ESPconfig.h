@@ -162,7 +162,8 @@ public:
             char imuRoll[6];
             char imuPitch[6];
             char imuYawRate[6];
-            
+            String lastNtripData;
+            uint8_t lastNtripDataLen;
             char nmea[100];
             const char* asciiHex = "0123456789ABCDEF";
             GPSdata(){}

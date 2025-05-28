@@ -206,6 +206,7 @@ void GPS::taskHandler(void *param){
 }
 
 void GPS::sendNTRIP(uint8_t* data, uint8_t len){
+    
     gpsSerial->write(data, len);
 }
 

@@ -484,16 +484,19 @@ void setup() {
           request->send(200, "text/plain", "Lowering wings");
       });
       server.on("/lowerWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+        espConfig.foldData.lastMsgRecieved = millis();
         espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 0;
         espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 0;
         request->send(200, "text/plain", "stopping lowering wings");
       });
       server.on("/raiseWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+        espConfig.foldData.lastMsgRecieved = millis();
         espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 1;
         espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 1;
         request->send(200, "text/plain", "raising wings");
     });
     server.on("/raiseWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
       espConfig.foldData.foldStates[espConfig.foldData.lhWingLift] = 0;
       espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 0;
       request->send(200, "text/plain", "stopping raising wings");

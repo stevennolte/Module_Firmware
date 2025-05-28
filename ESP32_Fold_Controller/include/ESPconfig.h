@@ -89,7 +89,7 @@ public:
     class JoystickData {
         public:
             uint8_t state;
-            bool joyStickActive = false;
+            bool joyStickActive = true;
             uint32_t lastMsgRecieved;
             uint8_t switchStates[8];
             JoystickData(){}
