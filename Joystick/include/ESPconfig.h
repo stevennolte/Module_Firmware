@@ -108,7 +108,7 @@ public:
             uint8_t switch8 = 0;
 
             //lh btn = 10
-
+            bool changeInCmd = false;
             uint8_t leftLift = 4;
             uint8_t leftLower = 5;
             uint8_t rightLift = 3;

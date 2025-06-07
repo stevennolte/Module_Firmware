@@ -26,6 +26,8 @@ auto& wifiCfg = espConfig.wifiCfg;
 auto& gpioDefs = espConfig.gpioDefs;
 auto& joyCmds = espConfig.joyCmds;
 
+uint32_t lastMessageSent = 0;
+
 class UDPMethods{
   private:
     int commandTimer = 0;
@@ -138,6 +140,7 @@ void updateDebugVars() {
   debugVars.push_back("Center Lower: " + String(espConfig.joyCmds.centerLower));
   debugVars.push_back("Auto Steer: " + String(espConfig.joyCmds.autoSteer));
   debugVars.push_back("Section Control: " + String(espConfig.joyCmds.sectionControl));
+  debugVars.push_back("Changed Commands: " + String(espConfig.joyCmds.changeInCmd));
   std::string ipValue = "Sensor: " + std::to_string(WiFi.localIP());
   // bleRemote.sendIPData(ipValue);d
 }
@@ -303,13 +306,22 @@ void setup() {
 
 
 void loop() {
-  udpMethods.sendCommands();
+  // udpMethods.sendCommands();
+  if (espConfig.joyCmds.changeInCmd){
+    espConfig.joyCmds.changeInCmd = false;
+    udpMethods.sendCommands();
+  }
+  if (millis() - lastMessageSent > 500) {
+    lastMessageSent = millis();
+    // udpMethods.sendCommands();
+  }
+  // udpMethods.sendCommands();
   if (digitalRead(LED_BUILTIN)){
     digitalWrite(LED_BUILTIN, LOW);
   } else {
     digitalWrite(LED_BUILTIN, HIGH);
   }
   // Serial.println(joyCmds.leftLift);
-  delay(50);
+  delay(10);
 }
 

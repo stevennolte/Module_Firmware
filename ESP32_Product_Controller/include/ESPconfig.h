@@ -191,6 +191,7 @@ public:
             float speed;
             uint8_t threeSection = 0;
             uint8_t sectionStates[65];
+            bool webserverSectionStates[5] = {false, false, false, false, false};
             float sectonWidth[5] = {200.0, 200.0, 160.0, 200.0, 200.0};
             uint8_t sectionsActive;
             float sectionWidthSum = 0.0;

@@ -66,6 +66,9 @@ void sendServerData() {
         doc["actRegulatorPosition"] = float(espConfig.regData.regReport.regReport_Struct.position)/100.0;
         doc["tarRegulatorPosition"] = espConfig.regData.targetPosition;
         doc["regulatorState"] = espConfig.regData.state;
+        doc["pulseCount"] = espConfig.rateData.pulseCount;
+        doc["sectionsActive"] = espConfig.rateData.sectionsActive;
+        doc["totalGallons"] = espConfig.rateData.totalGallons;
         // Serialize the JSON object to a string
         String jsonMessage;
         serializeJson(doc, jsonMessage);
@@ -675,6 +678,30 @@ void setup() {
         server.on("/module", HTTP_GET, handleGetModuleState);
         server.on("/performance", HTTP_GET, handleGetPerformanceVariables);
         server.on("/setRegulatorPosition", HTTP_POST, handleSetRegulatorPosition);
+        // Endpoint to enable/disable a section
+    server.on("^/section/(\\d+)/(enable|disable)$", HTTP_POST, [](AsyncWebServerRequest *request){
+        int section = request->pathArg(0).toInt();
+        String action = request->pathArg(1);
+
+        if (section >= 1 && section <= 5) {
+            espConfig.rateData.webserverSectionStates[section] = (action == "enable");
+            request->send(200, "text/plain", String("Section ") + section + (action == "enable" ? " enabled" : " disabled"));
+        } else {
+            request->send(400, "text/plain", "Invalid section");
+        }
+    });
+
+    // Endpoint to get the state of a section
+    server.on("^/section/(\\d+)/state$", HTTP_GET, [](AsyncWebServerRequest *request){
+        int section = request->pathArg(0).toInt();
+        if (section >= 1 && section <= 5) {
+            String json = String("{\"enabled\":") + (espConfig.rateData.webserverSectionStates[section] ? "true" : "false") + "}";
+            request->send(200, "application/json", json);
+        } else {
+            request->send(400, "application/json", "{\"error\":\"Invalid section\"}");
+        }
+    });
+
         #pragma endregion
         
         server.addHandler(&events);

@@ -25,7 +25,7 @@ void WAS::loop(){
     } else {
         espConfig->steerCfg.wirelessWAS = false;
         if (espConfig->progData.adsState == 1 && espConfig->steerCfg.wirelessWAS == false && espConfig->steerCfg.useADS == 1){ 
-            espConfig->steerData.actSteerAngle = ads->readADC_SingleEnded(0);
+            espConfig->steerData.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
         } else {
             espConfig->steerData.actSteerAngle = 0.0;
         }

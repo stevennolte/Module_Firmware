@@ -37,7 +37,39 @@ void Joystick::taskHandler(void *param){
 void Joystick::continuousLoop() {
     bool prevAutoSteerState = digitalRead(espConfig->gpioDefs.inputPins[9]); // Track previous state of the input pin
     bool prevSectionState = digitalRead(espConfig->gpioDefs.inputPins[7]);
+    uint8_t reading = 0;
     while (true) {
+        reading = !digitalRead(espConfig->gpioDefs.inputPins[4]);
+        if (reading != espConfig->joyCmds.leftLift) {
+            espConfig->joyCmds.changeInCmd = true;
+        }
+        espConfig->joyCmds.leftLift = reading;
+        reading = !digitalRead(espConfig->gpioDefs.inputPins[5]);
+        if (reading != espConfig->joyCmds.leftLower) {
+            espConfig->joyCmds.changeInCmd = true;
+        }
+        espConfig->joyCmds.leftLower = reading;
+        reading = !digitalRead(espConfig->gpioDefs.inputPins[3]);
+        if (reading != espConfig->joyCmds.rightLift) {
+            espConfig->joyCmds.changeInCmd = true;
+        }
+        espConfig->joyCmds.rightLift = reading;
+        reading = !digitalRead(espConfig->gpioDefs.inputPins[6]);
+        if (reading != espConfig->joyCmds.rightLower) {
+            espConfig->joyCmds.changeInCmd = true;
+        }
+        espConfig->joyCmds.rightLower = reading;
+        reading = !digitalRead(espConfig->gpioDefs.inputPins[2]);
+        if (reading != espConfig->joyCmds.centerLift) {
+            espConfig->joyCmds.changeInCmd = true;
+        }
+        espConfig->joyCmds.centerLift = reading;
+        reading = !digitalRead(espConfig->gpioDefs.inputPins[1]);
+        if (reading != espConfig->joyCmds.centerLower) {
+            espConfig->joyCmds.changeInCmd = true;
+        }
+        espConfig->joyCmds.centerLower = reading;
+
         espConfig->joyCmds.leftLift = !digitalRead(espConfig->gpioDefs.inputPins[4]);
         espConfig->joyCmds.leftLower = !digitalRead(espConfig->gpioDefs.inputPins[5]);
         espConfig->joyCmds.rightLift = !digitalRead(espConfig->gpioDefs.inputPins[3]);
@@ -51,9 +83,11 @@ void Joystick::continuousLoop() {
         // Check for a rising edge (button press)
         if (prevAutoSteerState == HIGH && currentAutoSteerState == LOW) {
             // Toggle autoSteer between 0 and 1
+            espConfig->joyCmds.changeInCmd = true;
             espConfig->joyCmds.autoSteer = !espConfig->joyCmds.autoSteer;
         }
         if (prevSectionState == HIGH && currentSectionState == LOW) {
+            espConfig->joyCmds.changeInCmd = true;
             espConfig->joyCmds.sectionControl = !espConfig->joyCmds.sectionControl;
         }
 

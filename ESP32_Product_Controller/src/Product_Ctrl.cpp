@@ -70,7 +70,12 @@ void Product_Ctrl::continuousLoop(){
         *sectionsActive = 0;
         for (uint8_t i = 0; i<65; i++){
             if (sectionStates[i] == 1){
-                (*sectionsActive)++;
+                if (i == 2){
+                    (*sectionsActive) = (*sectionsActive) + 8;
+                } else {
+                    (*sectionsActive) = (*sectionsActive) + 10;
+                }
+                // (*sectionsActive)++;
             }
         }
         espConfig->rateData.targetFlowRate = espConfig->rateData.targetRowFlowRate * float(*sectionsActive);

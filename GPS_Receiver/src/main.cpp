@@ -249,7 +249,8 @@ const char* asciiHex = "0123456789ABCDEF";
 bool passThroughGPS = false;
 bool passThroughGPS2 = false;
 uint32_t gpsReadyTime = 0;        //Used for GGA timeout
-
+int rollOffset = -33; //Used for Dual Antenna IMU
+int pitchOffset = 25; //Used for Dual Antenna IMU
 float roll = 0;
 float pitch = 0;
 float yaw = 0;
@@ -410,7 +411,8 @@ void readBNO()
               pitch = asin(t2) * RAD_TO_DEG_X_10;
               roll = atan2(t0, t1) * RAD_TO_DEG_X_10;
             }
-            
+            pitch = pitch + pitchOffset; //Add offset for Dual Antenna IMU
+            roll = roll + rollOffset; //Add offset for Dual Antenna IMU
             if(invertRoll)
             {
               roll *= -1;
@@ -778,6 +780,11 @@ void updateDebugVars() {
   debugVars.push_back("pitch: " + String(pitch));
   debugVars.push_back("roll: " + String(roll));
   debugVars.push_back("yaw: " + String(yaw));
+  debugVars.push_back("correctionHeading: " + String(correctionHeading));
+  debugVars.push_back("gps Heading: " + String());
+  // debugVars.push_back("Magx: " + String(bno08x.getMagX()));
+  // debugVars.push_back("Magy: " + String(bno08x.getMagY()));
+  // debugVars.push_back("Magz: " + String(bno08x.getMagZ()));
   std::string ipValue = "Sensor: " + std::to_string(WiFi.localIP());
 
   // bleRemote.sendIPData(ipValue);d
@@ -953,12 +960,14 @@ void setup(){
               if (bno08x.begin(bno08xAddress, twoWire)) //??? Passing NULL to non pointer argument, remove maybe ???
               {
                   //Increase I2C data rate to 400kHz
-                  twoWire.setClock(400000); 
-
+                  // twoWire.setClock(400000); 
                   delay(300);
 
                   // Use gameRotationVector and set REPORT_INTERVAL
                   bno08x.enableGameRotationVector(REPORT_INTERVAL);
+                  // bno08x.enableMagnetometer(REPORT_INTERVAL);
+                  // bno08x.enableGyroIntegratedRotationVector(REPORT_INTERVAL);
+                  // bno08x.enable
                   useBNO08x = true;
               }
               else

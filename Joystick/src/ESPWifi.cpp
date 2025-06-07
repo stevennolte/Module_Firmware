@@ -25,6 +25,7 @@ uint8_t ESPWifi::connect(){
                 Serial.println();
                 Serial.println(WiFi.localIP().toString());
                 IPAddress ip = WiFi.localIP();
+                espConfig->wifiCfg.ips[2] = ip[2];
                 IPAddress local_IP(ip[0],ip[1],ip[2],espConfig->wifiCfg.ips[3]);
                 IPAddress gateway(ip[0],ip[1],ip[2],1);
                 IPAddress subnet(255,255,255,0);

@@ -357,6 +357,7 @@
         </div>
     </div>
     <div class="progress-container">
+    
         <div class="progress-label">Regulator</div>
         <div class="progress-bar-container">
             <div class="progress-bar target-bar" id="RegulatorTarget">
@@ -436,6 +437,16 @@
         document.getElementById('RegulatorTarget').style.width = data.tarRegulatorPosition.toFixed(2) + '%';
         document.getElementById('RegulatorActual').textContent = data.actRegulatorPosition.toFixed(2);
         document.getElementById('RegulatorActual').style.width = data.actRegulatorPosition.toFixed(2) + '%';
+        const min = 0;
+        const max = 50;
+        let value = data.tarFlowRate;
+        value = Math.max(min, Math.min(max, value)); // Clamp the value between min and max
+        const percentage = ((value - min) / (max - min)) * 100; // Calculate percentage
+        document.getElementById('FlowrateTarget').textContent = data.tarFlowRate.toFixed(2);
+        document.getElementById('FlowrateTarget').style.width = percentage + '%';
+        document.getElementById('FlowrateProgress').textContent = data.actFlowRate.toFixed(2);
+        document.getElementById('FlowrateProgress').style.width = data.actFlowRate.toFixed(2) + '%';
+        
         const threeSectionToggle = document.getElementById('3sectiontoggle');
         const indicator = document.getElementById('threeSectionIndicator');
 
