@@ -75,6 +75,8 @@ uint8_t ESPconfig::loadConfig(){
     // }
     // i2cDefs.ADS_ADDRESS = uint8_t(doc["adsAddress"]);
     rateData.targetRate = doc["targetRate"];
+    regData.regKp = doc["regKp"];
+    rateData.nozzle = doc["nozzle"];
     return 1;
 }
 

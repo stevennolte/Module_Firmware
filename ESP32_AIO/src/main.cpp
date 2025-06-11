@@ -248,6 +248,7 @@ void updateDebugVars() {
   debugVars.push_back("MCP23017 State: " + String(progData.mcpState));
   debugVars.push_back("ADS1115 State: " + String(progData.adsState));
   debugVars.push_back("IMU State: " + String(espConfig.gpsData.imuState));
+  debugVars.push_back("External GPS: " + String(espConfig.gpsCfg.externalGPS ? "Enabled" : "Disabled"));
   debugVars.push_back("GPS Data: ");
   debugVars.push_back("..Timestamp: " + String(espConfig.gpsData.fixTime));
   debugVars.push_back("..Position Type: " + String(espConfig.gpsData.positionType));
@@ -484,6 +485,28 @@ void setup(){
         server.on("/Module_Connected", HTTP_GET, [](AsyncWebServerRequest *request){
           request->send(LittleFS, "/Module_Connected.svg", "image/svg+xml");
         });
+        server.on("/setGpsSource", HTTP_POST, [](AsyncWebServerRequest *request){},
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            StaticJsonDocument<128> doc;
+            DeserializationError error = deserializeJson(doc, data, len);
+            if (error) {
+                request->send(400, "text/plain", "Invalid JSON");
+                return;
+            }
+            String source = doc["source"] | "";
+            if (source == "um982") {
+
+                espConfig.gpsCfg.externalGPS = false;
+                request->send(200, "text/plain", "UM982 GPS selected");
+            } else if (source == "external") {
+                espConfig.gpsCfg.externalGPS = true;
+                request->send(200, "text/plain", "External GPS selected");
+            } else {
+                request->send(400, "text/plain", "Unknown GPS source");
+            }
+        }
+    );
         // server.on("/isConnected", HTTP_GET, [](AsyncWebServerRequest *request){
         //   request->send(LittleFS, "/Modu.svg", "image/svg+xml");
         // });

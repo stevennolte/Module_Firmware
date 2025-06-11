@@ -241,11 +241,22 @@
       debugIntervalId = setInterval(fetchDebugVarsForUI, debugInterval); // Use the default interval
       // setInterval(isConnected, 1000);
     };
+
+    function setGpsSource() {
+      const source = document.getElementById('gpsSource').value;
+      fetchWithTimeout('/setGpsSource', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source })
+      }, 5000)
+        .then(response => response.text())
+        .then(data => alert('GPS source set: ' + data))
+        .catch(error => alert('Error setting GPS source: ' + error));
+    }
   </script>
 </head>
 <body>
   <div style="display: flex; align-items: center; margin-bottom: 20px;">
-    <img id="connectionStatusImage" src="Module_Disconnected" alt="Connection Status" width="50" style="margin-right: 20px;">
     <h1>ESP32_AIO</h1>
   </div>
 
@@ -281,8 +292,14 @@
   </form>
 
   <h1>ESP32 Control</h1>
-  <button onclick="toggleAPMode()">Toggle AP Mode</button>
-  <p id="toggleStatus">Status: Unknown</p>
+
   <button onclick="zeroWAS()">Zero WAS</button>
+
+  <h2>GPS Source</h2>
+  <label for="gpsSource">Select GPS Source:</label>
+  <select id="gpsSource" onchange="setGpsSource()">
+    <option value="um982">UM982 GPS</option>
+    <option value="external">External GPS</option>
+  </select>
 </body>
 </html>

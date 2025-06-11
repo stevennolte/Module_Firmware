@@ -1,9 +1,10 @@
 #include "Product_Ctrl.h"
 
 
-Product_Ctrl::Product_Ctrl(ESPconfig* vars, CANBUS* canbus, Adafruit_ADS1015* ads) {
+Product_Ctrl::Product_Ctrl(ESPconfig* vars, CANBUS* canbus, Adafruit_ADS1015* ads) : pid(0.0,1.0, TuningMethod::Manual) {
     espConfig = vars;
     this->ads = ads;
+    
     sectionStates = espConfig->rateData.sectionStates;
     sectionPins = espConfig->gpioDefs.sectionPins;
     pressState = &espConfig->rateData.pressState;      // Initialize pressState pointer
@@ -13,6 +14,10 @@ Product_Ctrl::Product_Ctrl(ESPconfig* vars, CANBUS* canbus, Adafruit_ADS1015* ad
 
 void Product_Ctrl::begin(){
     Serial.println("Starting Product Controller");
+    // pid.setManualGains(0.1, 0.1, 0.0);
+    // pid.enableAntiWindup(true, 0.2f);
+    // pid.setSetpoint(espConfig->rateData.targetPressure);
+    
     // meter.begin(espConfig->gpioDefs.FLOW_PIN, espConfig->flowCfg.flowCalNumber);  
     // meter.setTresholds(espConfig->flowCfg.maxFlow, espConfig->flowCfg.maxFlow);
     for (uint8_t i = 0; i<5; i++){
@@ -42,6 +47,21 @@ void Product_Ctrl::taskHandler(void *param){
 
 void Product_Ctrl::continuousLoop(){
     while (true){
+        // pid.setSetpoint(espConfig->rateData.targetPressure);
+        // pid.update(espConfig->rateData.actualPressure);
+
+        espConfig->rateData.pidOutput =  (espConfig->rateData.targetPressure - espConfig->rateData.actualPressure)*espConfig->regData.regKp;
+        if (espConfig->regData.regControl == 1){
+            uint16_t newPosition = espConfig->regData.currentPosition + int(espConfig->rateData.pidOutput);
+            if (newPosition < 0){
+                newPosition = 0;
+            } else if (newPosition > 10000){
+                newPosition = 10000; // Assuming max position is 10000
+            }
+            espConfig->regData.targetPosition = newPosition;
+        }
+        
+       
         #pragma region Section Control
         if (millis()-*lastSectionMsg > 2000){
             for (uint8_t i = 1; i<65; i++){
@@ -66,7 +86,16 @@ void Product_Ctrl::continuousLoop(){
 
         #pragma region Rate Calculation
         espConfig->rateData.targetRowFlowRate = (espConfig->rateData.targetRate * espConfig->rateData.speed*20.0)/5940.0;
-        espConfig->rateData.targetPressure = 275.5083893 * pow(espConfig->rateData.targetRowFlowRate, 2) - 23.20941433 * espConfig->rateData.targetRowFlowRate + 4.769518499;
+        switch (espConfig->rateData.nozzle){
+            case 0:
+                espConfig->rateData.targetPressure = 275.5083893 * pow(espConfig->rateData.targetRowFlowRate, 2) - 23.20941433 * espConfig->rateData.targetRowFlowRate + 4.769518499;
+                break;
+            case 1:
+                espConfig->rateData.targetPressure = 581.9491364 * pow(espConfig->rateData.targetRowFlowRate, 2) + 26.30578448 * espConfig->rateData.targetRowFlowRate - 2.981712418;
+                break;
+        }
+        
+        
         *sectionsActive = 0;
         for (uint8_t i = 0; i<65; i++){
             if (sectionStates[i] == 1){
@@ -102,8 +131,8 @@ void Product_Ctrl::continuousLoop(){
         #pragma region Pressure Sensor
         //TODO: check reading to psi conversion
         espConfig->rateData.adsReading = ads->readADC_SingleEnded(0);
-        espConfig->rateData.adsMVreading = float(espConfig->rateData.adsReading) * 0.003;
-        espConfig->rateData.actualPressure = ((espConfig->rateData.adsMVreading-500) * 0.03); // convert to psi
+        espConfig->rateData.adsMVreading = ads->computeVolts(espConfig->rateData.adsReading);
+        espConfig->rateData.actualPressure = ((espConfig->rateData.adsMVreading-0.500) * 30); // convert to psi
         #pragma endregion
 
         #pragma region Regulator Control

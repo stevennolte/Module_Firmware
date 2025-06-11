@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 20px;
+        }
+        nav {
+            margin-bottom: 20px;
+        }
+        nav a {
+            text-decoration: none;
+            color: #fff;
+            padding: 10px 20px;
+            border: 2px solid #020204;
+            background-color: #4CAF50;
+            border-radius: 8px;
+            margin-right: 10px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        nav a:hover {
+            background-color: #45a049;
+            color: white;
+        }
+        .container {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 24px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 24px;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .data-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: bold;
+            color: #444;
+        }
+        .value {
+            color: #222;
+        }
+        .indicator {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            margin-left: 8px;
+            background-color: gray;
+            border: 1px solid #ccc;
+            vertical-align: middle;
+        }
+        .indicator.green {
+            background-color: green;
+        }
+        .indicator.red {
+            background-color: red;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <a href="boom.html">Boom Control</a>
+        <a href="product.html">Product Control</a>
+        <a href="debug.html">Debug</a>
+        <a href="settings.html">Settings</a>
+        <a href="serverdata.html">Server Data</a>
+    </nav>
+
+    <div class="container">
+        <h1>Server Data</h1>
+        <div class="data-row"><span class="label">Name:</span> <span class="value" id="serverName"></span></div>
+        <div class="data-row"><span class="label">Version:</span> <span class="value" id="serverVersion"></span></div>
+        <div class="data-row"><span class="label">Uptime (s):</span> <span class="value" id="serverTimestamp"></span></div>
+        <div class="data-row"><span class="label">Actual Pressure:</span> <span class="value" id="serverActPressure"></span></div>
+        <div class="data-row"><span class="label">Target Pressure:</span> <span class="value" id="serverTarPressure"></span></div>
+        <div class="data-row"><span class="label">Actual Flow Rate:</span> <span class="value" id="serverActFlowRate"></span></div>
+        <div class="data-row"><span class="label">Target Flow Rate:</span> <span class="value" id="serverTarFlowRate"></span></div>
+        <div class="data-row"><span class="label">Actual Application Rate:</span> <span class="value" id="serverActApplicationRate"></span></div>
+        <div class="data-row"><span class="label">Target Application Rate:</span> <span class="value" id="serverTarApplicationRate"></span></div>
+        <div class="data-row"><span class="label">Actual Regulator Position:</span> <span class="value" id="serverActRegulatorPosition"></span></div>
+        <div class="data-row"><span class="label">Target Regulator Position:</span> <span class="value" id="serverTarRegulatorPosition"></span></div>
+        <div class="data-row"><span class="label">Regulator State:</span> <span class="value" id="serverRegulatorState"></span></div>
+        <div class="data-row"><span class="label">Pulse Count:</span> <span class="value" id="serverPulseCount"></span></div>
+        <div class="data-row"><span class="label">Sections Active:</span> <span class="value" id="serverSectionsActive"></span></div>
+        <div class="data-row"><span class="label">Total Gallons:</span> <span class="value" id="serverTotalGallons"></span></div>
+        <div class="data-row">
+            <span class="label">3 Section Mode:</span>
+            <span class="value" id="serverThreeSectionMode"></span>
+            <span id="threeSectionIndicator" class="indicator"></span>
+        </div>
+    </div>
+
+    <script>
+    // Listen for SSE events from the controller
+    const eventSource = new EventSource('/events');
+
+    eventSource.addEventListener('moduleData', (event) => {
+        const data = JSON.parse(event.data);
+
+        document.getElementById('serverName').textContent = data.name ?? '';
+        document.getElementById('serverVersion').textContent = data.version ?? '';
+        document.getElementById('serverTimestamp').textContent = data.timestamp ?? '';
+        document.getElementById('serverActPressure').textContent = data.actPressure?.toFixed(2) ?? '';
+        document.getElementById('serverTarPressure').textContent = data.tarPressure?.toFixed(2) ?? '';
+        document.getElementById('serverActFlowRate').textContent = data.actFlowRate?.toFixed(2) ?? '';
+        document.getElementById('serverTarFlowRate').textContent = data.tarFlowRate?.toFixed(2) ?? '';
+        document.getElementById('serverActApplicationRate').textContent = data.actApplicationRate?.toFixed(2) ?? '';
+        document.getElementById('serverTarApplicationRate').textContent = data.tarApplicationRate?.toFixed(2) ?? '';
+        document.getElementById('serverActRegulatorPosition').textContent = data.actRegulatorPosition?.toFixed(2) ?? '';
+        document.getElementById('serverTarRegulatorPosition').textContent = data.tarRegulatorPosition?.toFixed(2) ?? '';
+        document.getElementById('serverRegulatorState').textContent = data.regulatorState ?? '';
+        document.getElementById('serverPulseCount').textContent = data.pulseCount ?? '';
+        document.getElementById('serverSectionsActive').textContent = data.sectionsActive ?? '';
+        document.getElementById('serverTotalGallons').textContent = data.totalGallons?.toFixed(2) ?? '';
+        document.getElementById('serverThreeSectionMode').textContent = data.threeSectionMode ? 'ON' : 'OFF';
+
+        // Update indicator color
+        const indicator = document.getElementById('threeSectionIndicator');
+        if (data.threeSectionMode) {
+            indicator.classList.remove('red');
+            indicator.classList.add('green');
+        } else {
+            indicator.classList.remove('green');
+            indicator.classList.add('red');
+        }
+    });
+
+    eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+    };
+    </script>
+</body>
+</html>

@@ -69,6 +69,12 @@ void sendServerData() {
         doc["pulseCount"] = espConfig.rateData.pulseCount;
         doc["sectionsActive"] = espConfig.rateData.sectionsActive;
         doc["totalGallons"] = espConfig.rateData.totalGallons;
+        if (espConfig.rateData.threeSection == 1) {
+            doc["threeSectionMode"] = true;
+        } else {
+            doc["threeSectionMode"] = false;
+        }
+        // doc["threeSectionMode"] = espConfig.rateData.threeSection;
         // Serialize the JSON object to a string
         String jsonMessage;
         serializeJson(doc, jsonMessage);
@@ -121,12 +127,18 @@ void updateDebugVars() {
   debugVars.push_back("Program State: " + String(progData.state));
   debugVars.push_back("TargetRate: " + String(espConfig.rateData.targetRate));
   debugVars.push_back("Flow Rate: " + String(espConfig.flowCfg.flowRate));
-  debugVars.push_back("Fold Outer Wings: " + String(foldOuterWingsState ? "ON" : "OFF"));
+  debugVars.push_back("3 Section Mode: " + String(espConfig.rateData.threeSection));
+  debugVars.push_back("------Sections-------");
   debugVars.push_back("Sec 1: " + String(espConfig.rateData.sectionStates[0]));
   debugVars.push_back("Sec 2: " + String(espConfig.rateData.sectionStates[1]));
   debugVars.push_back("Sec 3: " + String(espConfig.rateData.sectionStates[2]));
   debugVars.push_back("Sec 4: " + String(espConfig.rateData.sectionStates[3]));
   debugVars.push_back("Sec 5: " + String(espConfig.rateData.sectionStates[4]));
+  debugVars.push_back("webserver Sec 1: " + String(espConfig.rateData.webserverSectionStates[0]));
+  debugVars.push_back("webserver Sec 2: " + String(espConfig.rateData.webserverSectionStates[1]));
+  debugVars.push_back("webserver Sec 3: " + String(espConfig.rateData.webserverSectionStates[2]));
+  debugVars.push_back("webserver Sec 4: " + String(espConfig.rateData.webserverSectionStates[3]));
+  debugVars.push_back("webserver Sec 5: " + String(espConfig.rateData.webserverSectionStates[4]));
   debugVars.push_back("Sections Active: " + String(espConfig.rateData.sectionsActive));
   for (int i = 0; i < 5; i++){
     debugVars.push_back("Sec "+String(i+1)+" GPIO " + String(espConfig.gpioDefs.sectionPins[i]) +": " + String(digitalRead(espConfig.gpioDefs.sectionPins[i])));
@@ -139,6 +151,7 @@ void updateDebugVars() {
   debugVars.push_back("Press Reading mV: " + String(espConfig.rateData.adsMVreading));
   debugVars.push_back("Target Pressure: " + String(espConfig.rateData.targetPressure));
   debugVars.push_back("Target Flow Rate: " + String(espConfig.rateData.targetFlowRate));
+  debugVars.push_back("pidOutput: " + String(espConfig.rateData.pidOutput));
   debugVars.push_back("------Flowrate--------");
   debugVars.push_back("Actual Flow Rate: " + String(espConfig.rateData.actualFlowRate));
   debugVars.push_back("Pulse Count: " + String(espConfig.rateData.pulseCount));
@@ -593,6 +606,10 @@ void setup() {
           Serial.println("getting boom file");
           request->send(LittleFS, "/boom.html");
         });
+        server.on("/serverdata.html", HTTP_GET, [](AsyncWebServerRequest *request){
+          Serial.println("getting serverdata file");
+          request->send(LittleFS, "/serverdata.html");
+        });
         #pragma endregion
 
         #pragma region Request Handlers
@@ -608,35 +625,6 @@ void setup() {
         server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFirmwareUpload);
 
         
-        server.on("/foldOuterWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
-          handleToggleCommand("foldOuterWings", "on");
-          request->send(200, "text/plain", "Fold Outer Wings ON");
-        });
-
-        server.on("/foldOuterWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("foldOuterWings", "off");
-            request->send(200, "text/plain", "Fold Outer Wings OFF");
-        });
-
-        server.on("/foldCenterWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("foldCenterWings", "on");
-            request->send(200, "text/plain", "Fold Center Wings ON");
-        });
-
-        server.on("/foldCenterWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("foldCenterWings", "off");
-            request->send(200, "text/plain", "Fold Center Wings OFF");
-        });
-
-        server.on("/raiseWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("raiseWings", "on");
-            request->send(200, "text/plain", "Raise Wings ON");
-        });
-
-        server.on("/raiseWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
-            handleToggleCommand("raiseWings", "off");
-            request->send(200, "text/plain", "Raise Wings OFF");
-        });
         server.on("/systemEnable/on", HTTP_POST, [](AsyncWebServerRequest *request) {
           espConfig.rateData.systemState = 1;
           Serial.println("System Enabled");

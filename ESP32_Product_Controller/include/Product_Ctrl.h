@@ -3,7 +3,7 @@
 
 #include "Arduino.h"
 #include "ESPconfig.h"
-
+#include "AutoTunePID.h"
 #include "CANBUS.h"
 #include "Adafruit_ADS1X15.h"
 
@@ -28,6 +28,7 @@ class Product_Ctrl{
         float* targetRowFlowRate;
         float* targetPressure;
         uint8_t* sectionsActive;
+        AutoTunePID pid;
 };
 
 #endif

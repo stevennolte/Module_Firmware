@@ -501,6 +501,56 @@ void setup() {
       espConfig.foldData.foldStates[espConfig.foldData.rhWingLift] = 0;
       request->send(200, "text/plain", "stopping raising wings");
   });
+   server.on("/unfoldWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhWingRotate] = 2;
+      espConfig.foldData.foldStates[espConfig.foldData.rhWingRotate] = 2;
+      request->send(200, "text/plain", "Unfolding wings");
+  });
+  server.on("/unfoldWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhWingRotate] = 0;
+      espConfig.foldData.foldStates[espConfig.foldData.rhWingRotate] = 0;
+      request->send(200, "text/plain", "Stopping Unfolding wings");
+  });
+
+  server.on("/flipOutWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhOuterWingRotate] = 2;
+      espConfig.foldData.foldStates[espConfig.foldData.rhOuterWingRotate] = 2;
+      request->send(200, "text/plain", "Unfolding Outer Wings");
+  });
+  server.on("/flipOutWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhOuterWingRotate] = 0;  
+      espConfig.foldData.foldStates[espConfig.foldData.rhOuterWingRotate] = 0;
+      request->send(200, "text/plain", "Stopping Unfolding Outer Wings");
+  });
+  server.on("/flipInWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhOuterWingRotate] = 1;
+      espConfig.foldData.foldStates[espConfig.foldData.rhOuterWingRotate] = 1;
+      request->send(200, "text/plain", "Folding Outer Wings");
+  });
+  server.on("/flipInWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhOuterWingRotate] = 0;
+      espConfig.foldData.foldStates[espConfig.foldData.rhOuterWingRotate] = 0;
+      request->send(200, "text/plain", "Stopping Folding Outer Wings");
+  });
+  server.on("/foldWings/on", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhWingRotate] = 1;
+      espConfig.foldData.foldStates[espConfig.foldData.rhWingRotate] = 1;
+      request->send(200, "text/plain", "Folding Wings");
+  });
+  server.on("/foldWings/off", HTTP_POST, [](AsyncWebServerRequest *request) {
+      espConfig.foldData.lastMsgRecieved = millis();
+      espConfig.foldData.foldStates[espConfig.foldData.lhWingRotate] = 0;
+      espConfig.foldData.foldStates[espConfig.foldData.rhWingRotate] = 0;
+      request->send(200, "text/plain", "Stopping Folding Wings");
+  });
+
         server.on("/momentary", HTTP_POST, handleMomentaryCommand);
         
         

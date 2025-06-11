@@ -5,6 +5,8 @@
     "passwords": ["DontLoseMoney89","Fert504!","ss","sss"],
     "ledPin": "48",
     "ledBrightness": "100",
-    "targetRate" : "10.1"
+    "targetRate" : "10.1",
+    "regKp": "0.1",
+    "nozzle": "1"
 
 }

@@ -113,6 +113,8 @@ public:
         public:
             uint8_t state;   //0: not connected, 1: connected, 2: error
             uint8_t regControl; //0: off, 1: auto, 2: manual control
+            float regKp;
+           
             uint16_t currentPosition;
             uint16_t targetPosition;
             uint16_t targetPositionPrev;
@@ -186,9 +188,11 @@ public:
 
     class RateData {
         public:
+            float pidOutput;
             uint8_t systemState;
             uint32_t lastSectionMsg;
             float speed;
+            uint8_t nozzle; //0: red, 1: purple
             uint8_t threeSection = 0;
             uint8_t sectionStates[65];
             bool webserverSectionStates[5] = {false, false, false, false, false};
