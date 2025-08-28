@@ -253,6 +253,25 @@
         .then(data => alert('GPS source set: ' + data))
         .catch(error => alert('Error setting GPS source: ' + error));
     }
+
+    function saveConfiguration() {
+      fetchWithTimeout('/saveConfig', {}, 5000)
+        .then(response => response.text())
+        .then(data => alert('Configuration saved: ' + data))
+        .catch(error => alert('Error saving configuration: ' + error));
+    }
+
+    function resetConfiguration() {
+      if (confirm('Are you sure you want to reset configuration to defaults? This cannot be undone.')) {
+        fetchWithTimeout('/resetConfig', {}, 5000)
+          .then(response => response.text())
+          .then(data => {
+            alert('Configuration reset: ' + data);
+            location.reload(); // Reload page to reflect changes
+          })
+          .catch(error => alert('Error resetting configuration: ' + error));
+      }
+    }
   </script>
 </head>
 <body>
@@ -301,5 +320,9 @@
     <option value="um982">UM982 GPS</option>
     <option value="external">External GPS</option>
   </select>
+
+  <h2>Configuration</h2>
+  <button onclick="saveConfiguration()">Save Configuration</button>
+  <button onclick="resetConfiguration()">Reset to Defaults</button>
 </body>
 </html>

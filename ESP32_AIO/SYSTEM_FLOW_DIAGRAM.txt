@@ -1,0 +1,173 @@
+```
+ESP32 GLOBAL CONTEXT SYSTEM FLOW
+=================================
+
+1. STARTUP SEQUENCE:
+   ┌─────────────────┐
+   │   ESP32 Boot    │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │   setup() call  │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ getGlobalContext│ ◄── Creates singleton if first time
+   │    .getInstance │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ ctx.initialize()│
+   └─────────┬───────┘
+             │
+      ┌──────▼──────┐
+      │Check NVS for│
+      │   config    │
+      └──────┬──────┘
+             │
+    ┌────────▼────────┐
+    │Config exists?   │
+    └────┬───────┬────┘
+       YES│      │NO
+          │      │
+          │   ┌──▼──────────┐
+          │   │Look for JSON│
+          │   │    file     │
+          │   └──┬──────────┘
+          │      │
+          │   ┌──▼──────────┐
+          │   │JSON exists? │
+          │   └──┬─────┬────┘
+          │    YES│    │NO
+          │       │    │
+          │    ┌──▼──┐ │ ┌──▼──────┐
+          │    │Migr.│ │ │Load     │
+          │    │JSON │ │ │Defaults │
+          │    └──┬──┘ │ └──┬──────┘
+          │       │    │    │
+          │       └────┼────┘
+          │            │
+       ┌──▼────────────▼──┐
+       │  Load config     │
+       │  into structs    │
+       └──────┬───────────┘
+              │
+    ┌─────────▼─────────┐
+    │ System Ready!     │
+    │ All components    │
+    │ can access config │
+    └───────────────────┘
+
+2. RUNTIME ACCESS PATTERN:
+
+   Component needs data:
+   ┌─────────────────┐
+   │ STEER_CFG.gainP │
+   └─────────┬───────┘
+             │ (macro expands to:)
+             │
+   ┌─────────▼───────┐
+   │getGlobalContext()│
+   │.getSteerConfig()│
+   │.gainP           │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ Return float    │
+   │ value to caller │
+   └─────────────────┘
+
+3. CONFIGURATION UPDATE PATTERN:
+
+   User changes setting:
+   ┌─────────────────┐
+   │STEER_CFG.gainP =│
+   │     10.5        │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ saveConfig()    │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ctx.saveConfiguration()│
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ For each value: │
+   │configMgr.putFloat│
+   │("kp", 10.5)     │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ NVS atomic write│
+   │  to flash       │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ All other code  │
+   │ sees change     │
+   │ immediately     │
+   └─────────────────┘
+
+4. WEB INTERFACE INTEGRATION:
+
+   Web Request:
+   ┌─────────────────┐
+   │POST /setGpsSource│
+   │{"source":"ext"} │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │handleSetGpsSource│
+   │    function     │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ Parse JSON      │
+   │ Validate input  │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │GPS_CFG.external =│
+   │      true       │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ saveConfig()    │
+   └─────────┬───────┘
+             │
+   ┌─────────▼───────┐
+   │ Send response:  │
+   │"External GPS set"│
+   └─────────────────┘
+
+5. MEMORY LAYOUT:
+
+   ┌─────────────────────────────────┐
+   │        GlobalContext            │
+   │  (Singleton - only one copy)    │
+   │                                 │
+   │  ┌─────────────────────────┐   │
+   │  │      ESPconfig          │   │
+   │  │                         │   │
+   │  │  ┌─────────────────┐   │   │
+   │  │  │   steerCfg      │   │   │
+   │  │  │   steerData     │   │   │
+   │  │  │   gpsData       │   │   │
+   │  │  │   gpsCfg        │   │   │
+   │  │  │   wifiCfg       │   │   │
+   │  │  │   ...           │   │   │
+   │  │  └─────────────────┘   │   │
+   │  └─────────────────────────┘   │
+   │                                 │
+   │  ┌─────────────────────────┐   │
+   │  │   ConfigManager         │   │
+   │  │   (NVS interface)       │   │
+   │  └─────────────────────────┘   │
+   └─────────────────────────────────┘
+             ▲
+             │
+    All code accesses through
+    getGlobalContext() function
+```

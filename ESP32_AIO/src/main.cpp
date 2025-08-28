@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "GlobalContext.h"
 #include "ESPconfig.h"
 #include "ESPWifi.h"
 #include "myLED.h"
@@ -26,7 +27,9 @@ HardwareSerial gpsSerial(1);
 Adafruit_MCP23X17 mcp;
 Adafruit_ADS1115 ads;
 
-ESPconfig espConfig;
+// Use GlobalContext instead of individual espConfig
+GlobalContext& ctx = getGlobalContext();
+ESPconfig& espConfig = ctx.getConfig(); // For backward compatibility
 
 // Indicators indicators(&espConfig, &mcp);
 GPS gps(&espConfig, &gpsSerial, &bnoSerial, &mcp);
@@ -40,10 +43,11 @@ AsyncWebServer server(80);
 ESPsteer espSteer(&espConfig, &ads, &mcp);
 std::vector<String> debugVars;
 
-auto& progData = espConfig.progData;
-auto& progCfg = espConfig.progCfg;
-auto& progState = espConfig.progData.state;
-auto& wifiCfg = espConfig.wifiCfg;
+// Use convenient accessors from GlobalContext
+auto& progData = ctx.getProgramData();
+auto& progCfg = ctx.getProgramConfig();
+auto& progState = ctx.getProgramData().state;
+auto& wifiCfg = ctx.getWifiConfig();
 
 bool I2Csetup(){
   if(!twoWire.setPins(espConfig.gpioDefs.SDA_PIN, espConfig.gpioDefs.SCL_PIN)){
@@ -199,11 +203,53 @@ void handleWASzero(AsyncWebServerRequest *request) {
   Serial.println(espConfig.steerData.absAngle);
   Serial.println(espConfig.steerData.wasZeroAngle);
   Serial.println("WAS zeroed");
-  uint8_t res = espConfig.saveWASzero();
-  if (res == 1){
-    request->send(200, "text/plain", "WAS zeroed and saved to config.json");
+  
+  // Save using new GlobalContext system
+  if (ctx.saveConfiguration()) {
+    request->send(200, "text/plain", "WAS zeroed and saved to configuration");
   } else {
-    request->send(200, "text/plain", "WAS zeroed");
+    request->send(200, "text/plain", "WAS zeroed but failed to save");
+  }
+}
+
+// New handler for setting GPS source
+void handleSetGpsSource(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  StaticJsonDocument<128> doc;
+  DeserializationError error = deserializeJson(doc, data, len);
+  if (error) {
+    request->send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+  
+  String source = doc["source"] | "";
+  if (source == "um982") {
+    ctx.getGPSConfig().externalGPS = false;
+    ctx.saveConfiguration();
+    request->send(200, "text/plain", "UM982 GPS selected");
+  } else if (source == "external") {
+    ctx.getGPSConfig().externalGPS = true;
+    ctx.saveConfiguration();
+    request->send(200, "text/plain", "External GPS selected");
+  } else {
+    request->send(400, "text/plain", "Unknown GPS source");
+  }
+}
+
+// Handler for saving configuration
+void handleSaveConfig(AsyncWebServerRequest *request) {
+  if (ctx.saveConfiguration()) {
+    request->send(200, "text/plain", "Configuration saved successfully");
+  } else {
+    request->send(500, "text/plain", "Failed to save configuration");
+  }
+}
+
+// Handler for resetting configuration to defaults
+void handleResetConfig(AsyncWebServerRequest *request) {
+  if (ctx.resetToDefaults()) {
+    request->send(200, "text/plain", "Configuration reset to defaults");
+  } else {
+    request->send(500, "text/plain", "Failed to reset configuration");
   }
 }
 
@@ -439,7 +485,19 @@ void setup(){
   Serial.begin(115200);
   delay(5000);   // Wait for the usb to connect so you can see the outputs at startup
   Serial.println("Starting up...");
-  espConfig.progCfg.confRes = espConfig.loadConfig();
+  
+  // Initialize GlobalContext and load configuration
+  if (!ctx.initialize()) {
+    Serial.println("Failed to initialize GlobalContext");
+    progData.state = 3; // Error state
+    return;
+  }
+  
+  // Print configuration status for debugging
+  ctx.printConfigStatus();
+  
+  progCfg.confRes = 1; // Mark as successfully loaded
+  
   // Start Wifi AP and Webserver for diagnostics
   // espConfig.wifiCfg.state = espWifi.connect();
   
@@ -477,6 +535,13 @@ void setup(){
         server.on("/toggleAPMode", HTTP_POST, handleToggleAPMode); // Add this line
         // Handle toggle state update
         server.on("/zeroWAS", HTTP_GET, handleWASzero);
+        
+        // New configuration management routes
+        server.on("/setGpsSource", HTTP_POST, [](AsyncWebServerRequest *request){},
+                  NULL, handleSetGpsSource);
+        server.on("/saveConfig", HTTP_GET, handleSaveConfig);
+        server.on("/resetConfig", HTTP_GET, handleResetConfig);
+        
         // Start server
         server.on("/Module_Disconnected", HTTP_GET, [](AsyncWebServerRequest *request){
           Serial.println("Sending Module_Disconnected.svg");
