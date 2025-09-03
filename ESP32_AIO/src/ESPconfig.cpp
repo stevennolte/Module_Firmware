@@ -1,6 +1,24 @@
 #include "ESPconfig.h"
 
+// Static member initialization
+ESPconfig* ESPconfig::instance = nullptr;
+
 ESPconfig::ESPconfig() : progCfg(), wifiCfg(), otaCfg() {}
+
+// Singleton implementation
+ESPconfig& ESPconfig::getInstance() {
+    if (instance == nullptr) {
+        instance = new ESPconfig();
+    }
+    return *instance;
+}
+
+void ESPconfig::destroyInstance() {
+    if (instance != nullptr) {
+        delete instance;
+        instance = nullptr;
+    }
+}
 
 uint8_t ESPconfig::getStrapping(){
     pinMode(4, INPUT);

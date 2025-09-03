@@ -6,6 +6,7 @@
 // #include <TinyGPSPlus.h>
 #include "ESPudp.h"
 #include "Adafruit_MCP23X17.h"
+#include "MCPManager.h"
 #include <zNMEAParser.h>
 #include <SparkFun_Unicore_GNSS_Arduino_Library.h>
 #include "Adafruit_BNO08x_RVC.h"
@@ -15,6 +16,10 @@ class GPS{
     public:
         GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial, Adafruit_MCP23X17* mcp);
         void init(ESPudp* espUdp);
+        
+        // Alternative method using MCPManager singleton
+        void initWithSingleton(ESPudp* espUdp);
+        
         void continuousLoop();
         static void taskHandler(void *param);
         void buildNmea();

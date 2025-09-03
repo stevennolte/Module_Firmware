@@ -8,13 +8,24 @@
 
 class ESPconfig
 {
+private:
+    static ESPconfig* instance;
+    
 public:
+    // Singleton pattern methods
+    static ESPconfig& getInstance();
+    static void destroyInstance();
+    
+    // Existing public methods
     uint8_t loadConfig();
     uint8_t updateIP();
     uint8_t updateServer();
     uint8_t updateSteer();
     uint8_t getStrapping();
     uint8_t saveWASzero();
+    
+    // Constructor remains public for backward compatibility
+    ESPconfig();
   
     class GPIO_Definitions{
         public:
@@ -257,7 +268,6 @@ public:
             CANConfig(){}
     };
     CANConfig canCfg;
-    ESPconfig(/* args */);
     
     
 };

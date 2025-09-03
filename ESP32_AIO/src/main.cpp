@@ -5,6 +5,7 @@
 #include "Wire.h"
 #include "ESPudp.h"
 #include "Adafruit_MCP23X17.h"
+#include "MCPManager.h"
 #include <Adafruit_ADS1X15.h>
 // #include "Indicators.h"
 #include "MainPower.h"
@@ -14,7 +15,6 @@
 #include "ESPsteer.h"
 #include <ESPAsyncWebServer.h>
 #include "littlefs.h"
-
 
 //TODO: add wifi connect timer to ap mode
 
@@ -26,9 +26,13 @@ HardwareSerial gpsSerial(1);
 Adafruit_MCP23X17 mcp;
 Adafruit_ADS1115 ads;
 
-ESPconfig espConfig;
+// Using singleton pattern - single access point for configuration
+ESPconfig& espConfig = ESPconfig::getInstance();
 
-// Indicators indicators(&espConfig, &mcp);
+// Get MCPManager singleton instance (alternative approach)
+MCPManager& mcpManager = MCPManager::getInstance();
+
+// Components using singleton instance
 GPS gps(&espConfig, &gpsSerial, &bnoSerial, &mcp);
 MyLED myLED(&espConfig);
 MainPower mainPower(&espConfig, &mcp, &ads);
@@ -40,6 +44,7 @@ AsyncWebServer server(80);
 ESPsteer espSteer(&espConfig, &ads, &mcp);
 std::vector<String> debugVars;
 
+// Reference shortcuts using singleton
 auto& progData = espConfig.progData;
 auto& progCfg = espConfig.progCfg;
 auto& progState = espConfig.progData.state;
@@ -533,6 +538,10 @@ void setup(){
   }
   if (progData.mcpState == 1){
     mcp.begin_I2C(0x20, &twoWire);
+    
+    // Also initialize the MCPManager singleton (alternative approach)
+    mcpManager.begin(0x20, &twoWire);
+    
     // mcp.pinMode(espConfig.gpioDefs.rtkFix, OUTPUT);
     // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, HIGH);
     // delay(1000);
@@ -544,7 +553,11 @@ void setup(){
   
   
   // Start GPS
+  // Traditional approach using MCP pointer injection:
   gps.init(&espUdp);
+  
+  // Alternative approach using MCPManager singleton:
+  // gps.initWithSingleton(&espUdp);
 
   // If everything is good, turn on power to autosteer
   mainPower.startTask();

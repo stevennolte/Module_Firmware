@@ -104,6 +104,56 @@ void GPS::init(ESPudp* espUdp){
     
 }
 
+// Alternative method using MCPManager singleton
+void GPS::initWithSingleton(ESPudp* espUdp){
+    this->espUdp = espUdp;
+    
+    // Use MCPManager singleton instead of mcp pointer
+    MCPManager& mcpManager = MCPManager::getInstance();
+    
+    if (mcpManager.isInitialized()) {
+        mcpManager.pinMode(_gpsFixIndPin, OUTPUT);
+        mcpManager.pinMode(_rtkFixIndPin, OUTPUT);
+        mcpManager.digitalWrite(_gpsFixIndPin, HIGH);
+        mcpManager.digitalWrite(_rtkFixIndPin, HIGH);
+        delay(1000);
+        mcpManager.digitalWrite(_gpsFixIndPin, LOW);
+        mcpManager.digitalWrite(_rtkFixIndPin, LOW);
+        
+        Serial.println("GPS: Using MCPManager singleton for pin control");
+    } else {
+        Serial.println("GPS: MCPManager not initialized, skipping pin setup");
+    }
+    
+    // Rest of initialization is the same as original init method
+    parser.addHandler("G-GGA", staticGGA_Handler);
+    
+    if (rvc.begin(bnoSerial)){
+        espConfig->gpsData.imuState = 1;
+    } else {
+        espConfig->gpsData.imuState = 2;
+        Serial.println("RVC Start Failed");
+    }
+    
+    uint8_t gpsTryCnt = 0;
+    while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 5){
+        gpsTryCnt++;
+        delay(250);
+        Serial.println("Trying to start UM980");
+    }
+    if (!myGNSS.isConnected()) {
+        espConfig->gpsData.state = 2;
+        Serial.print("UM980 Failed to Respond on Serial, State: ");
+        Serial.println(espConfig->gpsData.state);
+    } else {
+        Serial.println("UM980 Connected and ready");
+        espConfig->gpsData.state = 1;
+        xTaskCreatePinnedToCore(taskHandler, "taskHandler", 10000, this, 1, NULL, 0);
+    }
+    
+    delay(1000);
+}
+
 void GPS::calculateChecksum(void)
 {
   int16_t sum = 0;
