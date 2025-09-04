@@ -32,133 +32,109 @@ uint8_t ESPdata::getStrapping(){
 }
 
 uint8_t ESPdata::loadConfig(){
-    progData.state = 2;
+    data.prog.state = 2;
     // Set default IP if not found in preferences
-    wifiCfg.ips[0] = preferences.getUChar("ip0", 192);
-    wifiCfg.ips[1] = preferences.getUChar("ip1", 168);
-    wifiCfg.ips[2] = preferences.getUChar("ip2", 5);
-    wifiCfg.ips[3] = preferences.getUChar("ip3", 11);
+    config.wifi.ips[0] = preferences.getUChar("ip0", 192);
+    config.wifi.ips[1] = preferences.getUChar("ip1", 168);
+    config.wifi.ips[2] = preferences.getUChar("ip2", 5);
+    config.wifi.ips[3] = preferences.getUChar("ip3", 11);
+
     
     // Load WAS zero angle
-    steerData.wasZeroAngle = preferences.getFloat("wasZero", 0.0);
-    
+    config.steer.wasZeroAngle = preferences.getFloat("wasZero", 0.0);
+
     // Load program name and verify
-    String configName = preferences.getString("name", "");
-    strlcpy(progCfg.name, configName.c_str(), sizeof(progCfg.name));
+    String configName = preferences.getString("name", "ESP32_AIO");
     
-    if (configName != NAME && configName.length() > 0){
-        return 5; // Name mismatch
-    }
     
-    // Parse version from VERSION define
-    char version[64];
-    strcpy(version, VERSION);
-    char *token = strtok(version, ".");
-    int i = 0;
-    while (token != NULL) {
-        int intValue = atoi(token);
-        switch (i){
-        case 0:
-            progCfg.version[0] = intValue;
-            break;
-        case 1:
-            progCfg.version[1] = intValue;
-            break;
-        case 2:
-            progCfg.version[2] = intValue;
-            break;
-        }
-        i++;
-        token = strtok(NULL, ".");
-    }
     
     // Load PID values
-    steerCfg.pidInputFilt = preferences.getFloat("pidInputFilt", 0.1);
-    steerCfg.pidOutputFilt = preferences.getFloat("pidOutputFilt", 0.1);
+    config.steer.pidInputFilt = preferences.getFloat("pidInputFilt", 0.1);
+    config.steer.pidOutputFilt = preferences.getFloat("pidOutputFilt", 0.1);
     Serial.print("PID Input Filter: ");
-    Serial.println(steerCfg.pidInputFilt);
+    Serial.println(config.steer.pidInputFilt);
     Serial.print("PID Output Filter: ");
-    Serial.println(steerCfg.pidOutputFilt);
-    
+    Serial.println(config.steer.pidOutputFilt);
+
     // Load steering configuration
-    steerCfg.gainP = preferences.getFloat("Kp", 50.0);
-    steerCfg.highPWM = preferences.getUChar("highPWM", 255);
-    steerCfg.lowPWM = preferences.getUChar("lowPWM", 10);
-    steerCfg.minPWM = preferences.getUChar("minPWM", 5);
-    steerCfg.countsPerDeg = preferences.getFloat("countsPerDeg", 10.0);
-    steerCfg.steerOffset = preferences.getFloat("wasOffset", 0.0);
-    steerCfg.useADS = preferences.getBool("useADS", true);
-    
+    config.steer.gainP = preferences.getFloat("Kp", 50.0);
+    config.steer.highPWM = preferences.getUChar("highPWM", 255);
+    config.steer.lowPWM = preferences.getUChar("lowPWM", 10);
+    config.steer.minPWM = preferences.getUChar("minPWM", 5);
+    config.steer.countsPerDeg = preferences.getFloat("countsPerDeg", 10.0);
+    config.steer.steerOffset = preferences.getFloat("wasOffset", 0.0);
+    config.steer.useADS = preferences.getBool("useADS", true);
+
     // Load server configuration
-    otaCfg.ipAddr = preferences.getUChar("serverAdr", 192);
-    otaCfg.port = preferences.getUShort("serverPort", 8080);
-    
-    progData.state = 1;
+    config.ota.ipAddr = preferences.getUChar("serverAdr", 192);
+    config.ota.port = preferences.getUShort("serverPort", 8080);
+
+    data.prog.state = 1;
     return 1; // Success
 }
 
 uint8_t ESPdata::saveConfig(){
     // Save all configuration to Preferences
-    preferences.putUChar("ip0", wifiCfg.ips[0]);
-    preferences.putUChar("ip1", wifiCfg.ips[1]);
-    preferences.putUChar("ip2", wifiCfg.ips[2]);
-    preferences.putUChar("ip3", wifiCfg.ips[3]);
-    
-    preferences.putFloat("wasZero", steerData.wasZeroAngle);
-    preferences.putString("name", progCfg.name);
-    
+    preferences.putUChar("ip0", config.wifi.ips[0]);
+    preferences.putUChar("ip1", config.wifi.ips[1]);
+    preferences.putUChar("ip2", config.wifi.ips[2]);
+    preferences.putUChar("ip3", config.wifi.ips[3]);
+
+    preferences.putFloat("wasZero", config.steer.wasZeroAngle);
+    preferences.putString("name", config.prog.name);
+
     // Save PID values
-    preferences.putFloat("pidInputFilt", steerCfg.pidInputFilt);
-    preferences.putFloat("pidOutputFilt", steerCfg.pidOutputFilt);
-    
+    preferences.putFloat("pidInputFilt", config.steer.pidInputFilt);
+    preferences.putFloat("pidOutputFilt", config.steer.pidOutputFilt);
+
     // Save steering configuration
-    preferences.putFloat("Kp", steerCfg.gainP);
-    preferences.putUChar("highPWM", steerCfg.highPWM);
-    preferences.putUChar("lowPWM", steerCfg.lowPWM);
-    preferences.putUChar("minPWM", steerCfg.minPWM);
-    preferences.putFloat("countsPerDeg", steerCfg.countsPerDeg);
-    preferences.putFloat("wasOffset", steerCfg.steerOffset);
-    preferences.putBool("useADS", steerCfg.useADS);
-    
+    preferences.putFloat("Kp", config.steer.gainP);
+    preferences.putUChar("highPWM", config.steer.highPWM);
+    preferences.putUChar("lowPWM", config.steer.lowPWM);
+    preferences.putUChar("minPWM", config.steer.minPWM);
+    preferences.putFloat("countsPerDeg", config.steer.countsPerDeg);
+    preferences.putFloat("wasOffset", config.steer.steerOffset);
+    preferences.putBool("useADS", config.steer.useADS);
+
     // Save server configuration
-    preferences.putUChar("serverAdr", otaCfg.ipAddr);
-    preferences.putUShort("serverPort", otaCfg.port);
-    
+    preferences.putUChar("serverAdr", config.ota.ipAddr);
+    preferences.putUShort("serverPort", config.ota.port);
+
     return 1; // Success
 }
 
 uint8_t ESPdata::updateIP() {
-    preferences.putUChar("ip0", wifiCfg.ips[0]);
-    preferences.putUChar("ip1", wifiCfg.ips[1]);
-    preferences.putUChar("ip2", wifiCfg.ips[2]);
-    preferences.putUChar("ip3", wifiCfg.ips[3]);
+    preferences.putUChar("ip0", config.wifi.ips[0]);
+    preferences.putUChar("ip1", config.wifi.ips[1]);
+    preferences.putUChar("ip2", config.wifi.ips[2]);
+    preferences.putUChar("ip3", config.wifi.ips[3]);
     Serial.println(F("Successfully updated IP address in Preferences"));
     return 1;
 }
 
 uint8_t ESPdata::updateServer(){
-    preferences.putUChar("serverAdr", otaCfg.ipAddr);
-    preferences.putUShort("serverPort", otaCfg.port);
+    preferences.putUChar("serverAdr", config.ota.ipAddr);
+    preferences.putUShort("serverPort", config.ota.port);
     Serial.println(F("Successfully updated server config in Preferences"));
     return 1;
 }
 
 uint8_t ESPdata::updateSteer(){
-    preferences.putFloat("Kp", steerCfg.gainP);
-    preferences.putUChar("highPWM", steerCfg.highPWM);
-    preferences.putUChar("lowPWM", steerCfg.lowPWM);
-    preferences.putUChar("minPWM", steerCfg.minPWM);
-    preferences.putFloat("countsPerDeg", steerCfg.countsPerDeg);
-    preferences.putFloat("wasOffset", steerCfg.steerOffset);
-    preferences.putBool("useADS", steerCfg.useADS);
-    preferences.putFloat("pidInputFilt", steerCfg.pidInputFilt);
-    preferences.putFloat("pidOutputFilt", steerCfg.pidOutputFilt);
+    preferences.putFloat("Kp", config.steer.gainP);
+    preferences.putUChar("highPWM", config.steer.highPWM);
+    preferences.putUChar("lowPWM", config.steer.lowPWM);
+    preferences.putUChar("minPWM", config.steer.minPWM);
+    preferences.putFloat("countsPerDeg", config.steer.countsPerDeg);
+    preferences.putFloat("wasOffset", config.steer.steerOffset);
+    preferences.putBool("useADS", config.steer.useADS);
+    preferences.putFloat("pidInputFilt", config.steer.pidInputFilt);
+    preferences.putFloat("pidOutputFilt", config.steer.pidOutputFilt);
     Serial.println(F("Successfully updated steer config in Preferences"));
     return 1;
 }
 
 uint8_t ESPdata::saveWASzero(){
-    preferences.putFloat("wasZero", steerData.wasZeroAngle);
+    preferences.putFloat("wasZero", config.steer.wasZeroAngle);
     Serial.println(F("Successfully updated WAS zero in Preferences"));
     return 1;
 }

@@ -48,12 +48,12 @@ public:
             uint8_t STEER_TEST_PIN = 6;
             uint8_t STEER_SWITCH_PIN = 5;
             uint8_t WORK_SWITCH_PIN = 4;
-        } cfgPins;
+        } pins;
         
         struct I2CAddresses {
             uint8_t TLE_ADDRESS = 0x22;
             uint8_t MCP_ADDRESS = 0x20;
-        } cfgI2C;
+        } i2c;
 
         struct WifiConfig {
             const char* ssids[4] = {"NOLTE_FARM", "FERT","SSEI","ss"};
@@ -66,183 +66,145 @@ public:
             uint16_t aioPort = 9999;
             uint16_t ntripPort = 2233;
             uint16_t modPort = 8888;
-        } cfgWifi;
-    };
-    Config config;
+        } wifi;
 
-    
+        struct GPSConfig {
+            bool externalGPS = false;
+            uint16_t gpsBaud;
+            uint8_t gpsTxPin;
+            uint8_t gpsRxPin;
+            uint8_t bnoPin;
+            uint16_t bnoBaud;
+            const bool invertRoll = true;  //Used for IMU with dual antenna
+        } gps;
 
-    struct ProgramConfig {
-        char name[64];
-        String name2;
-        uint8_t version[3];
-        uint8_t ledBrht;
-        uint8_t confRes;
-    };
+        struct ProgramConfig {
+            char name[64];
+            String name2;
+            uint8_t version[3];
+            uint8_t ledBrht;
+            uint8_t confRes;
+        } prog;
 
-    struct ProgramData {
-        uint8_t state;
-        uint8_t mcpState;
-        uint8_t adsState;
-        uint8_t steerDriverState;
-        uint32_t lastDebugRequest;
-    };
+        struct OTAConfig {
+            uint8_t state;
+            uint8_t port;
+            uint8_t ipAddr;
+            char basePath[64];
+        } ota;
+
+        struct IndicatorsConfig {
+            uint8_t powerOn = 8;
+            uint8_t ethGood = 9;
+            uint8_t steerStandby = 12;
+            uint8_t steerActive = 13;
+            // uint8_t indicatorPins[6] = {powerOn, ethGood, gpsFix, rtkFix, steerStandby, steerActive};
+        } indicators;
+
+        struct SteerConfig {
+            uint8_t settingsUpdated;
+            uint8_t gainP = 1;
+            uint8_t highPWM;
+            uint8_t lowPWM;
+            uint8_t minPWM;
+            uint8_t countsPerDeg;
+            uint16_t steerOffset;
+            uint8_t ackermanFix;
+            uint8_t set0;
+            uint8_t pulseCount;
+            uint8_t minSpeed;
+            uint8_t set1;
+            uint16_t steerMsgRate = 100;
+            float pidInputFilt;
+            float pidOutputFilt;
+            uint8_t useADS;
+            bool wirelessWAS;
+            float wasZeroAngle;
+        } steer;
+
+        struct CANConfig {
+            uint8_t txPin;
+            uint8_t rxPin;
+            uint16_t baudRate;
+        } can;
+    } config;
+  
+    struct Data{
+        struct ProgramData {
+            uint8_t state;
+            uint8_t mcpState;
+            uint8_t adsState;
+            uint8_t steerDriverState;
+            uint32_t lastDebugRequest;
+        } prog;
+        struct GPSData {
+            uint8_t state;
+            uint8_t imuState;
+            uint8_t positionType;
+            uint32_t posAge;
         
-    
+            // GGA
+            char fixTime[12];
+            char latitude[15];
+            char latNS[3];
+            char longitude[15];
+            char lonEW[3];
+            char fixQuality[2];
+            uint8_t fixQualityInt;
+            char numSats[4];
+            char HDOP[5];
+            char altitude[12];
+            char ageDGPS[10];
+            // VTG
+            char vtgHeading[12] = { };
+            char speedKnots[10] = { };
+            // IMU
+            char imuHeading[6];
+            char imuRoll[6];
+            char imuPitch[6];
+            char imuYawRate[6];
+            String lastNtripData;
+            uint8_t lastNtripDataLen;
+            char nmea[100];
+            const char* asciiHex = "0123456789ABCDEF";
+        } gps;
         
-    struct OTAConfig {
-        uint8_t state;
-        uint8_t port;
-        uint8_t ipAddr;
-        char basePath[64];
-    };
+        struct SwitchData {
+            bool steerSwitch;
+            bool workSwitch;
+        } swch;
 
-    struct MagConfig {
-        uint8_t sensitivity;
-    };
+        struct SteerData {
+            bool steerSwitch;
+            uint32_t steerSwitchLastTime;
+            uint16_t speed;
+            uint8_t status;
+            float targetSteerAngle;
+            uint8_t xte;
+            float actSteerAngle;
+            uint8_t switchState;
+            uint8_t pwmDisplay;
+            uint16_t pwmCmd;
+            uint8_t testState;
+            uint32_t lastSteerOutMsgTime;
+            uint32_t steerCurrent;
+            float pidOutput;
+            float pidInput;
+            uint16_t minCmd;
+            uint16_t maxCmd;
+            float minScalar;
+            float maxScalar;
+            uint32_t lastWAStime;
+            uint32_t watchdog;
+            float pidCmd;
+            uint8_t byte1;
+            uint8_t byte2;
+            uint8_t byte3;
+            uint8_t byte4;
+            float absAngle;
+        } steer;
 
-    struct IndicatorsConfig {
-        uint8_t powerOn = 8;
-        uint8_t ethGood = 9;
-        uint8_t steerStandby = 12;
-        uint8_t steerActive = 13;
-        // uint8_t indicatorPins[6] = {powerOn, ethGood, gpsFix, rtkFix, steerStandby, steerActive};
-    };
-
-    struct GPSConfig {
-        bool externalGPS = false;
-        uint16_t gpsBaud;
-        uint8_t gpsTxPin;
-        uint8_t gpsRxPin;
-        uint8_t bnoPin;
-        uint16_t bnoBaud;
-        const bool invertRoll = true;  //Used for IMU with dual antenna
-    };
-    
-    // Direct struct instances - clean access
-    GPIOPins pins;
-    I2CAddresses i2c;
-    ProgramConfig progCfg;
-    ProgramData progData;
-    WifiConfig wifiCfg;
-    OTAConfig otaCfg;
-    MagConfig magCfg;
-    IndicatorsConfig indicatorsCfg;
-    GPSConfig gpsCfg;
-
-    // Runtime data structs - simple and clean
-    struct SteerConfig {
-        uint8_t settingsUpdated;
-        uint8_t gainP = 1;
-        uint8_t highPWM;
-        uint8_t lowPWM;
-        uint8_t minPWM;
-        uint8_t countsPerDeg;
-        uint16_t steerOffset;
-        uint8_t ackermanFix;
-        uint8_t set0;
-        uint8_t pulseCount;
-        uint8_t minSpeed;
-        uint8_t set1;
-        uint16_t steerMsgRate = 100;
-        float pidInputFilt;
-        float pidOutputFilt;
-        uint8_t useADS;
-        bool wirelessWAS;
-    };
-
-    struct GPSData {
-        uint8_t state;
-        uint8_t imuState;
-        uint8_t positionType;
-        uint32_t posAge;
-       
-        // GGA
-        char fixTime[12];
-        char latitude[15];
-        char latNS[3];
-        char longitude[15];
-        char lonEW[3];
-        char fixQuality[2];
-        uint8_t fixQualityInt;
-        char numSats[4];
-        char HDOP[5];
-        char altitude[12];
-        char ageDGPS[10];
-        // VTG
-        char vtgHeading[12] = { };
-        char speedKnots[10] = { };
-        // IMU
-        char imuHeading[6];
-        char imuRoll[6];
-        char imuPitch[6];
-        char imuYawRate[6];
-        String lastNtripData;
-        uint8_t lastNtripDataLen;
-        char nmea[100];
-        const char* asciiHex = "0123456789ABCDEF";
-    };
-
-    struct SwitchData {
-        bool steerSwitch;
-        bool workSwitch;
-        uint32_t steerSwitchLastTime;
-        uint32_t workSwitchLastTime;
-    };
-
-    struct JoystickData {
-        
-        Testinfo testInfo;
-        uint8_t state;
-        bool joyStickActive = false;
-        uint32_t lastMsgRecieved;
-        uint8_t switchStates[8];
-    };
-
-    struct SteerData {
-        bool steerSwitch;
-        uint32_t steerSwitchLastTime;
-        uint16_t speed;
-        uint8_t status;
-        float targetSteerAngle;
-        uint8_t xte;
-        float actSteerAngle;
-        uint8_t switchState;
-        uint8_t pwmDisplay;
-        uint16_t pwmCmd;
-        uint8_t testState;
-        uint32_t lastSteerOutMsgTime;
-        uint32_t steerCurrent;
-        float pidOutput;
-        float pidInput;
-        uint16_t minCmd;
-        uint16_t maxCmd;
-        float minScalar;
-        float maxScalar;
-        uint32_t lastWAStime;
-        uint32_t watchdog;
-        float pidCmd;
-        uint8_t byte1;
-        uint8_t byte2;
-        uint8_t byte3;
-        uint8_t byte4;
-        float wasZeroAngle;
-        float absAngle;
-    };
-
-    struct CANConfig {
-        uint8_t txPin;
-        uint8_t rxPin;
-        uint16_t baudRate;
-    };
-
-    // Direct struct instances for clean access
-    SteerConfig steerCfg;
-    GPSData gpsData;
-    SwitchData switchData;
-    JoystickData joystickData;
-    SteerData steerData;
-    CANConfig canCfg;
+    } data;
 };
 
 #endif
