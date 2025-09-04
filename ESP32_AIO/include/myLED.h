@@ -2,17 +2,17 @@
 #define myLED_h
 
 // #include "Arduino.h"
-#include "ESPconfig.h"
+#include "ESPdata.h"
 #include <Adafruit_NeoPixel.h>
 
 class MyLED{
     public:
-        MyLED(ESPconfig* vars);
+        MyLED(ESPdata* vars);
         void showColor(uint32_t color);
         void startTask();  // Start the parallel task
         
     private:
-        ESPconfig* espConfig;
+        ESPdata* espData;
         Adafruit_NeoPixel pixel;
 
         static void taskHandler(void *param);  // Task handler

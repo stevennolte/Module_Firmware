@@ -5,10 +5,10 @@
 long firstPixelHue = 0;
 uint32_t updateTimer = 0;
 
-MyLED::MyLED(ESPconfig* vars) : pixel(1, 48, NEO_GRB + NEO_KHZ800) {
-  espConfig = vars;
+MyLED::MyLED(ESPdata* vars) : pixel(1, 48, NEO_GRB + NEO_KHZ800) {
+  espData = vars;
   
-  // Adafruit_NeoPixel pixel(1,espConfig->progCfg.ledPin,NEO_GRB + NEO_KHZ800);
+  // Adafruit_NeoPixel pixel(1,espData->progCfg.ledPin,NEO_GRB + NEO_KHZ800);
   
   // pixel.show();
 }
@@ -48,7 +48,7 @@ void MyLED::continuousLoop() {
  while (true) {
     vTaskDelay(10/portTICK_PERIOD_MS);
     // vTaskDelay(500);
-    switch (espConfig->progData.state){
+    switch (espData->progData.state){
       case 0:
         pixel.setPixelColor(0,pixel.Color(0,0,0));
         pixel.show();

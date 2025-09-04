@@ -2,7 +2,7 @@
 #define ESPWIFI_H
 
 #include <Arduino.h>
-#include "ESPconfig.h"
+#include "ESPdata.h"
 #include "ESPmDNS.h"
 
 class ESPWifi
@@ -12,13 +12,13 @@ class ESPWifi
         uint8_t makeAP();
         void startMonitor();
         void scanNetworks();
-        ESPWifi(ESPconfig* vars);
+        ESPWifi(ESPdata* vars);
     
 
     private:
         static void taskHandler(void *param);  // Task handler
         void continuousLoop();  // Function to run in the background task
-        ESPconfig* espConfig;
+        ESPdata* espData;
 };
 
 

@@ -2,10 +2,10 @@
 #define GPS_H
 
 #include "Arduino.h"
-#include "ESPconfig.h"
+#include "ESPdata.h"
 // #include <TinyGPSPlus.h>
 #include "ESPudp.h"
-#include "Adafruit_MCP23X17.h"
+
 #include "MCPManager.h"
 #include <zNMEAParser.h>
 #include <SparkFun_Unicore_GNSS_Arduino_Library.h>
@@ -14,11 +14,9 @@ class ESPudp;
 
 class GPS{
     public:
-        // Traditional constructor with MCP pointer
-        GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial, Adafruit_MCP23X17* mcp);
         
         // New constructor using MCPManager singleton (no MCP pointer needed)
-        GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial);
+        GPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial);
         
         void init(ESPudp* espUdp);
         
@@ -42,13 +40,13 @@ class GPS{
         uint32_t gpsWatchdog;
         uint8_t _gpsFixIndPin;
         uint8_t _rtkFixIndPin;
-        ESPconfig* espConfig;
+        ESPdata* espData;
         ESPudp* espUdp;
         NMEAParser<2> parser;
         UM980 myGNSS;
         HardwareSerial* gpsSerial;
         HardwareSerial* bnoSerial;
-        Adafruit_MCP23X17* mcp;
+
         
         Adafruit_BNO08x_RVC rvc;
 };

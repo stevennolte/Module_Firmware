@@ -2,7 +2,7 @@
 #define MOTORDRIVER_H
 
 #include "Arduino.h"
-#include "ESPconfig.h"
+#include "ESPdata.h"
 #include <Adafruit_MCP23X17.h>
 
 
@@ -17,7 +17,7 @@ class MotorDriver{
         void disable();
         void setCW();
         void setCCW();
-        MotorDriver(ESPconfig* vars, Adafruit_MCP23X17* mcp);
+        MotorDriver(ESPdata* vars, Adafruit_MCP23X17* mcp);
         
     private:
         
@@ -33,7 +33,7 @@ class MotorDriver{
         float pidInput;
         float pidOutput;
 
-        ESPconfig* espConfig;
+        ESPdata* espData;
         Adafruit_MCP23X17* mcp;
        
 

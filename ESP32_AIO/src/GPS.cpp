@@ -3,14 +3,14 @@
 GPS* GPS::instance = nullptr;
 
 // New constructor using MCPManager singleton (no MCP pointer needed)
-GPS::GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) : parser(), rvc() , myGNSS(){
-    espConfig = vars;
+GPS::GPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) : parser(), rvc() , myGNSS(){
+    espData = vars;
     
     this->gpsSerial = gpsSerial;
     this->bnoSerial = bnoSerial;
-
-    _gpsFixIndPin = espConfig->gpioDefs.gpsFix;
-    _rtkFixIndPin = espConfig->gpioDefs.rtkFix;
+    
+    _gpsFixIndPin = espData->gpioDefs.gpsFix;
+    _rtkFixIndPin = espData->gpioDefs.rtkFix;
     instance = this;
 }
 
@@ -19,31 +19,31 @@ GPS::GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) 
 void GPS::GGA_Handler() //Rec'd GGA
 {
     // fix time
-    parser.getArg(0, espConfig->gpsData.fixTime);
+    parser.getArg(0, espData->gpsData.fixTime);
 
     // latitude
-    parser.getArg(1, espConfig->gpsData.latitude);
-    parser.getArg(2, espConfig->gpsData.latNS);
+    parser.getArg(1, espData->gpsData.latitude);
+    parser.getArg(2, espData->gpsData.latNS);
 
     // longitude
-    parser.getArg(3, espConfig->gpsData.longitude);
+    parser.getArg(3, espData->gpsData.longitude);
     // Serial.println(longitude);
-    parser.getArg(4, espConfig->gpsData.lonEW);
+    parser.getArg(4, espData->gpsData.lonEW);
 
     // fix quality
-    parser.getArg(5, espConfig->gpsData.fixQuality);
+    parser.getArg(5, espData->gpsData.fixQuality);
 
     // satellite #
-    parser.getArg(6, espConfig->gpsData.numSats);
+    parser.getArg(6, espData->gpsData.numSats);
 
     // HDOP
-    parser.getArg(7, espConfig->gpsData.HDOP);
+    parser.getArg(7, espData->gpsData.HDOP);
 
     // altitude
-    parser.getArg(8, espConfig->gpsData.altitude);
+    parser.getArg(8, espData->gpsData.altitude);
 
     // time of last DGPS update
-    parser.getArg(12, espConfig->gpsData.ageDGPS);
+    parser.getArg(12, espData->gpsData.ageDGPS);
 
     buildNmea();
 }
@@ -59,13 +59,7 @@ void GPS::init(ESPudp* espUdp){
     
     MCPManager& mcpManager = MCPManager::getInstance();
     if (mcpManager.isInitialized()) {
-        mcpManager.pinMode(_gpsFixIndPin, OUTPUT);
-        mcpManager.pinMode(_rtkFixIndPin, OUTPUT);
-        mcpManager.digitalWrite(_gpsFixIndPin, HIGH);
-        mcpManager.digitalWrite(_rtkFixIndPin, HIGH);
-        delay(1000);
-        mcpManager.digitalWrite(_gpsFixIndPin, LOW);
-        mcpManager.digitalWrite(_rtkFixIndPin, LOW);
+        mcpManager.setGPSactive();
     }
    
     parser.addHandler("G-GGA", staticGGA_Handler);
@@ -76,9 +70,9 @@ void GPS::init(ESPudp* espUdp){
     //     Serial.println("BNO08x not detected");
     // }
     if (rvc.begin(bnoSerial)){
-        espConfig->gpsData.imuState = 1;
+        espData->gpsData.imuState = 1;
     } else {
-        espConfig->gpsData.imuState = 2;
+        espData->gpsData.imuState = 2;
         Serial.println("RVC Start Failed");
     }
     
@@ -90,11 +84,11 @@ void GPS::init(ESPudp* espUdp){
     }
     if (!myGNSS.isConnected()) //Give the serial port over to the library
     {
-        espConfig->gpsData.state = 2;
+        espData->gpsData.state = 2;
         Serial.println("UM980 failed to respond. Check ports and baud rates. Freezing...");
         
     } else {
-        espConfig->gpsData.state = 1;
+        espData->gpsData.state = 1;
         Serial.println("UM980 detected!");
         myGNSS.disableOutput();
         myGNSS.setModeRoverAutomotive();
@@ -137,9 +131,9 @@ void GPS::initWithSingleton(ESPudp* espUdp){
     parser.addHandler("G-GGA", staticGGA_Handler);
     
     if (rvc.begin(bnoSerial)){
-        espConfig->gpsData.imuState = 1;
+        espData->gpsData.imuState = 1;
     } else {
-        espConfig->gpsData.imuState = 2;
+        espData->gpsData.imuState = 2;
         Serial.println("RVC Start Failed");
     }
     
@@ -150,12 +144,12 @@ void GPS::initWithSingleton(ESPudp* espUdp){
         Serial.println("Trying to start UM980");
     }
     if (!myGNSS.isConnected()) {
-        espConfig->gpsData.state = 2;
+        espData->gpsData.state = 2;
         Serial.print("UM980 Failed to Respond on Serial, State: ");
-        Serial.println(espConfig->gpsData.state);
+        Serial.println(espData->gpsData.state);
     } else {
         Serial.println("UM980 Connected and ready");
-        espConfig->gpsData.state = 1;
+        espData->gpsData.state = 1;
         xTaskCreatePinnedToCore(taskHandler, "taskHandler", 10000, this, 1, NULL, 0);
     }
     
@@ -171,7 +165,7 @@ void GPS::calculateChecksum(void)
   // The checksum calc starts after '$' and ends before '*'
   for (inx = 1; inx < 200; inx++)
   {
-    tmp = espConfig->gpsData.nmea[inx];
+    tmp = espData->gpsData.nmea[inx];
 
     // * Indicates end of data and start of checksum
     if (tmp == '*')
@@ -183,63 +177,63 @@ void GPS::calculateChecksum(void)
   }
 
   byte chk = (sum >> 4);
-  char hex[2] = { espConfig->gpsData.asciiHex[chk], 0 };
-  strcat(espConfig->gpsData.nmea, hex);
+  char hex[2] = { espData->gpsData.asciiHex[chk], 0 };
+  strcat(espData->gpsData.nmea, hex);
 
   chk = (sum % 16);
-  char hex2[2] = { espConfig->gpsData.asciiHex[chk], 0 };
-  strcat(espConfig->gpsData.nmea, hex2);
+  char hex2[2] = { espData->gpsData.asciiHex[chk], 0 };
+  strcat(espData->gpsData.nmea, hex2);
 }
 
 
 
 void GPS::buildNmea()
 {
-    strcpy(espConfig->gpsData.nmea, "");
-    strcat(espConfig->gpsData.nmea, "$PANDA,");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.fixTime);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.latitude);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.latNS);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.longitude);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.lonEW);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.fixQuality);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.numSats);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.HDOP);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.altitude);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.ageDGPS);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.speedKnots);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.imuHeading);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.imuRoll);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.imuPitch);
-    strcat(espConfig->gpsData.nmea, ",");
-    strcat(espConfig->gpsData.nmea, espConfig->gpsData.imuYawRate);
-    strcat(espConfig->gpsData.nmea, "*");
+    strcpy(espData->gpsData.nmea, "");
+    strcat(espData->gpsData.nmea, "$PANDA,");
+    strcat(espData->gpsData.nmea, espData->gpsData.fixTime);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.latitude);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.latNS);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.longitude);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.lonEW);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.fixQuality);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.numSats);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.HDOP);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.altitude);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.ageDGPS);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.speedKnots);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.imuHeading);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.imuRoll);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.imuPitch);
+    strcat(espData->gpsData.nmea, ",");
+    strcat(espData->gpsData.nmea, espData->gpsData.imuYawRate);
+    strcat(espData->gpsData.nmea, "*");
 
     calculateChecksum();
 
-    strcat(espConfig->gpsData.nmea, "\r\n");
+    strcat(espData->gpsData.nmea, "\r\n");
 
 
-    if (espConfig->wifiCfg.state == 1)   //If ethernet running send the GPS there
+    if (espData->wifiCfg.state == 1)   //If ethernet running send the GPS there
     {
-        int len = strlen(espConfig->gpsData.nmea);
+        int len = strlen(espData->gpsData.nmea);
         // udpMethods.udp.writeTo(nmea,len,IPAddress(progData.ips[0],progData.ips[1],progData.ips[2],255),9999);
         // TODO: udpMethods.udp.broadcastTo(nmea,9999);
-        // espUdp->udpNtrip.broadcastTo(espConfig->gpsData.nmea,9999);
-        espUdp->sendUDPgps(espConfig->gpsData.nmea);
+        // espUdp->udpNtrip.broadcastTo(espData->gpsData.nmea,9999);
+        espUdp->sendUDPgps(espData->gpsData.nmea);
         // Eth_udpPAOGI.beginPacket(Eth_ipDestination, portDestination);
         // Eth_udpPAOGI.write(nmea, len);
         // Eth_udpPAOGI.endPacket();

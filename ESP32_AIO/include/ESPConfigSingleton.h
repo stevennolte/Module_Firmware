@@ -1,10 +1,10 @@
 #ifndef ESP_CONFIG_SINGLETON_H
 #define ESP_CONFIG_SINGLETON_H
 
-#include "ESPconfig.h"
+#include "ESPdata.h"
 
 // Convenience macro for accessing the ESPconfig singleton
-#define ESP_CONFIG ESPconfig::getInstance()
+#define ESP_CONFIG ESPdata::getInstance()
 
 // Quick access macros for frequently used sections
 #define PROG_DATA ESP_CONFIG.progData
@@ -42,7 +42,7 @@ STEER_DATA.targetSteerAngle = 45.0;
 GPS_DATA.latitude = "1234.5678";
 
 // Or explicit singleton access:
-ESPconfig::getInstance().steerData.targetSteerAngle = 45.0;
+ESPdata::getInstance().steerData.targetSteerAngle = 45.0;
 ESP_CONFIG.gpsData.latitude = "1234.5678";
 
 // Save configuration:

@@ -5,7 +5,7 @@
 #include "AsyncUDP.h"
 #include <AsyncTCP.h>
 
-#include "ESPconfig.h"
+#include "ESPdata.h"
 #include "GPS.h"
 
 // Forward declaration of the GPS class
@@ -22,14 +22,14 @@ class ESPudp{
         AsyncUDP udpGPS;
         AsyncUDP udpWAS;
         uint8_t calcChecksum(uint8_t* data, size_t size);
-        ESPudp(ESPconfig* vars);
+        ESPudp(ESPdata* vars);
     private:
         
         
         AsyncUDP udpNtrip;
         AsyncUDP udpJoystick;
         
-        ESPconfig* espConfig;
+        ESPdata* espData;
         GPS* _gps;
     
 };

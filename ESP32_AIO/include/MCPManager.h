@@ -3,7 +3,7 @@
 
 #include <Adafruit_MCP23X17.h>
 #include <Wire.h>
-#include "ESPConfigSingleton.h"
+#include "ESPdata.h"
 
 /**
  * @brief Singleton manager for Adafruit_MCP23X17 I/O expander
@@ -16,10 +16,10 @@ private:
     static MCPManager* instance;
     Adafruit_MCP23X17 mcp;
     bool initialized;
-    ESPconfig& config;  // Store reference to avoid repeated getInstance() calls
+    ESPdata& config;  // Store reference to avoid repeated getInstance() calls
     
     // Private constructor to prevent direct instantiation
-    MCPManager() : initialized(false), config(ESPconfig::getInstance()) {}
+    MCPManager() : initialized(false), config(ESPdata::getInstance()) {}
     
     // Prevent copy construction and assignment
     MCPManager(const MCPManager&) = delete;
@@ -115,7 +115,7 @@ public:
         return LOW;
     }
 
-    void setGPS(){
+    void setGPSactive(){
         mcp.pinMode(config.gpioDefs.gpsFix, OUTPUT);
         mcp.digitalWrite(config.gpioDefs.gpsFix, HIGH);
         return;

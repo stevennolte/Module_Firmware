@@ -2,8 +2,8 @@
 #include "WiFi.h"
 
 
-ESPWifi::ESPWifi(ESPconfig* vars){
-    espConfig = vars;
+ESPWifi::ESPWifi(ESPdata* vars){
+    espData = vars;
 }
 
 uint8_t ESPWifi::connect(){
@@ -12,12 +12,12 @@ uint8_t ESPWifi::connect(){
     uint8_t numNetworks = WiFi.scanNetworks();
     for (int i = 0; i < numNetworks; i++){
         for (int j = 0; j < 4; j++){
-            // Serial.println(espConfig->wifiCfg.ssids[j]);
-            if (WiFi.SSID(i) == espConfig->wifiCfg.ssids[j]){
+            // Serial.println(espData->wifiCfg.ssids[j]);
+            if (WiFi.SSID(i) == espData->wifiCfg.ssids[j]){
                 Serial.println("Found network");
-                Serial.println(espConfig->wifiCfg.ssids[j]);
-                Serial.println(espConfig->wifiCfg.passwords[j]);
-                WiFi.begin(espConfig->wifiCfg.ssids[j],espConfig->wifiCfg.passwords[j]);
+                Serial.println(espData->wifiCfg.ssids[j]);
+                Serial.println(espData->wifiCfg.passwords[j]);
+                WiFi.begin(espData->wifiCfg.ssids[j],espData->wifiCfg.passwords[j]);
                 while(WiFi.status() != WL_CONNECTED){
                     Serial.print(".");
                     delay(100);
@@ -25,7 +25,7 @@ uint8_t ESPWifi::connect(){
                 Serial.println();
                 Serial.println(WiFi.localIP().toString());
                 IPAddress ip = WiFi.localIP();
-                IPAddress local_IP(ip[0],ip[1],ip[2],espConfig->wifiCfg.ips[3]);
+                IPAddress local_IP(ip[0],ip[1],ip[2],espData->wifiCfg.ips[3]);
                 IPAddress gateway(ip[0],ip[1],ip[2],1);
                 IPAddress subnet(255,255,255,0);
                 WiFi.config(local_IP,gateway,subnet);
@@ -40,8 +40,8 @@ uint8_t ESPWifi::connect(){
 }
 
 uint8_t ESPWifi::makeAP(){
-    IPAddress local_IP(espConfig->wifiCfg.ips[0],espConfig->wifiCfg.ips[1],espConfig->wifiCfg.ips[2],espConfig->wifiCfg.ips[3]);
-    IPAddress gateway(espConfig->wifiCfg.ips[0],espConfig->wifiCfg.ips[1],espConfig->wifiCfg.ips[2],1);
+    IPAddress local_IP(espData->wifiCfg.ips[0],espData->wifiCfg.ips[1],espData->wifiCfg.ips[2],espData->wifiCfg.ips[3]);
+    IPAddress gateway(espData->wifiCfg.ips[0],espData->wifiCfg.ips[1],espData->wifiCfg.ips[2],1);
     IPAddress subnet(255,255,255,0);
     WiFi.setHostname(NAME);
     WiFi.mode(WIFI_AP_STA);   
@@ -71,8 +71,8 @@ void ESPWifi::taskHandler(void *param){
 
 void ESPWifi::continuousLoop(){
     while (true){
-        espConfig->wifiCfg.moduleIP = WiFi.localIP();
-        switch(espConfig->wifiCfg.state){
+        espData->wifiCfg.moduleIP = WiFi.localIP();
+        switch(espData->wifiCfg.state){
             case 0:
                 break;
             case 1:
@@ -86,7 +86,7 @@ void ESPWifi::continuousLoop(){
             case 2:
                 break;
             case 3:
-                if(espConfig->wifiCfg.apMode==0){
+                if(espData->wifiCfg.apMode==0){
                     // scanNetworks();
                 }    
             // scanNetworks();

@@ -4,14 +4,14 @@
 // #define WAS_DEBUG
 
 #include "Arduino.h"
-#include "ESPconfig.h"
+#include "ESPdata.h"
 #include <Wire.h>
 #include "Adafruit_ADS1X15.h"
 
 
 class WAS{
     public:
-        WAS(ESPconfig* vars, Adafruit_ADS1115* ads);
+        WAS(ESPdata* vars, Adafruit_ADS1115* ads);
         void init();
         void loop();
         void zeroSteerAngle();
@@ -24,7 +24,7 @@ class WAS{
         uint32_t lastUpdateTime;
         #endif
         void updateRampValue();
-        ESPconfig* espConfig;
+        ESPdata* espData;
         Adafruit_ADS1115* ads;
        
         

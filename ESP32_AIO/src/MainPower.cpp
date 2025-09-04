@@ -1,23 +1,23 @@
 #include "MainPower.h"
 
 
-MainPower::MainPower(ESPconfig* config, Adafruit_MCP23X17* mcp, Adafruit_ADS1115* ads)
+MainPower::MainPower(ESPdata* config, Adafruit_MCP23X17* mcp, Adafruit_ADS1115* ads)
 {
-    _config = config;
+    _data = config;
     _mcp = mcp;
     _ads = ads;
-    _powerOn = _config->gpioDefs.mainPowerInd;
-    _mainPowerPin = _config->gpioDefs.mainPowerPin;
+    _powerOn = _data->gpioDefs.mainPowerInd;
+    _mainPowerPin = _data->gpioDefs.mainPowerPin;
 }
 
 void MainPower::startTask()
 {
     _mcp->pinMode(_powerOn, OUTPUT);
-    pinMode(_config->gpioDefs.mainPowerPin, OUTPUT);
-    pinMode(_config->gpioDefs.mainPowerDen, OUTPUT);
-    digitalWrite(_config->gpioDefs.mainPowerDen, LOW);
+    pinMode(_data->gpioDefs.mainPowerPin, OUTPUT);
+    pinMode(_data->gpioDefs.mainPowerDen, OUTPUT);
+    digitalWrite(_data->gpioDefs.mainPowerDen, LOW);
 
-    digitalWrite(_config->gpioDefs.mainPowerPin, HIGH);
+    digitalWrite(_data->gpioDefs.mainPowerPin, HIGH);
     _mcp->digitalWrite(_powerOn, HIGH);
     xTaskCreatePinnedToCore(
         taskHandler,   /* Task function. */

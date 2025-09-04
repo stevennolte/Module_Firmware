@@ -2,20 +2,20 @@
 #define CANBUS_H
 
 #include "Arduino.h"
-#include "ESPconfig.h"
+#include "ESPdata.h"
 #include "driver/twai.h"
 
 
 class CANBUS{
     public:
-        CANBUS(ESPconfig* vars);
+        CANBUS(ESPdata* vars);
         void begin();
         void sendCAN(uint32_t identifier, uint8_t data[], uint8_t data_length_code);
         void receiveCAN();
         void handle_tx_message(twai_message_t message);
         void transmit_normal_message(uint32_t identifier, uint8_t data[], uint8_t data_length_code);
     private:
-        ESPconfig* espConfig;
+        ESPdata* espData;
         twai_message_t rx_message;
         twai_message_t tx_message;
         twai_general_config_t g_config;

@@ -1,8 +1,8 @@
 #include "WAS.h"
 
 
-WAS::WAS(ESPconfig* vars, Adafruit_ADS1115* ads) {
-    espConfig = vars;
+WAS::WAS(ESPdata* vars, Adafruit_ADS1115* ads) {
+    espData = vars;
     this->ads = ads;
     #ifdef WAS_DEBUG
     rampValue = -20.0;
@@ -20,14 +20,14 @@ void WAS::init() {
 
 void WAS::loop(){
     #ifndef WAS_DEBUG
-    if (millis()-espConfig->steerData.lastWAStime < 1000){
-        espConfig->steerCfg.wirelessWAS = true;
+    if (millis()-espData->steerData.lastWAStime < 1000){
+        espData->steerCfg.wirelessWAS = true;
     } else {
-        espConfig->steerCfg.wirelessWAS = false;
-        if (espConfig->progData.adsState == 1 && espConfig->steerCfg.wirelessWAS == false && espConfig->steerCfg.useADS == 1){ 
-            espConfig->steerData.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
+        espData->steerCfg.wirelessWAS = false;
+        if (espData->progData.adsState == 1 && espData->steerCfg.wirelessWAS == false && espData->steerCfg.useADS == 1){ 
+            espData->steerData.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
         } else {
-            espConfig->steerData.actSteerAngle = 0.0;
+            espData->steerData.actSteerAngle = 0.0;
         }
     }
     vTaskDelay(10);
@@ -40,7 +40,7 @@ void WAS::loop(){
 }
 
 void WAS::zeroSteerAngle() {
-    espConfig->steerData.wasZeroAngle = espConfig->steerData.actSteerAngle;
+    espData->steerData.wasZeroAngle = espData->steerData.actSteerAngle;
 }
 
 #ifdef WAS_DEBUG
@@ -58,7 +58,7 @@ void WAS::updateRampValue() {
             rampDirection = 1; // Change direction to up
         }
 
-        espConfig->steerData.actSteerAngle = rampValue;
+        espData->steerData.actSteerAngle = rampValue;
         // Serial.println(rampValue);
     }
 }
