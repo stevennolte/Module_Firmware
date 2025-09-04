@@ -2,12 +2,13 @@
 
 GPS* GPS::instance = nullptr;
 
-GPS::GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial, Adafruit_MCP23X17* mcp) : parser(), rvc() , myGNSS(){
+// New constructor using MCPManager singleton (no MCP pointer needed)
+GPS::GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) : parser(), rvc() , myGNSS(){
     espConfig = vars;
     
     this->gpsSerial = gpsSerial;
     this->bnoSerial = bnoSerial;
-    this->mcp = mcp;
+
     _gpsFixIndPin = espConfig->gpioDefs.gpsFix;
     _rtkFixIndPin = espConfig->gpioDefs.rtkFix;
     instance = this;
@@ -53,13 +54,20 @@ void GPS::staticGGA_Handler(){
 }
 void GPS::init(ESPudp* espUdp){
     this->espUdp = espUdp;
-    mcp->pinMode(_gpsFixIndPin, OUTPUT);
-    mcp->pinMode(_rtkFixIndPin, OUTPUT);
-    mcp->digitalWrite(_gpsFixIndPin, HIGH);
-    mcp->digitalWrite(_rtkFixIndPin, HIGH);
-    delay(1000);
-    mcp->digitalWrite(_gpsFixIndPin, LOW);
-    mcp->digitalWrite(_rtkFixIndPin, LOW);
+    
+    // Use MCPManager if no MCP pointer was provided in constructor
+    
+    MCPManager& mcpManager = MCPManager::getInstance();
+    if (mcpManager.isInitialized()) {
+        mcpManager.pinMode(_gpsFixIndPin, OUTPUT);
+        mcpManager.pinMode(_rtkFixIndPin, OUTPUT);
+        mcpManager.digitalWrite(_gpsFixIndPin, HIGH);
+        mcpManager.digitalWrite(_rtkFixIndPin, HIGH);
+        delay(1000);
+        mcpManager.digitalWrite(_gpsFixIndPin, LOW);
+        mcpManager.digitalWrite(_rtkFixIndPin, LOW);
+    }
+   
     parser.addHandler("G-GGA", staticGGA_Handler);
     // parser.setErrorHandler(errorHandler);
     // parser.addHandler("G-GGA", GPS::GGA_Handler);

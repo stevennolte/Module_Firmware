@@ -1,8 +1,7 @@
 #ifndef ESPCONF_H
 #define ESPCONF_H
 #include "Arduino.h"
-#include "LittleFS.h"
-#include "ArduinoJson.h"
+#include "Preferences.h"
 #include "Version.h"
 
 
@@ -10,14 +9,16 @@ class ESPconfig
 {
 private:
     static ESPconfig* instance;
+    Preferences preferences;  // Add Preferences object
     
 public:
     // Singleton pattern methods
     static ESPconfig& getInstance();
     static void destroyInstance();
     
-    // Existing public methods
+    // Updated methods for Preferences
     uint8_t loadConfig();
+    uint8_t saveConfig();
     uint8_t updateIP();
     uint8_t updateServer();
     uint8_t updateSteer();

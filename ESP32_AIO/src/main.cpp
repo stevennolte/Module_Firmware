@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "ESPconfig.h"
+#include "ESPdata.h"
 #include "ESPWifi.h"
 #include "myLED.h"
 #include "Wire.h"
@@ -29,11 +30,14 @@ Adafruit_ADS1115 ads;
 // Using singleton pattern - single access point for configuration
 ESPconfig& espConfig = ESPconfig::getInstance();
 
+// Using singleton pattern - single access point for program data
+ESPdata& espData = ESPdata::getInstance();
+
 // Get MCPManager singleton instance (alternative approach)
 MCPManager& mcpManager = MCPManager::getInstance();
 
 // Components using singleton instance
-GPS gps(&espConfig, &gpsSerial, &bnoSerial, &mcp);
+GPS gps(&espConfig, &gpsSerial, &bnoSerial);  // Using MCPManager singleton, no MCP pointer needed
 MyLED myLED(&espConfig);
 MainPower mainPower(&espConfig, &mcp, &ads);
 ESPWifi espWifi(&espConfig);
@@ -101,64 +105,64 @@ bool I2Csetup(){
   
 }
 
-#pragma region OTA
-const char *errtext(int code)
-{
-	switch(code)
-	{
-		case ESP32OTAPull::UPDATE_AVAILABLE:
-			return "An update is available but wasn't installed";
-		case ESP32OTAPull::NO_UPDATE_PROFILE_FOUND:
-			return "No profile matches";
-		case ESP32OTAPull::NO_UPDATE_AVAILABLE:
-			return "Profile matched, but update not applicable";
-		case ESP32OTAPull::UPDATE_OK:
-			return "An update was done, but no reboot";
-		case ESP32OTAPull::HTTP_FAILED:
-			return "HTTP GET failure";
-		case ESP32OTAPull::WRITE_ERROR:
-			return "Write error";
-		case ESP32OTAPull::JSON_PROBLEM:
-			return "Invalid JSON";
-		case ESP32OTAPull::OTA_UPDATE_FAIL:
-			return "Update fail (no OTA partition?)";
-		default:
-			if (code > 0)
-				return "Unexpected HTTP response code";
-			break;
-	}
-	return "Unknown error";
-}
+// #pragma region OTA
+// const char *errtext(int code)
+// {
+// 	switch(code)
+// 	{
+// 		case ESP32OTAPull::UPDATE_AVAILABLE:
+// 			return "An update is available but wasn't installed";
+// 		case ESP32OTAPull::NO_UPDATE_PROFILE_FOUND:
+// 			return "No profile matches";
+// 		case ESP32OTAPull::NO_UPDATE_AVAILABLE:
+// 			return "Profile matched, but update not applicable";
+// 		case ESP32OTAPull::UPDATE_OK:
+// 			return "An update was done, but no reboot";
+// 		case ESP32OTAPull::HTTP_FAILED:
+// 			return "HTTP GET failure";
+// 		case ESP32OTAPull::WRITE_ERROR:
+// 			return "Write error";
+// 		case ESP32OTAPull::JSON_PROBLEM:
+// 			return "Invalid JSON";
+// 		case ESP32OTAPull::OTA_UPDATE_FAIL:
+// 			return "Update fail (no OTA partition?)";
+// 		default:
+// 			if (code > 0)
+// 				return "Unexpected HTTP response code";
+// 			break;
+// 	}
+// 	return "Unknown error";
+// }
 
-void OtaPullCallback(int offset, int totallength)
-{
-	Serial.printf("Updating %d of %d (%02d%%)...\r", offset, totallength, 100 * offset / totallength);
-}
+// void OtaPullCallback(int offset, int totallength)
+// {
+// 	Serial.printf("Updating %d of %d (%02d%%)...\r", offset, totallength, 100 * offset / totallength);
+// }
 
-void softwareUpdate(){
-  char basePath[] = "/%s/Releases/OTA_Config.json";
-  char CONFIG_URL[150];
-  sprintf(CONFIG_URL, basePath, NAME);
-  Serial.println(CONFIG_URL);
-  char SERVER[150];
-  sprintf(SERVER, "http://%d.%d.%d.%d:%d",espConfig.wifiCfg.ips[0],espConfig.wifiCfg.ips[1],espConfig.wifiCfg.ips[2],espConfig.otaCfg.ipAddr,espConfig.otaCfg.port);
-  Serial.print("CONFIG_URL: ");
-  Serial.println(CONFIG_URL);
-  Serial.print("SERVER: ");
-  Serial.println(SERVER);
+// void softwareUpdate(){
+//   char basePath[] = "/%s/Releases/OTA_Config.json";
+//   char CONFIG_URL[150];
+//   sprintf(CONFIG_URL, basePath, NAME);
+//   Serial.println(CONFIG_URL);
+//   char SERVER[150];
+//   sprintf(SERVER, "http://%d.%d.%d.%d:%d",espConfig.wifiCfg.ips[0],espConfig.wifiCfg.ips[1],espConfig.wifiCfg.ips[2],espConfig.otaCfg.ipAddr,espConfig.otaCfg.port);
+//   Serial.print("CONFIG_URL: ");
+//   Serial.println(CONFIG_URL);
+//   Serial.print("SERVER: ");
+//   Serial.println(SERVER);
   
-  ota.SetConfig(NAME);
-  ota.SetCallback(OtaPullCallback);
+//   ota.SetConfig(NAME);
+//   ota.SetCallback(OtaPullCallback);
   
-  Serial.printf("We are running version %s of the sketch, Board='%s', Device='%s', IP='%s \n", VERSION, ARDUINO_BOARD, WiFi.macAddress().c_str(),(String)(WiFi.localIP()[3]));
-  Serial.println();
-  // Serial.printf("Checking %s to see if an update is available...\n", CONFIG_URL);
-  Serial.println();
-  int ret = ota.CheckForOTAUpdate(SERVER, CONFIG_URL, VERSION);
-  Serial.printf("CheckForOTAUpdate returned %d (%s)\n\n", ret, errtext(ret));
-}
+//   Serial.printf("We are running version %s of the sketch, Board='%s', Device='%s', IP='%s \n", VERSION, ARDUINO_BOARD, WiFi.macAddress().c_str(),(String)(WiFi.localIP()[3]));
+//   Serial.println();
+//   // Serial.printf("Checking %s to see if an update is available...\n", CONFIG_URL);
+//   Serial.println();
+//   int ret = ota.CheckForOTAUpdate(SERVER, CONFIG_URL, VERSION);
+//   Serial.printf("CheckForOTAUpdate returned %d (%s)\n\n", ret, errtext(ret));
+// }
 
-#pragma endregion
+// #pragma endregion
 
 #pragma region Webserver
 
@@ -445,6 +449,11 @@ void setup(){
   delay(5000);   // Wait for the usb to connect so you can see the outputs at startup
   Serial.println("Starting up...");
   espConfig.progCfg.confRes = espConfig.loadConfig();
+  
+  // Load program data from Preferences
+  espData.loadData();
+  Serial.println("Program data loaded from Preferences");
+  
   // Start Wifi AP and Webserver for diagnostics
   // espConfig.wifiCfg.state = espWifi.connect();
   
@@ -553,10 +562,13 @@ void setup(){
   
   
   // Start GPS
-  // Traditional approach using MCP pointer injection:
+  // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):
   gps.init(&espUdp);
   
-  // Alternative approach using MCPManager singleton:
+  // Traditional approach using MCP pointer injection:
+  // gps.init(&espUdp);  // Would use MCP pointer if provided in constructor
+  
+  // Alternative explicit singleton method:
   // gps.initWithSingleton(&espUdp);
 
   // If everything is good, turn on power to autosteer
@@ -601,6 +613,18 @@ void loop(){
   
   //Read in NMEA from the UM980
   debugPrint();
+  
+  // Update program data
+  espData.setUptime(millis());
+  
+  // Example: Save data every 30 seconds (30000 ms / 5000 ms delay = 6 cycles)
+  static uint8_t saveCounter = 0;
+  saveCounter++;
+  if (saveCounter >= 6) {
+    espData.saveData();
+    saveCounter = 0;
+    Serial.println("Program data saved to Preferences");
+  }
   
   delay(5000);
 }

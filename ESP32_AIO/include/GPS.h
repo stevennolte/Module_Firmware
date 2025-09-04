@@ -14,7 +14,12 @@ class ESPudp;
 
 class GPS{
     public:
+        // Traditional constructor with MCP pointer
         GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial, Adafruit_MCP23X17* mcp);
+        
+        // New constructor using MCPManager singleton (no MCP pointer needed)
+        GPS(ESPconfig* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial);
+        
         void init(ESPudp* espUdp);
         
         // Alternative method using MCPManager singleton
