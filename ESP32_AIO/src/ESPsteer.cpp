@@ -14,72 +14,72 @@ ESPsteer::ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads, Adafruit_MCP23X17* mcp)
 void ESPsteer::continuousLoop() {
     while (true) {
         vTaskDelay(3);
-        if (espData->steerCfg.settingsUpdated = 1){
+        if (espData->steer.settingsUpdated == 1){
             setPIDgains();
-            if (espData->steerCfg.set0 == 1){
+            if (espData->steer.set0 == 1){
                 // TODO: Set steer angle offset
-                
-                espData->steerCfg.set0 = 0;
+
+                espData->steer.set0 = 0;
             }
-            espData->steerCfg.settingsUpdated = 0;
+            espData->steer.settingsUpdated = 0;
         }
         was.loop();
-        espData->steerData.steerCurrent = getCurrent();
-        espData->steerData.testState = getTestState();
-        // Serial.println(espData->steerData.testState);
+        espData->steer.steerCurrent = getCurrent();
+        espData->steer.testState = getTestState();
+        // Serial.println(espData->steer.testState);
         // vTaskDelay(1000);
-        if (millis() - espData->steerData.lastSteerOutMsgTime > espData->steerCfg.steerMsgRate) {
+        if (millis() - espData->steer.lastSteerOutMsgTime > espData->steer.steerMsgRate) {
 
-            espData->steerData.lastSteerOutMsgTime = millis();
+            espData->steer.lastSteerOutMsgTime = millis();
             uint8_t testdata[14];
             testdata[0] = 0x80;
             testdata[1] = 0x81;
-            testdata[2] = espData->wifiCfg.ips[3];
+            testdata[2] = espData->wifi.ips[3];
             testdata[3] = 253;
             testdata[4] = 8;
-            testdata[5] = static_cast<uint16_t>(espData->steerData.actSteerAngle*100) & 0xFF;
-            testdata[6] = static_cast<uint16_t>(espData->steerData.actSteerAngle*100) >> 8;
+            testdata[5] = static_cast<uint16_t>(espData->steer.actSteerAngle*100) & 0xFF;
+            testdata[6] = static_cast<uint16_t>(espData->steer.actSteerAngle*100) >> 8;
             testdata[7] = 9999 & 0xFF;
             testdata[8] = 9999 >> 8;
             testdata[9] = 8888 & 0xFF;
             testdata[10] = 8888 >> 8;
-            if (espData->joystickData.switchStates[6] == 1) {
+            if (espData->joystick.switchStates[6] == 1) {
                 testdata[11] |= 0x01; // Set the first bit to 1
             } else {
                 testdata[11] &= ~0x01; // Clear the first bit to 0
             }
                         
             // Set the second bit of testdata[11] to switchStates[7]
-            if (espData->joystickData.switchStates[7] == 1) {
+            if (espData->joystick.switchStates[7] == 1) {
                 testdata[11] |= 0x02; // Set the second bit to 1
             } else {
                 testdata[11] &= ~0x02; // Clear the second bit to 0
             }
             // testdata[11] = 0;
-            testdata[12] = static_cast<uint8_t>((espData->steerData.pwmCmd * 255) / 8109);
+            testdata[12] = static_cast<uint8_t>((espData->steer.pwmCmd * 255) / 8109);
             testdata[13] = espUdp->calcChecksum(testdata, sizeof(testdata));
-            espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espData->wifiCfg.ips[0], espData->wifiCfg.ips[1], espData->wifiCfg.ips[2], 255), 9999);
+            espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);
             // espUdp->sendUDP(testdata, sizeof(testdata));
             delay(3);
             // Current Message
             uint8_t currentData[14];
             currentData[0] = 0x80;
             currentData[1] = 0x81;
-            currentData[2] = espData->wifiCfg.ips[3];
+            currentData[2] = espData->wifi.ips[3];
             currentData[3] = 250;
             currentData[4] = 8;
-            currentData[5] = static_cast<uint8_t>((espData->steerData.steerCurrent * 255) / (65535/4));
+            currentData[5] = static_cast<uint8_t>((espData->steer.steerCurrent * 255) / (65535/4));
             currentData[13] = espUdp->calcChecksum(currentData, sizeof(currentData));
-            espUdp->udp.writeTo(currentData, sizeof(currentData), IPAddress(espData->wifiCfg.ips[0], espData->wifiCfg.ips[1], espData->wifiCfg.ips[2], 255), 9999);
+            espUdp->udp.writeTo(currentData, sizeof(currentData), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);
         }
-        
-        
-        switch (espData->steerData.status){
+
+
+        switch (espData->steer.status){
             case 1:
                 steerLoop();
                 break;
             case 0:
-                // if (espData->steerData.testState != 0){
+                // if (espData->steer.testState != 0){
                 steerTestLoop();
                 // }
                 break;
@@ -90,7 +90,7 @@ void ESPsteer::continuousLoop() {
 
 void ESPsteer::steerTestLoop(){
     // Serial.println("Steer Test Loop");
-    switch (espData->steerData.testState){
+    switch (espData->steer.testState){
         case 1:
             if (pid.getSetpoint() != 1){
                 pid.setSetpoint(100);
@@ -115,7 +115,7 @@ void ESPsteer::steerTestLoop(){
     }
     #ifdef PRINT_PID_DEBUG
     Serial.print("Test State: ");
-    Serial.print(espData->steerData.testState);
+    Serial.print(espData->steer.testState);
     Serial.print("\tSetpoint: ");
     Serial.print(pid.getSetpoint());
     Serial.print("\tOutput: ");
@@ -124,21 +124,21 @@ void ESPsteer::steerTestLoop(){
 }
 
 void ESPsteer::steerLoop(){
-    
-    if (millis() - espData->steerData.watchdog > 2000){
-        espData->steerData.status = 0;
+
+    if (millis() - espData->steer.watchdog > 2000){
+        espData->steer.status = 0;
     }
     
-    if (espData->steerData.status == 1){
-        pid.setSetpoint(espData->steerData.targetSteerAngle);
-        pid.update(espData->steerData.actSteerAngle);
-        espData->steerData.pidCmd = pid.getOutput();
-        motorDriver.setOutput(espData->steerData.pidCmd);
+    if (espData->steer.status == 1){
+        pid.setSetpoint(espData->steer.targetSteerAngle);
+        pid.update(espData->steer.actSteerAngle);
+        espData->steer.pidCmd = pid.getOutput();
+        motorDriver.setOutput(espData->steer.pidCmd);
     } else {
         pid.setSetpoint(0);
         pid.update(0);
-        espData->steerData.pidCmd = pid.getOutput();
-        motorDriver.setOutput(espData->steerData.pidCmd);
+        espData->steer.pidCmd = pid.getOutput();
+        motorDriver.setOutput(espData->steer.pidCmd);
     }
 }
 
@@ -149,14 +149,14 @@ void ESPsteer::taskHandler(void *param) {
 }
 
 void ESPsteer::setPIDgains(){
-    pid.setManualGains(float(espData->steerCfg.gainP)/200.0, 0, 0);
+    pid.setManualGains(float(espData->steer.gainP)/200.0, 0, 0);
 }
 
 void ESPsteer::begin(ESPudp* espUdp) {
     this->espUdp = espUdp;
-    pinMode(espData->gpioDefs.STEER_TEST_PIN, INPUT);
-    _status = espData->steerData.status;
-    espData->joystickData.testInfo.testa
+    pinMode(espData->pins.STEER_TEST_PIN, INPUT);
+    _status = espData->steer.status;
+    
 
     motorDriver.init();
     Serial.println("\tMotor Driver Initialized");
@@ -181,7 +181,7 @@ uint32_t ESPsteer::getCurrent() {
 }
 
 uint8_t ESPsteer::getTestState(){
-    uint32_t reading = analogReadMilliVolts(espData->gpioDefs.STEER_TEST_PIN);
+    uint32_t reading = analogReadMilliVolts(espData->pins.STEER_TEST_PIN);
     if (reading < 700){
         return 1;
     } else if (reading > 3000){

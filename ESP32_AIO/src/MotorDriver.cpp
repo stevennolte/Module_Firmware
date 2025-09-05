@@ -14,12 +14,12 @@ MotorDriver::MotorDriver(ESPdata* vars, Adafruit_MCP23X17* mcp){
     espData = vars;
     this->mcp = mcp;
     
-    inaPin = espData->gpioDefs.MOTOR_A_PIN;
-    inbPin = espData->gpioDefs.MOTOR_B_PIN;
-    pwmPin = espData->gpioDefs.MOTOR_PWM_PIN;
-    enaPin = espData->gpioDefs.ENA;
-    enbPin = espData->gpioDefs.ENB;
-    
+    inaPin = espData->pins.MOTOR_A_PIN;
+    inbPin = espData->pins.MOTOR_B_PIN;
+    pwmPin = espData->pins.MOTOR_PWM_PIN;
+    enaPin = espData->pins.ENA;
+    enbPin = espData->pins.ENB;
+
     
 }
 
@@ -36,7 +36,7 @@ void MotorDriver::init(){
     };
     ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
     ledc_channel_config_t ledc_channel = {
-        .gpio_num = espData->gpioDefs.MOTOR_PWM_PIN,
+        .gpio_num = espData->pins.MOTOR_PWM_PIN,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_0,
         .intr_type = LEDC_INTR_DISABLE,
@@ -54,7 +54,7 @@ void MotorDriver::init(){
     pinMode(inbPin, OUTPUT);
     // pinMode(pwmPin, OUTPUT);
     
-    if (espData->progData.mcpState == 1){
+    if (espData->program.mcpState == 1){
         mcp->pinMode(enaPin, OUTPUT);  //MCP23017 has the diagnostics pins as inputs
         mcp->pinMode(enbPin, OUTPUT); 
         mcp->digitalWrite(enaPin, LOW);
@@ -73,10 +73,10 @@ void MotorDriver::init(){
 
 void MotorDriver::setOutput(float value){
     // Serial.println(value);
-    espData->steerData.minScalar = float(espData->steerCfg.minPWM)/255.0;
-    espData->steerData.maxScalar = float(espData->steerCfg.highPWM)/255.0;
-    espData->steerData.minCmd = maxPWM * espData->steerData.minScalar;
-    espData->steerData.maxCmd = maxPWM * espData->steerData.maxScalar;
+    espData->steer.minScalar = float(espData->steer.minPWM)/255.0;
+    espData->steer.maxScalar = float(espData->steer.highPWM)/255.0;
+    espData->steer.minCmd = maxPWM * espData->steer.minScalar;
+    espData->steer.maxCmd = maxPWM * espData->steer.maxScalar;
     if (value > 0.001){
         
         // value = max(value, minScalar);
@@ -97,12 +97,12 @@ void MotorDriver::setOutput(float value){
     
     
     // Scale value to range [minCMD, maxCMD]
-    uint16_t scaledValue = espData->steerData.minCmd + value * (espData->steerData.maxCmd - espData->steerData.minCmd);
+    uint16_t scaledValue = espData->steer.minCmd + value * (espData->steer.maxCmd - espData->steer.minCmd);
 
     // cmdValue = uint16_t((float(maxPWM)) * abs(value));
     // espData->steerData.pwmCmd = min(float(cmdValue),scalar);
     cmdValue = scaledValue;
-    espData->steerData.pwmCmd = scaledValue;
+    espData->steer.pwmCmd = scaledValue;
     
     // Serial.println(cmdValue);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, cmdValue);

@@ -16,11 +16,11 @@ private:
     static MCPManager* instance;
     Adafruit_MCP23X17 mcp;
     bool initialized;
-    ESPdata& config;  // Store reference to avoid repeated getInstance() calls
+    ESPdata& _data;  // Store reference to avoid repeated getInstance() calls
     
     // Private constructor to prevent direct instantiation
-    MCPManager() : initialized(false), config(ESPdata::getInstance()) {}
-    
+    MCPManager() : initialized(false), _data(ESPdata::getInstance()) {}
+
     // Prevent copy construction and assignment
     MCPManager(const MCPManager&) = delete;
     MCPManager& operator=(const MCPManager&) = delete;
@@ -116,8 +116,8 @@ public:
     }
 
     void setGPSactive(){
-        mcp.pinMode(config.gpioDefs.gpsFix, OUTPUT);
-        mcp.digitalWrite(config.gpioDefs.gpsFix, HIGH);
+        mcp.pinMode(_data.pins.gpsFix, OUTPUT);
+        mcp.digitalWrite(_data.pins.gpsFix, HIGH);
         return;
     }
 };

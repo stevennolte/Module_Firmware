@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "espData.h"
 #include "ESPdata.h"
 #include "ESPWifi.h"
 #include "myLED.h"
@@ -28,16 +27,13 @@ Adafruit_MCP23X17 mcp;
 Adafruit_ADS1115 ads;
 
 // Using singleton pattern - single access point for configuration
-espData& espData = espData::getInstance();
-
-// Using singleton pattern - single access point for program data
 ESPdata& espData = ESPdata::getInstance();
 
 // Get MCPManager singleton instance (alternative approach)
-MCPManager& mcpManager = MCPManager::getInstance();
+
 
 // Components using singleton instance
-GPS gps(&espData, &gpsSerial, &bnoSerial);  // Using MCPManager singleton, no MCP pointer needed
+ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // Using MCPManager singleton, no MCP pointer needed
 MyLED myLED(&espData);
 MainPower mainPower(&espData, &mcp, &ads);
 ESPWifi espWifi(&espData);
@@ -48,14 +44,9 @@ AsyncWebServer server(80);
 ESPsteer espSteer(&espData, &ads, &mcp);
 std::vector<String> debugVars;
 
-// Reference shortcuts using singleton
-auto& progData = espData.progData;
-auto& progCfg = espData.progCfg;
-auto& progState = espData.progData.state;
-auto& wifiCfg = espData.wifiCfg;
 
 bool I2Csetup(){
-  if(!twoWire.setPins(espData.gpioDefs.SDA_PIN, espData.gpioDefs.SCL_PIN)){
+  if(!twoWire.setPins(espData.pins.SDA_PIN, espData.pins.SCL_PIN)){
     Serial.println("Wire failed to set pins");
     return false;
   }
@@ -77,12 +68,12 @@ bool I2Csetup(){
   if (error == 0)
   {
     Serial.println("MCP23017 found at address 0x20  !");
-    progData.mcpState = 1;
+    espData.program.mcpState = 1;
   }
   else 
   {
     Serial.println("Unknown error at address 0x20");
-    progData.mcpState = 2;
+    espData.program.mcpState = 2;
   }
   
   twoWire.beginTransmission(0x48);
@@ -90,14 +81,14 @@ bool I2Csetup(){
   if (error == 0)
   {
     Serial.println("ADS1115 found at address 0x48  !");
-    progData.adsState = 1;
+    espData.program.adsState = 1;
   }
   else 
   {
     Serial.println("Unknown error at address 0x48");
-    progData.adsState = 2;
+    espData.program.adsState = 2;
   }
-  if (progData.mcpState == 2 || progData.adsState == 2){
+  if (espData.program.mcpState == 2 || espData.program.adsState == 2){
     return false;
   } else {
     return true;
@@ -204,9 +195,9 @@ void handleFileDownload(AsyncWebServerRequest *request) {
 
 void handleWASzero(AsyncWebServerRequest *request) {
   // espSteer.was.zeroSteerAngle();
-  espData.steerData.wasZeroAngle = espData.steerData.absAngle;
-  Serial.println(espData.steerData.absAngle);
-  Serial.println(espData.steerData.wasZeroAngle);
+  espData.steer.wasZeroAngle = espData.steer.absAngle;
+  Serial.println(espData.steer.absAngle);
+  Serial.println(espData.steer.wasZeroAngle);
   Serial.println("WAS zeroed");
   uint8_t res = espData.saveWASzero();
   if (res == 1){
@@ -251,70 +242,67 @@ void updateDebugVars() {
   debugVars.push_back("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
   debugVars.push_back("Version: " + String(VERSION));
   debugVars.push_back("Wifi SSID: " + WiFi.SSID());
-  debugVars.push_back("IP Address: " + String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]));
-  debugVars.push_back("Wifi State: " + String(wifiCfg.state));
-  debugVars.push_back("Program State: " + String(progData.state));
-  debugVars.push_back("MCP23017 State: " + String(progData.mcpState));
-  debugVars.push_back("ADS1115 State: " + String(progData.adsState));
-  debugVars.push_back("IMU State: " + String(espData.gpsData.imuState));
-  debugVars.push_back("External GPS: " + String(espData.gpsCfg.externalGPS ? "Enabled" : "Disabled"));
+  debugVars.push_back("IP Address: " + String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]));
+  debugVars.push_back("Wifi State: " + String(espData.wifi.state));
+  debugVars.push_back("Program State: " + String(espData.program.state));
+  debugVars.push_back("MCP23017 State: " + String(espData.program.mcpState));
+  debugVars.push_back("ADS1115 State: " + String(espData.program.adsState));
+  debugVars.push_back("IMU State: " + String(espData.gps.imuState));
+  debugVars.push_back("External GPS: " + String(espData.gps.externalGPS ? "Enabled" : "Disabled"));
   debugVars.push_back("GPS Data: ");
-  debugVars.push_back("..Timestamp: " + String(espData.gpsData.fixTime));
-  debugVars.push_back("..Position Type: " + String(espData.gpsData.positionType));
-  debugVars.push_back("..Latitude: " + String(espData.gpsData.latitude));
-  debugVars.push_back("..Longitude: " + String(espData.gpsData.longitude));
-  debugVars.push_back("..Altitude: " + String(espData.gpsData.altitude));
-  debugVars.push_back("..Speed: " + String(espData.gpsData.speedKnots));
-  debugVars.push_back("..Heading: " + String(espData.gpsData.imuHeading));
-  debugVars.push_back("..Roll: " + String(espData.gpsData.imuRoll));
-  debugVars.push_back("..Pitch: " + String(espData.gpsData.imuPitch));
-  debugVars.push_back("..Yaw Rate: " + String(espData.gpsData.imuYawRate));
-  debugVars.push_back("..Fix Quality: " + String(espData.gpsData.fixQuality));
-  debugVars.push_back("..Number of Satellites: " + String(espData.gpsData.numSats));
-  debugVars.push_back("..HDOP: " + String(espData.gpsData.HDOP));
-  debugVars.push_back("..Age of DGPS: " + String(espData.gpsData.ageDGPS));
-  debugVars.push_back("..NMEA: " + String(espData.gpsData.nmea));
-  debugVars.push_back("..Last Ntrip Data: " + String(espData.gpsData.lastNtripData));
-  debugVars.push_back("..Last Ntrip Data Length: " + String(espData.gpsData.lastNtripDataLen));
+  debugVars.push_back("..Timestamp: " + String(espData.gps.fixTime));
+  debugVars.push_back("..Position Type: " + String(espData.gps.positionType));
+  debugVars.push_back("..Latitude: " + String(espData.gps.latitude));
+  debugVars.push_back("..Longitude: " + String(espData.gps.longitude));
+  debugVars.push_back("..Altitude: " + String(espData.gps.altitude));
+  debugVars.push_back("..Speed: " + String(espData.gps.speedKnots));
+  debugVars.push_back("..Heading: " + String(espData.gps.imuHeading));
+  debugVars.push_back("..Roll: " + String(espData.gps.imuRoll));
+  debugVars.push_back("..Pitch: " + String(espData.gps.imuPitch));
+  debugVars.push_back("..Yaw Rate: " + String(espData.gps.imuYawRate));
+  debugVars.push_back("..Fix Quality: " + String(espData.gps.fixQuality));
+  debugVars.push_back("..Number of Satellites: " + String(espData.gps.numSats));
+  debugVars.push_back("..HDOP: " + String(espData.gps.HDOP));
+  debugVars.push_back("..Age of DGPS: " + String(espData.gps.ageDGPS));
+  debugVars.push_back("..NMEA: " + String(espData.gps.nmea));
+  debugVars.push_back("..Last Ntrip Data: " + String(espData.gps.lastNtripData));
+  debugVars.push_back("..Last Ntrip Data Length: " + String(espData.gps.lastNtripDataLen));
   debugVars.push_back("Steer Data: ");
-  debugVars.push_back("..Target Steer Angle: " + String(espData.steerData.targetSteerAngle));
-  debugVars.push_back("..Steer Angle: " + String(espData.steerData.actSteerAngle));
-  debugVars.push_back("..Absolute Angle: " + String(espData.steerData.absAngle));
-  debugVars.push_back("..ZeroValue: " + String(espData.steerData.wasZeroAngle));
-  debugVars.push_back("..Test State: " + String(espData.steerData.testState));
-  debugVars.push_back("..Steer Current: " + String(espData.steerData.steerCurrent));
-  debugVars.push_back("..Switch State: " + String(espData.steerData.switchState));
-  debugVars.push_back("..PWM Command: " + String(espData.steerData.pwmCmd));
-  debugVars.push_back("..PID Input: " + String(espData.steerData.pidCmd));
-  debugVars.push_back("..Status: " + String(espData.steerData.status));
-  debugVars.push_back("..Wireless WAS: " + String(espData.steerCfg.wirelessWAS));
-  // debugVars.push_back("..WAS byte1: " + String(espData.steerData.byte1));
-  // debugVars.push_back("..WAS byte2: " + String(espData.steerData.byte2));
-  // debugVars.push_back("..WAS byte3: " + String(espData.steerData.byte3));
-  // debugVars.push_back("..WAS byte4: " + String(espData.steerData.byte4));
+  debugVars.push_back("..Target Steer Angle: " + String(espData.steer.targetSteerAngle));
+  debugVars.push_back("..Steer Angle: " + String(espData.steer.actSteerAngle));
+  debugVars.push_back("..Absolute Angle: " + String(espData.steer.absAngle));
+  debugVars.push_back("..ZeroValue: " + String(espData.steer.wasZeroAngle));
+  debugVars.push_back("..Test State: " + String(espData.steer.testState));
+  debugVars.push_back("..Steer Current: " + String(espData.steer.steerCurrent));
+  debugVars.push_back("..Switch State: " + String(espData.steer.switchState));
+  debugVars.push_back("..PWM Command: " + String(espData.steer.pwmCmd));
+  debugVars.push_back("..PID Input: " + String(espData.steer.pidCmd));
+  debugVars.push_back("..Status: " + String(espData.steer.status));
+  debugVars.push_back("..Wireless WAS: " + String(espData.steer.wirelessWAS));
+  // debugVars.push_back("..WAS byte1: " + String(espConfig.steerData.byte1));
+  // debugVars.push_back("..WAS byte2: " + String(espConfig.steerData.byte2));
+  // debugVars.push_back("..WAS byte3: " + String(espConfig.steerData.byte3));
+  // debugVars.push_back("..WAS byte4: " + String(espConfig.steerData.byte4));
   debugVars.push_back("Steer Config: ");
-  debugVars.push_back("..Settings Updated: " + String(espData.steerCfg.settingsUpdated));
-  debugVars.push_back("..Gain P: " + String(espData.steerCfg.gainP));
-  debugVars.push_back("..High PWM: " + String(espData.steerCfg.highPWM));
-  debugVars.push_back("..Low PWM: " + String(espData.steerCfg.lowPWM));
-  debugVars.push_back("..Min PWM: " + String(espData.steerCfg.minPWM));
-  debugVars.push_back("..Counts per Degree: " + String(espData.steerCfg.countsPerDeg));
-  debugVars.push_back("..Steer Offset: " + String(espData.steerCfg.steerOffset));
-  debugVars.push_back("..Ackerman Fix: " + String(espData.steerCfg.ackermanFix));
-  debugVars.push_back("..Set0: " + String(espData.steerCfg.set0));
-  debugVars.push_back("..Pulse Count: " + String(espData.steerCfg.pulseCount));
-  debugVars.push_back("..Min Speed: " + String(espData.steerCfg.minSpeed));
-  debugVars.push_back("..Set1: " + String(espData.steerCfg.set1));
-  debugVars.push_back("..Steer Msg Rate: " + String(espData.steerCfg.steerMsgRate));
-  debugVars.push_back("..PID Input Filter: " + String(espData.steerCfg.pidInputFilt));
+  debugVars.push_back("..Settings Updated: " + String(espData.steer.settingsUpdated));
+  debugVars.push_back("..Gain P: " + String(espData.steer.gainP));
+  debugVars.push_back("..High PWM: " + String(espData.steer.highPWM));
+  debugVars.push_back("..Low PWM: " + String(espData.steer.lowPWM));
+  debugVars.push_back("..Min PWM: " + String(espData.steer.minPWM));
+  debugVars.push_back("..Counts per Degree: " + String(espData.steer.countsPerDeg));
+  debugVars.push_back("..Steer Offset: " + String(espData.steer.steerOffset));
+  debugVars.push_back("..Ackerman Fix: " + String(espData.steer.ackermanFix));
+  debugVars.push_back("..Set0: " + String(espData.steer.set0));
+  debugVars.push_back("..Pulse Count: " + String(espData.steer.pulseCount));
+  debugVars.push_back("..Min Speed: " + String(espData.steer.minSpeed));
+  debugVars.push_back("..Set1: " + String(espData.steer.set1));
+  debugVars.push_back("..Steer Msg Rate: " + String(espData.steer.steerMsgRate));
+  debugVars.push_back("..PID Input Filter: " + String(espData.steer.pidInputFilt));
   debugVars.push_back("Switches: ");
-  debugVars.push_back("..Steer Switch: " + String(espData.switchData.steerSwitch));
-  debugVars.push_back("..Work Switch: " + String(espData.switchData.workSwitch)); 
-  for (int i = 0; i < 8; i++){
-    debugVars.push_back("..Joystick switch " + String(i) + ": " + String(espData.joystickData.switchStates[i]));
+  debugVars.push_back("..Steer Switch: " + String(espData.switches.steerSwitch));
+  debugVars.push_back("..Work Switch: " + String(espData.switches.workSwitch));
 
-  }
-  String sipValue = String(wifiCfg.ips[0])+"."+String(wifiCfg.ips[1])+"."+String(wifiCfg.ips[2])+"."+String(wifiCfg.ips[3]);
+  String sipValue = String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
   char  CharArray[ArrayLength];
   sipValue.toCharArray(CharArray,ArrayLength);
@@ -404,7 +392,7 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t in
 void handleToggleAPMode(AsyncWebServerRequest *request) {
   static bool apModeState = false;
   apModeState = !apModeState;
-  wifiCfg.apMode = apModeState ? 1 : 0;
+  espData.wifi.apMode = apModeState ? 1 : 0;
   Serial.printf("AP Mode State: %s\n", apModeState ? "ON" : "OFF");
   request->send(200, "text/plain", apModeState ? "AP_Mode is ON" : "AP_Mode is OFF");
 }
@@ -414,59 +402,55 @@ void handleToggleAPMode(AsyncWebServerRequest *request) {
 #pragma region Buttons
 void IRAM_ATTR handleSteerSwitch() {
   unsigned long currentTime = millis();
-  if (currentTime - espData.switchData.steerSwitchLastTime > 100) {
-      espData.switchData.steerSwitch = true; // Set the flag
-      espData.switchData.steerSwitchLastTime = currentTime; // Update the debounce timestamp
-  }
+  if (currentTime - espData.steer.steerSwitchLastTime > 100) {
+      espData.steer.steerSwitch = true; // Set the flag
+      espData.steer.steerSwitchLastTime = currentTime; // Update the debounce timestamp
+    }
 }
 
 void IRAM_ATTR handleWorkSwitch() {
   unsigned long currentTime = millis();
-  if (currentTime - espData.switchData.workSwitchLastTime > 100) {
-      espData.switchData.workSwitch = true; // Set the flag
-      espData.switchData.workSwitchLastTime = currentTime; // Update the debounce timestamp
+  if (currentTime - espData.switches.workSwitchLastTime > 100) {
+      espData.switches.workSwitch = true; // Set the flag
+      espData.switches.workSwitchLastTime = currentTime; // Update the debounce timestamp
   }
 }
 
 void buttonSetup(){
   // Set up the GPIO pins for the buttons
-  pinMode(espData.gpioDefs.STEER_SWITCH_PIN, INPUT_PULLUP);
-  pinMode(espData.gpioDefs.WORK_SWITCH_PIN, INPUT_PULLUP);
-  
+  pinMode(espData.pins.STEER_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(espData.pins.WORK_SWITCH_PIN, INPUT_PULLUP);
+
   // Attach interrupts to the buttons
-  attachInterrupt(digitalPinToInterrupt(espData.gpioDefs.STEER_SWITCH_PIN), handleSteerSwitch, FALLING);
-  attachInterrupt(digitalPinToInterrupt(espData.gpioDefs.WORK_SWITCH_PIN), handleWorkSwitch, FALLING);
+  attachInterrupt(digitalPinToInterrupt(espData.pins.STEER_SWITCH_PIN), handleSteerSwitch, FALLING);
+  attachInterrupt(digitalPinToInterrupt(espData.pins.WORK_SWITCH_PIN), handleWorkSwitch, FALLING);
 }
 #pragma endregion
 
 void setup(){
-  progData.state = 0;
+  espData.program.state = 0;
   myLED.startTask();
-  progData.state = 2;
-  
+  espData.program.state = 2;
+
   // Start USB Serial Port
   Serial.begin(115200);
   delay(5000);   // Wait for the usb to connect so you can see the outputs at startup
   Serial.println("Starting up...");
-  espData.progCfg.confRes = espData.loadConfig();
-  
-  // Load program data from Preferences
-  espData.loadData();
-  Serial.println("Program data loaded from Preferences");
-  
+  espData.program.confRes = espData.loadConfig();
+
   // Start Wifi AP and Webserver for diagnostics
-  // espData.wifiCfg.state = espWifi.connect();
-  
-  while (wifiCfg.state != 1){
-    wifiCfg.state = espWifi.connect();
+  // espConfig.wifiCfg.state = espWifi.connect();
+
+  while (espData.wifi.state != 1){
+    espData.wifi.state = espWifi.connect();
     if (millis() > 120000){
       Serial.println("Wifi connection timed out");
-      wifiCfg.state = espWifi.makeAP();
+      espData.wifi.state = espWifi.makeAP();
       break;
     }
   }
-  // espData.wifiCfg.state = espWifi.makeAP();
-  Serial.println("Wifi State: " + String(espData.wifiCfg.state));
+  // espConfig.wifiCfg.state = espWifi.makeAP();
+  Serial.println("Wifi State: " + String(espData.wifi.state));
   #pragma region Server Setup
         // Serve the main HTML page
         server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -511,10 +495,10 @@ void setup(){
             String source = doc["source"] | "";
             if (source == "um982") {
 
-                espData.gpsCfg.externalGPS = false;
+                espData.gps.externalGPS = false;
                 request->send(200, "text/plain", "UM982 GPS selected");
             } else if (source == "external") {
-                espData.gpsCfg.externalGPS = true;
+                espData.gps.externalGPS = true;
                 request->send(200, "text/plain", "External GPS selected");
             } else {
                 request->send(400, "text/plain", "Unknown GPS source");
@@ -528,9 +512,9 @@ void setup(){
       #pragma endregion
 
   // Start other Serial Ports
-  bnoSerial.setPins(espData.gpioDefs.BNO_PIN, 10);
+  bnoSerial.setPins(espData.pins.BNO_PIN, 10);
   bnoSerial.begin(115200);
-  gpsSerial.setPins(espData.gpioDefs.GPS_RX, espData.gpioDefs.GPS_TX);
+  gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
   gpsSerial.begin(115200);
   
   // Grab the config
@@ -540,23 +524,23 @@ void setup(){
   
   if(!I2Csetup()){
     Serial.println("I2C setup failed");
-    progData.state = 3;
+    espData.program.state = 3;
     while(1){
       delay(1000);
     }
   }
-  if (progData.mcpState == 1){
+  if (espData.program.mcpState == 1){
     mcp.begin_I2C(0x20, &twoWire);
     
     // Also initialize the MCPManager singleton (alternative approach)
-    mcpManager.begin(0x20, &twoWire);
+    // mcpManager.begin(0x20, &twoWire);
     
-    // mcp.pinMode(espData.gpioDefs.rtkFix, OUTPUT);
-    // mcp.digitalWrite(espData.gpioDefs.rtkFix, HIGH);
+    // mcp.pinMode(espConfig.gpioDefs.rtkFix, OUTPUT);
+    // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, HIGH);
     // delay(1000);
-    // mcp.digitalWrite(espData.gpioDefs.rtkFix, LOW);
+    // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, LOW);
   }
-  if (progData.adsState == 1){
+  if (espData.program.adsState == 1){
     ads.begin(0x48, &twoWire);
   }
   
@@ -582,49 +566,36 @@ void setup(){
   espUdp.begin(&gps);
   Serial.println("Network setup complete");
   // delay(5000);
-  progData.state = 1;
-  
+  espData.program.state = 1;
+
 }
 
 void debugPrint(){
   Serial.printf("Timestamp since boot [ms]: %lu", millis());
-  Serial.printf(" progName: %s", espData.progCfg.name);
-  Serial.printf(" progState: %lu", progState);
-  Serial.printf(" confRes: %lu", espData.progCfg.confRes);
-  Serial.printf(" wifiRes: %lu", espData.wifiCfg.state);
-  Serial.printf(" gpsFix: %lu", espData.gpsData.fixQualityInt);
-  Serial.printf(" ip[0]: %d", espData.wifiCfg.ips[0]);
-  Serial.printf(" ip[1]: %d", espData.wifiCfg.ips[1]);
-  Serial.printf(" ip[2]: %d", espData.wifiCfg.ips[2]);
-  Serial.printf(" ip[3]: %d", espData.wifiCfg.ips[3]);
+  Serial.printf(" progName: %s", espData.program.name);
+  Serial.printf(" progState: %lu", espData.program.state);
+  Serial.printf(" confRes: %lu", espData.program.confRes);
+  Serial.printf(" wifiRes: %lu", espData.wifi.state);
+  Serial.printf(" gpsFix: %lu", espData.gps.fixQualityInt);
+  Serial.printf(" ip[0]: %d", espData.wifi.ips[0]);
+  Serial.printf(" ip[1]: %d", espData.wifi.ips[1]);
+  Serial.printf(" ip[2]: %d", espData.wifi.ips[2]);
+  Serial.printf(" ip[3]: %d", espData.wifi.ips[3]);
+
+
   
-  
-  
-  // Serial.printf(" gpsAge: %lu", espData.gpsData.);
+  // Serial.printf(" gpsAge: %lu", espConfig.gpsData.);
   Serial.println();
   // Serial.println(twoWire.requestFrom(0x22, 0x01));
-  // Serial.printf("Mag x: %.2f mT, y: %.2f mT, z: %.2f mT, Temp: %.2f °C\n", espData.magData.x, espData.magData.y, espData.magData.z, (espData.magData.t*1.8)+32);
+  // Serial.printf("Mag x: %.2f mT, y: %.2f mT, z: %.2f mT, Temp: %.2f °C\n", espConfig.magData.x, espConfig.magData.y, espConfig.magData.z, (espConfig.magData.t*1.8)+32);
   // Serial.println();
-  // Serial.println(espData.progCfg.name);
+  // Serial.println(espConfig.progCfg.name);
   // Serial.println();
 }
 
 void loop(){
   
-  //Read in NMEA from the UM980
   debugPrint();
-  
-  // Update program data
-  espData.setUptime(millis());
-  
-  // Example: Save data every 30 seconds (30000 ms / 5000 ms delay = 6 cycles)
-  static uint8_t saveCounter = 0;
-  saveCounter++;
-  if (saveCounter >= 6) {
-    espData.saveData();
-    saveCounter = 0;
-    Serial.println("Program data saved to Preferences");
-  }
   
   delay(5000);
 }

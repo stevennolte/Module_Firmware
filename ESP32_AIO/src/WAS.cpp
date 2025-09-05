@@ -20,14 +20,14 @@ void WAS::init() {
 
 void WAS::loop(){
     #ifndef WAS_DEBUG
-    if (millis()-espData->steerData.lastWAStime < 1000){
-        espData->steerCfg.wirelessWAS = true;
+    if (millis()-espData->steer.lastWAStime < 1000){
+        espData->steer.wirelessWAS = true;
     } else {
-        espData->steerCfg.wirelessWAS = false;
-        if (espData->progData.adsState == 1 && espData->steerCfg.wirelessWAS == false && espData->steerCfg.useADS == 1){ 
-            espData->steerData.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
+        espData->steer.wirelessWAS = false;
+        if (espData->program.adsState == 1 && espData->steer.wirelessWAS == false && espData->steer.useADS == 1){ 
+            espData->steer.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
         } else {
-            espData->steerData.actSteerAngle = 0.0;
+            espData->steer.actSteerAngle = 0.0;
         }
     }
     vTaskDelay(10);
@@ -40,7 +40,7 @@ void WAS::loop(){
 }
 
 void WAS::zeroSteerAngle() {
-    espData->steerData.wasZeroAngle = espData->steerData.actSteerAngle;
+    espData->steer.wasZeroAngle = espData->steer.actSteerAngle;
 }
 
 #ifdef WAS_DEBUG

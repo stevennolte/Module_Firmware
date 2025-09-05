@@ -9,13 +9,13 @@
 #include "GPS.h"
 
 // Forward declaration of the GPS class
-class GPS;
+class ESPGPS;
 
 
 class ESPudp{
     public:
         uint8_t aioReply[11];
-        void begin(GPS* gps);
+        void begin(ESPGPS* gps);
         void sendUDP(uint8_t* data, size_t size);
         void sendUDPgps(const char * data);
         AsyncUDP udp;
@@ -30,7 +30,7 @@ class ESPudp{
         AsyncUDP udpJoystick;
         
         ESPdata* espData;
-        GPS* _gps;
+        ESPGPS* _gps;
     
 };
 

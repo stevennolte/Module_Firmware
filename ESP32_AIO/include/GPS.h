@@ -5,6 +5,7 @@
 #include "ESPdata.h"
 // #include <TinyGPSPlus.h>
 #include "ESPudp.h"
+#include "ESPdata_macros.h"
 
 #include "MCPManager.h"
 #include <zNMEAParser.h>
@@ -12,12 +13,12 @@
 #include "Adafruit_BNO08x_RVC.h"
 class ESPudp;
 
-class GPS{
+class ESPGPS{
     public:
         
         // New constructor using MCPManager singleton (no MCP pointer needed)
-        GPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial);
-        
+        ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial);
+
         void init(ESPudp* espUdp);
         
         // Alternative method using MCPManager singleton
@@ -33,7 +34,7 @@ class GPS{
         void GGA_Handler();
         void displayInfo();
     private:
-        static GPS* instance;
+        static ESPGPS* instance;
         static void staticGGA_Handler();
         char fixTime[12];
         uint32_t imuWatchdog;

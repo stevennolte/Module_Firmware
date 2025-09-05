@@ -48,7 +48,7 @@ void MyLED::continuousLoop() {
  while (true) {
     vTaskDelay(10/portTICK_PERIOD_MS);
     // vTaskDelay(500);
-    switch (espData->progData.state){
+    switch (espData->program.state){
       case 0:
         pixel.setPixelColor(0,pixel.Color(0,0,0));
         pixel.show();

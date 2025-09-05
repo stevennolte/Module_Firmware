@@ -31,7 +31,7 @@ void CANBUS::sendCAN(uint32_t identifier, uint8_t data[], uint8_t data_length_co
     }
     
 void CANBUS::begin(){
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)espData->canCfg.txPin, (gpio_num_t)espData->canCfg.rxPin, TWAI_MODE_NO_ACK);  // TWAI_MODE_NORMAL, TWAI_MODE_NO_ACK or TWAI_MODE_LISTEN_ONLY
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)espData->can.txPin, (gpio_num_t)espData->can.rxPin, TWAI_MODE_NO_ACK);  // TWAI_MODE_NORMAL, TWAI_MODE_NO_ACK or TWAI_MODE_LISTEN_ONLY
       twai_timing_config_t t_config  = TWAI_TIMING_CONFIG_250KBITS();
       twai_filter_config_t f_config  = TWAI_FILTER_CONFIG_ACCEPT_ALL();
       twai_driver_install(&g_config, &t_config, &f_config);
