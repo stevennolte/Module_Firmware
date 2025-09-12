@@ -57,10 +57,7 @@ void ESPGPS::init(ESPudp* espUdp){
     
     // Use MCPManager if no MCP pointer was provided in constructor
     
-    MCPManager& mcpManager = MCPManager::getInstance();
-    if (mcpManager.isInitialized()) {
-        mcpManager.setGPSactive();
-    }
+    
    
     parser.addHandler("G-GGA", staticGGA_Handler);
     // parser.setErrorHandler(errorHandler);
@@ -110,22 +107,9 @@ void ESPGPS::init(ESPudp* espUdp){
 void ESPGPS::initWithSingleton(ESPudp* espUdp){
     this->espUdp = espUdp;
     
-    // Use MCPManager singleton instead of mcp pointer
-    MCPManager& mcpManager = MCPManager::getInstance();
     
-    if (mcpManager.isInitialized()) {
-        mcpManager.pinMode(_gpsFixIndPin, OUTPUT);
-        mcpManager.pinMode(_rtkFixIndPin, OUTPUT);
-        mcpManager.digitalWrite(_gpsFixIndPin, HIGH);
-        mcpManager.digitalWrite(_rtkFixIndPin, HIGH);
-        delay(1000);
-        mcpManager.digitalWrite(_gpsFixIndPin, LOW);
-        mcpManager.digitalWrite(_rtkFixIndPin, LOW);
-        
-        Serial.println("GPS: Using MCPManager singleton for pin control");
-    } else {
-        Serial.println("GPS: MCPManager not initialized, skipping pin setup");
-    }
+  
+    
     
     // Rest of initialization is the same as original init method
     parser.addHandler("G-GGA", staticGGA_Handler);

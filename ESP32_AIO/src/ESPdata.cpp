@@ -4,8 +4,7 @@
 ESPdata* ESPdata::instance = nullptr;
 
 ESPdata::ESPdata() {
-    // Initialize Preferences in constructor
-    preferences.begin("agopen", false); // "agopen" namespace, read-write mode
+    // Don't initialize Preferences in constructor - will be done later in initPreferences()
 }
 
 // Singleton implementation
@@ -24,6 +23,15 @@ void ESPdata::destroyInstance() {
     }
 }
 
+void ESPdata::initPreferences() {
+    // Initialize Preferences after NVS is ready
+    if (!preferences.begin("agopen", false)) {
+        Serial.println("Failed to initialize Preferences");
+    } else {
+        Serial.println("Preferences initialized successfully");
+    }
+}
+
 uint8_t ESPdata::getStrapping(){
     pinMode(4, INPUT);
     uint32_t measurement = analogReadMilliVolts(4);
@@ -34,6 +42,7 @@ uint8_t ESPdata::getStrapping(){
 uint8_t ESPdata::loadConfig(){
     program.state = 2;
     // Set default IP if not found in preferences
+    program.bootState = preferences.getUChar("bootState", 0);
     wifi.ips[0] = preferences.getUChar("ip0", 192);
     wifi.ips[1] = preferences.getUChar("ip1", 168);
     wifi.ips[2] = preferences.getUChar("ip2", 5);
@@ -110,6 +119,12 @@ uint8_t ESPdata::updateIP() {
     preferences.putUChar("ip3", wifi.ips[3]);
     Serial.println(F("Successfully updated IP address in Preferences"));
     return 1;
+}
+
+bool ESPdata::saveBootState(uint8_t state) {
+    preferences.putUChar("bootState", state);
+    Serial.println(F("Successfully updated boot state in Preferences"));
+    return true;
 }
 
 uint8_t ESPdata::updateServer(){

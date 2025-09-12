@@ -16,6 +16,7 @@ public:
     static void destroyInstance();
     
     // Updated methods for Preferences
+    void initPreferences();  // Initialize Preferences after NVS is ready
     uint8_t loadConfig();
     uint8_t saveConfig();
     uint8_t updateIP();
@@ -23,7 +24,8 @@ public:
     uint8_t updateSteer();
     uint8_t getStrapping();
     uint8_t saveWASzero();
-    
+    bool saveBootState(uint8_t state);
+
     // Constructor remains public for backward compatibility
     ESPdata();
 
@@ -109,6 +111,7 @@ public:
 
         struct Program {
             char name[64];
+            uint8_t bootState;
             String name2;
             uint8_t version[3];
             uint8_t ledBrht;
