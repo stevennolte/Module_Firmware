@@ -7,7 +7,7 @@ uint32_t updateTimer = 0;
 
 MyLED::MyLED(ESPdata* vars) : pixel(1, 48, NEO_GRB + NEO_KHZ800) {
   espData = vars;
-  
+  startTask();
   // Adafruit_NeoPixel pixel(1,espData->progCfg.ledPin,NEO_GRB + NEO_KHZ800);
   
   // pixel.show();

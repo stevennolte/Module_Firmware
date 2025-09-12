@@ -25,6 +25,7 @@ public:
     uint8_t getStrapping();
     uint8_t saveWASzero();
     bool saveBootState(uint8_t state);
+    bool getBootState();
 
     // Constructor remains public for backward compatibility
     ESPdata();
