@@ -5,8 +5,9 @@
 #include "Wire.h"
 #include "ESPudp.h"
 #include "Adafruit_MCP23X17.h"
+#include "MCPManager.h"
 #include <Adafruit_ADS1X15.h>
-#include "Indicators.h"
+// #include "Indicators.h"
 #include "MainPower.h"
 #include "GPS.h"
 #include "HardwareSerial.h"
@@ -14,11 +15,6 @@
 #include "ESPsteer.h"
 #include <ESPAsyncWebServer.h>
 #include "littlefs.h"
-#include "CANBUS.h"
-
-// #include "ESPOTAUpdater.h"
-#include "nvs_flash.h"
-#include "esp_task_wdt.h"
 
 //TODO: add wifi connect timer to ap mode
 
@@ -30,23 +26,22 @@ HardwareSerial gpsSerial(1);
 Adafruit_MCP23X17 mcp;
 Adafruit_ADS1115 ads;
 
-// Simple global objects - initialized after NVS is ready in setup()
-// This avoids early singleton instantiation issues
-ESPdata* espDataPtr = nullptr;
-#define espData (*espDataPtr)  // Simple macro for accessing singleton
+// Using singleton pattern - single access point for configuration
+ESPdata& espData = ESPdata::getInstance();
 
-// Component objects - will be created in setup()
-ESPGPS* gps = nullptr;
-MyLED* myLED = nullptr;
-MainPower* mainPower = nullptr;
-ESPWifi* espWifi = nullptr;
-ESPudp* espUdp = nullptr;
-ESPsteer* espSteer = nullptr;
-Indicators* indicators = nullptr;
-CANBUS* canbus = nullptr;
-// Objects that don't depend on ESPdata
+// Get MCPManager singleton instance (alternative approach)
+
+
+// Components using singleton instance
+ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // Using MCPManager singleton, no MCP pointer needed
+MyLED myLED(&espData);
+MainPower mainPower(&espData, &mcp, &ads);
+ESPWifi espWifi(&espData);
+ESPudp espUdp(&espData);
 ESP32OTAPull ota;
 AsyncWebServer server(80);
+
+ESPsteer espSteer(&espData, &ads, &mcp);
 std::vector<String> debugVars;
 
 
@@ -101,6 +96,64 @@ bool I2Csetup(){
   
 }
 
+// #pragma region OTA
+// const char *errtext(int code)
+// {
+// 	switch(code)
+// 	{
+// 		case ESP32OTAPull::UPDATE_AVAILABLE:
+// 			return "An update is available but wasn't installed";
+// 		case ESP32OTAPull::NO_UPDATE_PROFILE_FOUND:
+// 			return "No profile matches";
+// 		case ESP32OTAPull::NO_UPDATE_AVAILABLE:
+// 			return "Profile matched, but update not applicable";
+// 		case ESP32OTAPull::UPDATE_OK:
+// 			return "An update was done, but no reboot";
+// 		case ESP32OTAPull::HTTP_FAILED:
+// 			return "HTTP GET failure";
+// 		case ESP32OTAPull::WRITE_ERROR:
+// 			return "Write error";
+// 		case ESP32OTAPull::JSON_PROBLEM:
+// 			return "Invalid JSON";
+// 		case ESP32OTAPull::OTA_UPDATE_FAIL:
+// 			return "Update fail (no OTA partition?)";
+// 		default:
+// 			if (code > 0)
+// 				return "Unexpected HTTP response code";
+// 			break;
+// 	}
+// 	return "Unknown error";
+// }
+
+// void OtaPullCallback(int offset, int totallength)
+// {
+// 	Serial.printf("Updating %d of %d (%02d%%)...\r", offset, totallength, 100 * offset / totallength);
+// }
+
+// void softwareUpdate(){
+//   char basePath[] = "/%s/Releases/OTA_Config.json";
+//   char CONFIG_URL[150];
+//   sprintf(CONFIG_URL, basePath, NAME);
+//   Serial.println(CONFIG_URL);
+//   char SERVER[150];
+//   sprintf(SERVER, "http://%d.%d.%d.%d:%d",espData.wifiCfg.ips[0],espData.wifiCfg.ips[1],espData.wifiCfg.ips[2],espData.otaCfg.ipAddr,espData.otaCfg.port);
+//   Serial.print("CONFIG_URL: ");
+//   Serial.println(CONFIG_URL);
+//   Serial.print("SERVER: ");
+//   Serial.println(SERVER);
+  
+//   ota.SetConfig(NAME);
+//   ota.SetCallback(OtaPullCallback);
+  
+//   Serial.printf("We are running version %s of the sketch, Board='%s', Device='%s', IP='%s \n", VERSION, ARDUINO_BOARD, WiFi.macAddress().c_str(),(String)(WiFi.localIP()[3]));
+//   Serial.println();
+//   // Serial.printf("Checking %s to see if an update is available...\n", CONFIG_URL);
+//   Serial.println();
+//   int ret = ota.CheckForOTAUpdate(SERVER, CONFIG_URL, VERSION);
+//   Serial.printf("CheckForOTAUpdate returned %d (%s)\n\n", ret, errtext(ret));
+// }
+
+// #pragma endregion
 
 #pragma region Webserver
 
@@ -158,8 +211,10 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_
   if (!index) {
     Serial.printf("Update Start: %s\n", filename.c_str());
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
+      Update.printError(Serial);
     }
   }
+  
   // Write the received data to the flash memory
   if (Update.write(data, len) != len) {
     Update.printError(Serial);
@@ -366,95 +421,36 @@ void buttonSetup(){
   pinMode(espData.pins.STEER_SWITCH_PIN, INPUT_PULLUP);
   pinMode(espData.pins.WORK_SWITCH_PIN, INPUT_PULLUP);
 
-
   // Attach interrupts to the buttons
   attachInterrupt(digitalPinToInterrupt(espData.pins.STEER_SWITCH_PIN), handleSteerSwitch, FALLING);
   attachInterrupt(digitalPinToInterrupt(espData.pins.WORK_SWITCH_PIN), handleWorkSwitch, FALLING);
 }
 #pragma endregion
 
-void recoveryServer(){
-  // Start Wifi AP and Webserver for diagnostics
-  espData.wifi.state = espWifi->makeAP();
-  Serial.println("Wifi State: " + String(espData.wifi.state));
-  #pragma region Server Setup
-        // Serve the main HTML page
-        server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-          Serial.println("getting index file");
-          request->send(LittleFS, "/index.html");
-        });
-        // Route to get debug variables as JSON
-        server.on("/getDebugVars", HTTP_GET, handleDebugVars);
-        // Route to list files as JSON
-        server.on("/getFiles", HTTP_GET, handleFileList);
-        // Route to download files
-        server.on("/download", HTTP_GET, handleFileDownload);
-
-        // Handle file upload
-        server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFileUpload);
-
-        server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, 
-        handleFirmwareUpload);
-
-        server.on("/reboot", HTTP_GET, handleReboot);
-        
-        server.on("/toggleAPMode", HTTP_POST, handleToggleAPMode); // Add this line
-        // Handle toggle state update
-
-        // Start server
-        server.begin();
-      #pragma endregion
-  while(1){
-    delay(1000);
-  }
-}
-
-void normalBoot(){
-  // Initialize and configure watchdog timer for 30 seconds
-  Serial.println("Starting normal boot with 30-second watchdog timer...");
-  esp_task_wdt_init(30, true); // 30 seconds timeout, panic on timeout
-  esp_task_wdt_add(NULL); // Add current task to watchdog
-  
-  espData.program.state = 1;
-  Serial.println("Set program state to 1");
-  
-  espData.saveBootState(2);
-  Serial.println("Saved boot state 2");
-  
+void setup(){
   espData.program.state = 0;
-  Serial.println("Set program state to 0");
-  
-  myLED->startTask();
-  Serial.println("Started LED task");
-  
+  myLED.startTask();
   espData.program.state = 2;
-  Serial.println("Set program state to 2");
-  
-  // Feed watchdog after initial setup
-  esp_task_wdt_reset();
 
-  
+  // Start USB Serial Port
+  Serial.begin(115200);
+  delay(5000);   // Wait for the usb to connect so you can see the outputs at startup
+  Serial.println("Starting up...");
   espData.program.confRes = espData.loadConfig();
-  Serial.printf("Config loaded, result: %d\n", espData.program.confRes);
-  
-  // Feed watchdog after config load
-  esp_task_wdt_reset();
+
+  // Start Wifi AP and Webserver for diagnostics
+  // espConfig.wifiCfg.state = espWifi.connect();
 
   while (espData.wifi.state != 1){
-    espData.wifi.state = espWifi->connect();
-    // Feed watchdog during wifi connection attempts
-    esp_task_wdt_reset();
+    espData.wifi.state = espWifi.connect();
     if (millis() > 120000){
       Serial.println("Wifi connection timed out");
-      espData.wifi.state = espWifi->makeAP();
+      espData.wifi.state = espWifi.makeAP();
       break;
     }
   }
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espData.wifi.state));
-  
-  // Feed watchdog after WiFi setup
-  esp_task_wdt_reset();
   #pragma region Server Setup
         // Serve the main HTML page
         server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -489,7 +485,7 @@ void normalBoot(){
         });
         server.on("/setGpsSource", HTTP_POST, [](AsyncWebServerRequest *request){},
         NULL,
-        [&](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             StaticJsonDocument<128> doc;
             DeserializationError error = deserializeJson(doc, data, len);
             if (error) {
@@ -498,6 +494,7 @@ void normalBoot(){
             }
             String source = doc["source"] | "";
             if (source == "um982") {
+
                 espData.gps.externalGPS = false;
                 request->send(200, "text/plain", "UM982 GPS selected");
             } else if (source == "external") {
@@ -525,35 +522,18 @@ void normalBoot(){
 
   // Start I2C and check for hardware
   
-  // Feed watchdog before I2C setup
-  esp_task_wdt_reset();
-  
-  Serial.println("Starting I2C setup...");
-  
   if(!I2Csetup()){
     Serial.println("I2C setup failed");
     espData.program.state = 3;
-    // Remove from watchdog before entering infinite loop
-    esp_task_wdt_delete(NULL);
     while(1){
       delay(1000);
     }
   }
-  
-  Serial.println("I2C setup successful");
-  
-  // Feed watchdog after I2C setup
-  esp_task_wdt_reset();
-  
   if (espData.program.mcpState == 1){
     mcp.begin_I2C(0x20, &twoWire);
     
-    Serial.println("Initializing indicators...");
-    
-    // Initialize indicators after MCP is ready
-    indicators->init();
-    indicators->testSequence();  // Optional: run test sequence at startup
-    indicators->startTask(4096, 1, 0);  // Start FreeRTOS task: 4KB stack, priority 1, core 0
+    // Also initialize the MCPManager singleton (alternative approach)
+    // mcpManager.begin(0x20, &twoWire);
     
     // mcp.pinMode(espConfig.gpioDefs.rtkFix, OUTPUT);
     // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, HIGH);
@@ -564,111 +544,30 @@ void normalBoot(){
     ads.begin(0x48, &twoWire);
   }
   
-  Serial.println("Hardware initialization complete");
-  
-  // Feed watchdog after hardware initialization
-  // esp_task_wdt_reset();  // COMMENTED OUT - WATCHDOG DISABLED
-  
-  Serial.println("Starting GPS...");
   
   // Start GPS
-  gps->init(espUdp);
+  // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):
+  gps.init(&espUdp);
   
-  Serial.println("Starting main power and steering...");
+  // Traditional approach using MCP pointer injection:
+  // gps.init(&espUdp);  // Would use MCP pointer if provided in constructor
   
-  // If everything is good, turn on power to autosteer
-  mainPower->startTask();
-  espSteer->begin(espUdp);
+  // Alternative explicit singleton method:
+  // gps.initWithSingleton(&espUdp);
 
-  Serial.println("Starting UDP...");
+  // If everything is good, turn on power to autosteer
+  mainPower.startTask();
+  espSteer.begin(&espUdp);
+  
+  // Scan for Wifi networks
+  // espWifi.connect();
   
   // UDP setup
-  espUdp->begin(gps);
+  espUdp.begin(&gps);
   Serial.println("Network setup complete");
-  
-  // Feed watchdog before final operations
-  esp_task_wdt_reset();
-  
   // delay(5000);
   espData.program.state = 1;
-  espData.saveBootState(1);
-  
-  // Boot completed successfully - remove from watchdog
-  esp_task_wdt_delete(NULL);
-  Serial.println("Normal boot completed successfully - watchdog disabled");
-}
 
-void recoveryBoot(){
-  espData.program.state = 4;
-  myLED->startTask();
-  recoveryServer();
-}
-
-
-void setup(){
-  // Start USB Serial Port - ESP32-S3 USB CDC mode
-  Serial.begin(115200);
-  
-  // For ESP32-S3 with USB CDC, wait for Serial connection
-  unsigned long startTime = millis();
-  while (!Serial && (millis() - startTime) < 5000) {
-    delay(10); // Wait up to 5 seconds for Serial connection
-  }
-  
-  // Additional delay to ensure stability
-  delay(1000);
-  
-  // Force flush and ensure connection
-  Serial.println();
-  Serial.println("=== ESP32 AIO Starting Up ===");
-  Serial.println("Serial port initialized successfully");
-  
-  Serial.println("About to initialize NVS...");
-  
-  // Initialize NVS FIRST - before any ESPdata access
-  // esp_err_t err = nvs_flash_init();
-  // if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-  //   // NVS partition was truncated and needs to be erased
-  //   Serial.println("NVS partition needs erasing, erasing now...");
-  //   ESP_ERROR_CHECK(nvs_flash_erase());
-  //   err = nvs_flash_init();
-  // }
-  // ESP_ERROR_CHECK(err);
-  // Serial.println("NVS initialized successfully");
-  
-  Serial.println("Getting ESPdata instance...");
-  
-  // Now safe to get ESPdata instance
-  espDataPtr = &ESPdata::getInstance();
-  
-  Serial.println("Initializing ESPdata Preferences...");
-  espData.initPreferences();
-  
-  Serial.println("Creating component instances...");
-  
-  // Initialize all components that depend on ESPdata
-  gps = new ESPGPS(&espData, &gpsSerial, &bnoSerial);
-  myLED = new MyLED(&espData);
-  mainPower = new MainPower(&espData, &mcp, &ads);
-  espWifi = new ESPWifi(&espData);
-  espUdp = new ESPudp(&espData);
-  espSteer = new ESPsteer(&espData, &ads, &mcp);
-  indicators = new Indicators(&espData, &mcp);
-  canbus = new CANBUS(&espData);
-
-  Serial.println("All components initialized successfully");
-  
-  Serial.println("Checking bootState...");
-  
-  Serial.printf("Boot state: %d\n", espData.program.bootState);
-  
-  if (espData.program.bootState != 1){
-    Serial.println("Entering recovery boot...");
-    recoveryBoot();
-  } else {
-    Serial.println("Entering normal boot...");
-    normalBoot();
-  }
 }
 
 void debugPrint(){
@@ -695,8 +594,6 @@ void debugPrint(){
 }
 
 void loop(){
-  // Indicators now run in their own FreeRTOS task
-  // No need to call indicators.loop() here anymore
   
   debugPrint();
   

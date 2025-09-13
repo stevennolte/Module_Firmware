@@ -7,6 +7,7 @@
 #include "ESPudp.h"
 #include "ESPdata_macros.h"
 
+#include "MCPManager.h"
 #include <zNMEAParser.h>
 #include <SparkFun_Unicore_GNSS_Arduino_Library.h>
 #include "Adafruit_BNO08x_RVC.h"
