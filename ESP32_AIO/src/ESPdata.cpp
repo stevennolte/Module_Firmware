@@ -121,11 +121,6 @@ uint8_t ESPdata::updateIP() {
     return 1;
 }
 
-bool ESPdata::getBootState(){
-    program.bootState = preferences.getUChar("bootState", 0);
-    return program.bootState;
-}
-
 bool ESPdata::saveBootState(uint8_t state) {
     preferences.putUChar("bootState", state);
     Serial.println(F("Successfully updated boot state in Preferences"));

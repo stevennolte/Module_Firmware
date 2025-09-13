@@ -297,7 +297,6 @@ void handleDebugVars(AsyncWebServerRequest *request) {
 void handleReboot(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", "Rebooting...");
   delay(100); // Give some time for the response to be sent
-  espData.saveBootState(1); // Set to normal boot
   ESP.restart();
 }
 
@@ -405,22 +404,16 @@ void recoveryServer(){
         // Start server
         server.begin();
       #pragma endregion
+  while(1){
+    delay(1000);
+  }
 }
 
 void normalBoot(){
+  // Initialize and configure watchdog timer for 30 seconds
   Serial.println("Starting normal boot with 30-second watchdog timer...");
   esp_task_wdt_init(30, true); // 30 seconds timeout, panic on timeout
   esp_task_wdt_add(NULL); // Add current task to watchdog
-
-  // Initialize all components that depend on ESPdata
-  gps = new ESPGPS(&espData, &gpsSerial, &bnoSerial);
-  mainPower = new MainPower(&espData, &mcp, &ads);
-  espUdp = new ESPudp(&espData);
-  espSteer = new ESPsteer(&espData, &ads, &mcp);
-  indicators = new Indicators(&espData, &mcp);
-  canbus = new CANBUS(&espData);
-  Serial.println("All components initialized successfully");
-  
   
   espData.program.state = 1;
   Serial.println("Set program state to 1");
@@ -440,6 +433,12 @@ void normalBoot(){
   // Feed watchdog after initial setup
   esp_task_wdt_reset();
 
+  
+  espData.program.confRes = espData.loadConfig();
+  Serial.printf("Config loaded, result: %d\n", espData.program.confRes);
+  
+  // Feed watchdog after config load
+  esp_task_wdt_reset();
 
   while (espData.wifi.state != 1){
     espData.wifi.state = espWifi->connect();
@@ -622,35 +621,54 @@ void setup(){
   // Force flush and ensure connection
   Serial.println();
   Serial.println("=== ESP32 AIO Starting Up ===");
+  Serial.println("Serial port initialized successfully");
+  
+  Serial.println("About to initialize NVS...");
+  
+  // Initialize NVS FIRST - before any ESPdata access
+  // esp_err_t err = nvs_flash_init();
+  // if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+  //   // NVS partition was truncated and needs to be erased
+  //   Serial.println("NVS partition needs erasing, erasing now...");
+  //   ESP_ERROR_CHECK(nvs_flash_erase());
+  //   err = nvs_flash_init();
+  // }
+  // ESP_ERROR_CHECK(err);
+  // Serial.println("NVS initialized successfully");
+  
+  Serial.println("Getting ESPdata instance...");
   
   // Now safe to get ESPdata instance
   espDataPtr = &ESPdata::getInstance();
   
   Serial.println("Initializing ESPdata Preferences...");
   espData.initPreferences();
-  espData.loadConfig();
-
-
-  myLED = new MyLED(&espData);
-  espWifi = new ESPWifi(&espData);
-
-  if (espData.getBootState() == 1){
-    Serial.println("Previous boot was clean");
-    normalBoot();
-  } else {
-    Serial.println("Previous boot was NOT clean");
-    Serial.printf("Boot state: %d\n", espData.getBootState());
-    recoveryBoot();
-  }
-
   
+  Serial.println("Creating component instances...");
+  
+  // Initialize all components that depend on ESPdata
+  gps = new ESPGPS(&espData, &gpsSerial, &bnoSerial);
+  myLED = new MyLED(&espData);
+  mainPower = new MainPower(&espData, &mcp, &ads);
+  espWifi = new ESPWifi(&espData);
+  espUdp = new ESPudp(&espData);
+  espSteer = new ESPsteer(&espData, &ads, &mcp);
+  indicators = new Indicators(&espData, &mcp);
+  canbus = new CANBUS(&espData);
 
+  Serial.println("All components initialized successfully");
   
   Serial.println("Checking bootState...");
-
-  Serial.printf("Boot state: %d\n", espData.getBootState());
-
- 
+  
+  Serial.printf("Boot state: %d\n", espData.program.bootState);
+  
+  if (espData.program.bootState != 1){
+    Serial.println("Entering recovery boot...");
+    recoveryBoot();
+  } else {
+    Serial.println("Entering normal boot...");
+    normalBoot();
+  }
 }
 
 void debugPrint(){
