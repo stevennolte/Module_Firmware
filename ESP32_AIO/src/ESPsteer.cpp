@@ -4,11 +4,10 @@
 
 //TODO: SET STEER ANGLE, IMU DATA, ETC DURING TIMEOUT
 
-ESPsteer::ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads, Adafruit_MCP23X17* mcp) : motorDriver(vars, mcp), was(vars, ads), pid(-1.0,1.0, TuningMethod::Manual) {
+ESPsteer::ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads) 
+    : motorDriver(vars), was(vars, ads), pid(-1.0,1.0, TuningMethod::Manual), mcpManager(MCPManager::getInstance()) {
     espData = vars;
     this->ads = ads;
-    this->mcp = mcp;
-    
 }
 
 void ESPsteer::continuousLoop() {

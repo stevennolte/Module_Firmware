@@ -4,6 +4,7 @@
 #include "Arduino.h"
 #include "ESPdata.h"
 #include <Adafruit_MCP23X17.h>
+#include "MCPManager.h"
 
 
 
@@ -17,7 +18,7 @@ class MotorDriver{
         void disable();
         void setCW();
         void setCCW();
-        MotorDriver(ESPdata* vars, Adafruit_MCP23X17* mcp);
+        MotorDriver(ESPdata* vars);  // Removed MCP parameter
         
     private:
         
@@ -34,7 +35,7 @@ class MotorDriver{
         float pidOutput;
 
         ESPdata* espData;
-        Adafruit_MCP23X17* mcp;
+        MCPManager& mcpManager;  // Reference to MCPManager singleton
        
 
 };

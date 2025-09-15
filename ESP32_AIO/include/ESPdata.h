@@ -23,6 +23,7 @@ public:
     uint8_t updateSteer();
     uint8_t getStrapping();
     uint8_t saveWASzero();
+    bool setBootMode(uint8_t mode);
     
     // Constructor remains public for backward compatibility
     ESPdata();
@@ -50,6 +51,25 @@ public:
             uint8_t WORK_SWITCH_PIN = 4;
         } pins;
         
+        struct MCPgpio {
+            struct inputs{
+                uint8_t work_switch = 0;
+                uint8_t remote_switch = 1;
+                uint8_t steer_switch = 2;
+
+            } inputs;
+            struct outputs{
+                uint8_t power_on = 8;
+                uint8_t eth_good = 9;
+                uint8_t gps_fix = 10;
+                uint8_t rtk_fix = 11;
+                uint8_t steer_standby = 12;
+                uint8_t steer_active = 13;
+                uint8_t motor_enb = 14;
+                uint8_t motor_ena = 15;
+            } outputs;
+        } mcpPins;
+
         struct I2CAddresses {
             uint8_t TLE_ADDRESS = 0x22;
             uint8_t MCP_ADDRESS = 0x20;
@@ -118,6 +138,8 @@ public:
             uint8_t adsState;
             uint8_t steerDriverState;
             uint32_t lastDebugRequest;
+            uint32_t bootcount;
+            uint8_t bootMode;
         } program;
 
         struct OTA {

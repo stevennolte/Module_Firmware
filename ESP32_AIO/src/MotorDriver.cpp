@@ -10,17 +10,14 @@
 #include "MotorDriver.h"
 #include "driver/ledc.h"
 
-MotorDriver::MotorDriver(ESPdata* vars, Adafruit_MCP23X17* mcp){
+MotorDriver::MotorDriver(ESPdata* vars) : mcpManager(MCPManager::getInstance()) {
     espData = vars;
-    this->mcp = mcp;
     
     inaPin = espData->pins.MOTOR_A_PIN;
     inbPin = espData->pins.MOTOR_B_PIN;
     pwmPin = espData->pins.MOTOR_PWM_PIN;
     enaPin = espData->pins.ENA;
     enbPin = espData->pins.ENB;
-
-    
 }
 
 
@@ -54,11 +51,11 @@ void MotorDriver::init(){
     pinMode(inbPin, OUTPUT);
     // pinMode(pwmPin, OUTPUT);
     
-    if (espData->program.mcpState == 1){
-        mcp->pinMode(enaPin, OUTPUT);  //MCP23017 has the diagnostics pins as inputs
-        mcp->pinMode(enbPin, OUTPUT); 
-        mcp->digitalWrite(enaPin, LOW);
-        mcp->digitalWrite(enbPin, LOW); 
+    if (espData->program.mcpState == 1 && mcpManager.isInitialized()){
+        mcpManager.setupMotorPins();  // Uses ESPdata pin definitions automatically
+        Serial.println("MotorDriver: Motor pins configured using MCPManager");
+    } else {
+        Serial.println("MotorDriver: MCPManager not available, motor enable pins not configured");
     }
     
 
@@ -110,13 +107,19 @@ void MotorDriver::setOutput(float value){
 }
 
 void MotorDriver::enable(){
-    mcp->digitalWrite(enaPin, HIGH);
-    mcp->digitalWrite(enbPin, HIGH);
+    if (mcpManager.isInitialized()) {
+        mcpManager.enableMotor();  // Uses ESPdata pin definitions automatically
+    } else {
+        Serial.println("MotorDriver: Cannot enable motor - MCPManager not initialized");
+    }
 }
 
 void MotorDriver::disable(){
-    mcp->digitalWrite(enaPin, LOW);
-    mcp->digitalWrite(enbPin, LOW);
+    if (mcpManager.isInitialized()) {
+        mcpManager.disableMotor();  // Uses ESPdata pin definitions automatically
+    } else {
+        Serial.println("MotorDriver: Cannot disable motor - MCPManager not initialized");
+    }
     digitalWrite(inbPin, LOW);
     digitalWrite(inaPin, LOW);
 }

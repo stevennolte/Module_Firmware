@@ -9,6 +9,7 @@
 #include <Adafruit_ADS1X15.h>
 #include "ESPudp.h"
 #include "AutoTunePID.h"
+#include "MCPManager.h"
 
 class ESPudp;
 
@@ -17,7 +18,7 @@ class ESPsteer{
         void begin(ESPudp* espUdp);
         uint32_t getCurrent();
         void setPIDgains();
-        ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads, Adafruit_MCP23X17* mcp);
+        ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads);  // Removed MCP parameter
         WAS was;
     private:
         void steerTestLoop();
@@ -28,7 +29,7 @@ class ESPsteer{
         uint8_t getTestState();
         ESPdata* espData;
         Adafruit_ADS1115* ads;
-        Adafruit_MCP23X17* mcp;
+        MCPManager& mcpManager;  // Reference to MCPManager singleton
         ESPudp* espUdp;
         MotorDriver motorDriver;
         

@@ -3,9 +3,9 @@
 ESPGPS* ESPGPS::instance = nullptr;
 
 // New constructor using MCPManager singleton (no MCP pointer needed)
-ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) : parser(), rvc() , myGNSS(){
+ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) 
+    : parser(), rvc(), myGNSS(), mcpManager(MCPManager::getInstance()) {
     espData = vars;
-    
     this->gpsSerial = gpsSerial;
     this->bnoSerial = bnoSerial;
     
@@ -45,6 +45,18 @@ void ESPGPS::GGA_Handler() //Rec'd GGA
     // time of last DGPS update
     parser.getArg(12, espData->gps.ageDGPS);
 
+    // Update GPS indicators based on fix quality using MCPManager member
+    if (mcpManager.isInitialized()) {
+        // GPS fix indicator: ON if we have any fix (quality > 0)
+        bool hasGPSFix = (atoi(espData->gps.fixQuality) > 0);
+        mcpManager.setGPSFix(hasGPSFix);  // Uses ESPdata pin definitions
+        
+        // RTK fix indicator: ON if we have RTK fix (quality 4 or 5)
+        int quality = atoi(espData->gps.fixQuality);
+        bool hasRTKFix = (quality == 4 || quality == 5);
+        mcpManager.setRTKFix(hasRTKFix);  // Uses ESPdata pin definitions
+    }
+
     buildNmea();
 }
 void ESPGPS::staticGGA_Handler(){
@@ -55,11 +67,13 @@ void ESPGPS::staticGGA_Handler(){
 void ESPGPS::init(ESPudp* espUdp){
     this->espUdp = espUdp;
     
-    // Use MCPManager if no MCP pointer was provided in constructor
-    
-    MCPManager& mcpManager = MCPManager::getInstance();
+    // Setup GPS indicators using MCPManager member
     if (mcpManager.isInitialized()) {
-        mcpManager.setGPSactive();
+        mcpManager.setupGPSIndicators();  // Uses ESPdata pin definitions
+        mcpManager.testGPSIndicators();   // Uses ESPdata pin definitions
+        Serial.println("GPS: Indicator pins configured using MCPManager");
+    } else {
+        Serial.println("GPS: MCPManager not initialized, skipping indicator setup");
     }
    
     parser.addHandler("G-GGA", staticGGA_Handler);
@@ -110,21 +124,13 @@ void ESPGPS::init(ESPudp* espUdp){
 void ESPGPS::initWithSingleton(ESPudp* espUdp){
     this->espUdp = espUdp;
     
-    // Use MCPManager singleton instead of mcp pointer
-    MCPManager& mcpManager = MCPManager::getInstance();
-    
+    // Setup GPS indicators using MCPManager member
     if (mcpManager.isInitialized()) {
-        mcpManager.pinMode(_gpsFixIndPin, OUTPUT);
-        mcpManager.pinMode(_rtkFixIndPin, OUTPUT);
-        mcpManager.digitalWrite(_gpsFixIndPin, HIGH);
-        mcpManager.digitalWrite(_rtkFixIndPin, HIGH);
-        delay(1000);
-        mcpManager.digitalWrite(_gpsFixIndPin, LOW);
-        mcpManager.digitalWrite(_rtkFixIndPin, LOW);
-        
-        Serial.println("GPS: Using MCPManager singleton for pin control");
+        mcpManager.setupGPSIndicators(_gpsFixIndPin, _rtkFixIndPin);
+        mcpManager.testGPSIndicators(_gpsFixIndPin, _rtkFixIndPin);
+        Serial.println("GPS: Using MCPManager for indicator setup");
     } else {
-        Serial.println("GPS: MCPManager not initialized, skipping pin setup");
+        Serial.println("GPS: MCPManager not initialized");
     }
     
     // Rest of initialization is the same as original init method
@@ -260,6 +266,30 @@ void ESPGPS::taskHandler(void *param){
 void ESPGPS::sendNTRIP(uint8_t* data, uint8_t len){
 
     gpsSerial->write(data, len);
+}
+
+// MCPManager helper methods
+void ESPGPS::updateGPSIndicators() {
+    if (mcpManager.isInitialized()) {
+        // GPS fix indicator: ON if we have any fix (quality > 0)
+        bool hasGPSFix = (atoi(espData->gps.fixQuality) > 0);
+        
+        // RTK fix indicator: ON if we have RTK fix (quality 4 or 5)
+        int quality = atoi(espData->gps.fixQuality);
+        bool hasRTKFix = (quality == 4 || quality == 5);
+        
+        mcpManager.setGPSFix(_gpsFixIndPin, hasGPSFix);
+        mcpManager.setRTKFix(_rtkFixIndPin, hasRTKFix);
+    }
+}
+
+void ESPGPS::setGPSIndicators(bool hasGPSFix, bool hasRTKFix) {
+    if (mcpManager.isInitialized()) {
+        mcpManager.setGPSFix(_gpsFixIndPin, hasGPSFix);
+        mcpManager.setRTKFix(_rtkFixIndPin, hasRTKFix);
+    } else {
+        Serial.println("GPS: MCPManager not initialized, cannot set indicators");
+    }
 }
 
 

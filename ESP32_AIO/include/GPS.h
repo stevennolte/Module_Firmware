@@ -7,10 +7,13 @@
 #include "ESPudp.h"
 #include "ESPdata_macros.h"
 
-#include "MCPManager.h"
+
 #include <zNMEAParser.h>
 #include <SparkFun_Unicore_GNSS_Arduino_Library.h>
 #include "Adafruit_BNO08x_RVC.h"
+#include "Adafruit_MCP23X17.h"
+#include "MCPManager.h"
+
 class ESPudp;
 
 class ESPGPS{
@@ -33,6 +36,10 @@ class ESPGPS{
         // static void errorHandler();
         void GGA_Handler();
         void displayInfo();
+        
+        // MCPManager helper methods
+        void updateGPSIndicators();
+        void setGPSIndicators(bool hasGPSFix, bool hasRTKFix);
     private:
         static ESPGPS* instance;
         static void staticGGA_Handler();
@@ -43,12 +50,13 @@ class ESPGPS{
         uint8_t _rtkFixIndPin;
         ESPdata* espData;
         ESPudp* espUdp;
+        MCPManager& mcpManager;  // Reference to MCPManager singleton
         NMEAParser<2> parser;
         UM980 myGNSS;
         HardwareSerial* gpsSerial;
         HardwareSerial* bnoSerial;
 
-        
+        Adafruit_MCP23X17 mcp;
         Adafruit_BNO08x_RVC rvc;
 };
 

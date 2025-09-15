@@ -1,10 +1,9 @@
 #include "MainPower.h"
 
 
-MainPower::MainPower(ESPdata* config, Adafruit_MCP23X17* mcp, Adafruit_ADS1115* ads)
+MainPower::MainPower(ESPdata* config, Adafruit_ADS1115* ads) : _mcpManager(MCPManager::getInstance())
 {
     _data = config;
-    _mcp = mcp;
     _ads = ads;
     _powerOn = _data->pins.mainPowerInd;
     _mainPowerPin = _data->pins.mainPowerPin;
@@ -12,13 +11,19 @@ MainPower::MainPower(ESPdata* config, Adafruit_MCP23X17* mcp, Adafruit_ADS1115* 
 
 void MainPower::startTask()
 {
-    _mcp->pinMode(_powerOn, OUTPUT);
+    if (_mcpManager.isInitialized()) {
+        _mcpManager.setupPowerPin();     // Uses ESPdata pin definitions automatically
+        _mcpManager.setPowerState(true); // Uses ESPdata pin definitions automatically
+        Serial.println("MainPower: Power indicator configured using MCPManager");
+    } else {
+        Serial.println("MainPower: MCPManager not initialized, power indicator not configured");
+    }
+    
     pinMode(_mainPowerPin, OUTPUT);
     pinMode(_data->pins.mainPowerDen, OUTPUT);
     digitalWrite(_data->pins.mainPowerDen, LOW);
 
     digitalWrite(_mainPowerPin, HIGH);
-    _mcp->digitalWrite(_powerOn, HIGH);
     xTaskCreatePinnedToCore(
         taskHandler,   /* Task function. */
         "MainPower",     /* name of task. */

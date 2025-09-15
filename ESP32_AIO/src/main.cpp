@@ -1,10 +1,11 @@
 #include <Arduino.h>
+#include "nvs_flash.h"
 #include "ESPdata.h"
 #include "ESPWifi.h"
 #include "myLED.h"
 #include "Wire.h"
 #include "ESPudp.h"
-#include "Adafruit_MCP23X17.h"
+// #include "Adafruit_MCP23X17.h"
 #include "MCPManager.h"
 #include <Adafruit_ADS1X15.h>
 // #include "Indicators.h"
@@ -23,25 +24,28 @@ TwoWire twoWire1 = TwoWire(1);
 HardwareSerial bnoSerial(2);
 HardwareSerial gpsSerial(1);
 
-Adafruit_MCP23X17 mcp;
+// Adafruit_MCP23X17 mcp;
 Adafruit_ADS1115 ads;
 
 // Using singleton pattern - single access point for configuration
 ESPdata& espData = ESPdata::getInstance();
-
-// Get MCPManager singleton instance (alternative approach)
-
+MCPManager& mcpManager = MCPManager::getInstance();
+// MCPManager singleton instance will be initialized in setup()
+// Usage example:
+// MCPManager& mcpMgr = MCPManager::getInstance();
+// mcpMgr.setupMotorPins(pin1, pin2);
+// mcpMgr.enableMotor(pin1, pin2);
 
 // Components using singleton instance
-ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // Using MCPManager singleton, no MCP pointer needed
+ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // MCPManager accessed via singleton inside class
 MyLED myLED(&espData);
-MainPower mainPower(&espData, &mcp, &ads);
+MainPower mainPower(&espData, &ads);  // MCPManager accessed via singleton inside class
 ESPWifi espWifi(&espData);
 ESPudp espUdp(&espData);
 ESP32OTAPull ota;
 AsyncWebServer server(80);
 
-ESPsteer espSteer(&espData, &ads, &mcp);
+ESPsteer espSteer(&espData, &ads);  // MCPManager accessed via singleton inside class
 std::vector<String> debugVars;
 
 
@@ -72,7 +76,7 @@ bool I2Csetup(){
   }
   else 
   {
-    Serial.println("Unknown error at address 0x20");
+    Serial.println("MCP23017 not found at address 0x20");
     espData.program.mcpState = 2;
   }
   
@@ -85,7 +89,7 @@ bool I2Csetup(){
   }
   else 
   {
-    Serial.println("Unknown error at address 0x48");
+    Serial.println("ADS1115 not found at address 0x48");
     espData.program.adsState = 2;
   }
   if (espData.program.mcpState == 2 || espData.program.adsState == 2){
@@ -427,24 +431,18 @@ void buttonSetup(){
 }
 #pragma endregion
 
-void setup(){
-  espData.program.state = 0;
-  myLED.startTask();
+
+void normalboot(){
+  // Normal boot sequence
+  /** @brief Normal boot sequence */
+  Serial.println("Normal Boot Sequence Initiated");
   espData.program.state = 2;
-
-  // Start USB Serial Port
-  Serial.begin(115200);
-  delay(5000);   // Wait for the usb to connect so you can see the outputs at startup
-  Serial.println("Starting up...");
-  espData.program.confRes = espData.loadConfig();
-
-  // Start Wifi AP and Webserver for diagnostics
-  // espConfig.wifiCfg.state = espWifi.connect();
-
   while (espData.wifi.state != 1){
     espData.wifi.state = espWifi.connect();
+    /** @brief Check for WiFi connection, if times out, create AP */
     if (millis() > 120000){
       Serial.println("Wifi connection timed out");
+      Serial.println("Switching to AP mode");
       espData.wifi.state = espWifi.makeAP();
       break;
     }
@@ -530,10 +528,16 @@ void setup(){
     }
   }
   if (espData.program.mcpState == 1){
-    mcp.begin_I2C(0x20, &twoWire);
+    // Initialize the original MCP instance for backward compatibility
+    // mcp.begin_I2C(0x20, &twoWire);
     
-    // Also initialize the MCPManager singleton (alternative approach)
-    // mcpManager.begin(0x20, &twoWire);
+    // Initialize the MCPManager singleton
+    // MCPManager& mcpManager = MCPManager::getInstance();
+    if (mcpManager.begin(&espData, 0x20, &twoWire)) {
+      Serial.println("MCPManager initialized successfully");
+    } else {
+      Serial.println("MCPManager initialization failed");
+    }
     
     // mcp.pinMode(espConfig.gpioDefs.rtkFix, OUTPUT);
     // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, HIGH);
@@ -567,6 +571,24 @@ void setup(){
   Serial.println("Network setup complete");
   // delay(5000);
   espData.program.state = 1;
+
+  // Add your normal boot logic here
+}
+
+void setup(){
+  Serial.begin(115200);
+  delay(1000); // Give time for serial to initialize
+  Serial.println("\n\nStarting up...");
+  myLED.startTask();
+  espData.program.confRes = espData.loadConfig();
+  if (espData.program.state != 1){
+    Serial.println(" Booting into Recovery Mode");
+    // recoveryBoot();
+  } else {
+    normalboot();
+  }
+  // Start Wifi AP and Webserver for diagnostics
+  // espConfig.wifiCfg.state = espWifi.connect();
 
 }
 

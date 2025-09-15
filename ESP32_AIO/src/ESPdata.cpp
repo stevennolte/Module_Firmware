@@ -5,7 +5,7 @@ ESPdata* ESPdata::instance = nullptr;
 
 ESPdata::ESPdata() {
     // Initialize Preferences in constructor
-    preferences.begin("agopen", false); // "agopen" namespace, read-write mode
+    
 }
 
 // Singleton implementation
@@ -34,11 +34,22 @@ uint8_t ESPdata::getStrapping(){
 uint8_t ESPdata::loadConfig(){
     program.state = 2;
     // Set default IP if not found in preferences
+    if (!preferences.begin("agopen", false)) { // "agopen" namespace, read-write mode
+        Serial.println("Failed to initialize preferences - NVS may not be initialized");
+        // You could add additional error handling here if needed
+    } else {
+        Serial.println("Preferences initialized successfully");
+    }
+    program.bootMode = preferences.getUChar("bootMode", 0);
     wifi.ips[0] = preferences.getUChar("ip0", 192);
     wifi.ips[1] = preferences.getUChar("ip1", 168);
     wifi.ips[2] = preferences.getUChar("ip2", 5);
     wifi.ips[3] = preferences.getUChar("ip3", 11);
 
+    program.bootcount = preferences.getULong("bootcount", 0);
+    Serial.println("Boot count: " + String(program.bootcount));
+    program.bootcount = program.bootcount + 1;
+    preferences.putULong("bootcount", program.bootcount);
     
     // Load WAS zero angle
     steer.wasZeroAngle = preferences.getFloat("wasZero", 0.0);
@@ -57,6 +68,7 @@ uint8_t ESPdata::loadConfig(){
     Serial.println(steer.pidOutputFilt);
 
     // Load steering configuration
+    // preferences.putFloat("Kp", 50.0); // Ensure Kp has a default value if not set   
     steer.gainP = preferences.getFloat("Kp", 50.0);
     steer.highPWM = preferences.getUChar("highPWM", 255);
     steer.lowPWM = preferences.getUChar("lowPWM", 10);
@@ -68,9 +80,41 @@ uint8_t ESPdata::loadConfig(){
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
     ota.port = preferences.getUShort("serverPort", 8080);
+    // Print entire configuration to serial monitor
+    Serial.println("=== ESP32 Configuration ===");
+    Serial.println("Program:");
+    Serial.println("  Name: " + String(NAME));
+    Serial.println("  Boot Mode: " + String(program.bootMode));
+    Serial.println("  Boot Count: " + String(program.bootcount));
+    Serial.println("  State: " + String(program.state));
 
+    Serial.println("WiFi:");
+    Serial.println("  IP: " + String(wifi.ips[0]) + "." + String(wifi.ips[1]) + "." + String(wifi.ips[2]) + "." + String(wifi.ips[3]));
+
+    Serial.println("Steering:");
+    Serial.println("  WAS Zero Angle: " + String(steer.wasZeroAngle));
+    Serial.println("  WAS Offset: " + String(steer.steerOffset));
+    Serial.println("  Gain P (Kp): " + String(steer.gainP));
+    Serial.println("  High PWM: " + String(steer.highPWM));
+    Serial.println("  Low PWM: " + String(steer.lowPWM));
+    Serial.println("  Min PWM: " + String(steer.minPWM));
+    Serial.println("  Counts Per Degree: " + String(steer.countsPerDeg));
+    Serial.println("  Use ADS: " + String(steer.useADS ? "true" : "false"));
+    Serial.println("  PID Input Filter: " + String(steer.pidInputFilt));
+    Serial.println("  PID Output Filter: " + String(steer.pidOutputFilt));
+
+    Serial.println("OTA/Server:");
+    Serial.println("  Server IP: " + String(ota.ipAddr));
+    Serial.println("  Server Port: " + String(ota.port));
+    Serial.println("=== End Configuration ===");
     program.state = 1;
     return 1; // Success
+}
+
+bool ESPdata::setBootMode(uint8_t mode){
+    program.bootMode = mode;
+    preferences.putUChar("bootMode", program.bootMode);
+    return true;
 }
 
 uint8_t ESPdata::saveConfig(){
