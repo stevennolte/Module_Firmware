@@ -6,12 +6,49 @@
 #include <Wire.h>
 #include "ESPdata.h"
 
+// LED State Management
+enum class LEDState {
+    OFF,                    // LED off
+    ON,                     // LED solid on
+    SLOW_PULSE,            // Slow pulse (1 Hz)
+    FAST_PULSE,            // Fast pulse (2 Hz)
+    RAPID_PULSE,           // Rapid pulse (5 Hz)
+    ERROR_FLASH,           // Error flash pattern (3 quick flashes, pause)
+    HEARTBEAT              // Heartbeat pattern (double pulse)
+};
+
+struct LEDIndicator {
+    uint8_t pin;
+    LEDState state;
+    unsigned long lastToggle;
+    bool currentState;
+    uint8_t flashCount;    // For error flash pattern
+    
+    LEDIndicator() : pin(0), state(LEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
+    LEDIndicator(uint8_t p) : pin(p), state(LEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
+};
+
 class MCPManager {
 private:
     static MCPManager* instance;
     Adafruit_MCP23X17 mcp;
     bool initialized;
     ESPdata* espData;  // Pointer to ESPdata for pin access
+    
+    // LED Indicators
+    LEDIndicator ledGPSFix;
+    LEDIndicator ledRTKFix;
+    LEDIndicator ledPowerOn;
+    LEDIndicator ledEthGood;
+    LEDIndicator ledSteerStandby;
+    LEDIndicator ledSteerActive;
+    
+    TaskHandle_t ledTaskHandle;
+    
+    // Private methods
+    static void ledUpdateTask(void* parameter);
+    void updateLEDs();
+    void updateLED(LEDIndicator& led);
     
     // Private constructor for singleton
     MCPManager();
@@ -68,6 +105,15 @@ public:
     void testGPSIndicators();        // Uses ESPdata pin definitions
     void setGPSFix(bool state);      // Uses ESPdata pin definitions
     void setRTKFix(bool state);      // Uses ESPdata pin definitions
+    
+    // LED State Management methods
+    void setPowerLED(LEDState state);
+    void setGPSLED(LEDState state);
+    void setRTKLED(LEDState state);
+    void setEthLED(LEDState state);
+    void setSteerStandbyLED(LEDState state);
+    void setSteerActiveLED(LEDState state);
+    void setAllLEDs(LEDState state);
     
     // Get direct access to MCP object (for advanced usage or backward compatibility)
     Adafruit_MCP23X17* getMCP();
