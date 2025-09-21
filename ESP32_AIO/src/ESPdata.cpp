@@ -31,8 +31,25 @@ uint8_t ESPdata::getStrapping(){
     return 1;
 }
 
+bool ESPdata::setMCPstate(uint8_t state){
+    program.mcpState = state;
+    preferences.putUChar("mcpState", program.mcpState);
+    return true;
+}
+
+bool ESPdata::setTwoWireState(uint8_t state){
+    program.twoWireState = state;
+    preferences.putUChar("twoWireState", program.twoWireState);
+    return true;
+}
+
+bool ESPdata::setADSstate(uint8_t state){
+    program.adsState = state;
+    preferences.putUChar("adsState", program.adsState);
+    return true;
+}
+
 uint8_t ESPdata::loadConfig(){
-    program.state = 2;
     // Set default IP if not found in preferences
     if (!preferences.begin("agopen", false)) { // "agopen" namespace, read-write mode
         Serial.println("Failed to initialize preferences - NVS may not be initialized");
@@ -40,12 +57,15 @@ uint8_t ESPdata::loadConfig(){
     } else {
         Serial.println("Preferences initialized successfully");
     }
+    program.state = preferences.getUChar("state", 0);
     program.bootMode = preferences.getUChar("bootMode", 0);
     wifi.ips[0] = preferences.getUChar("ip0", 192);
     wifi.ips[1] = preferences.getUChar("ip1", 168);
     wifi.ips[2] = preferences.getUChar("ip2", 5);
     wifi.ips[3] = preferences.getUChar("ip3", 11);
-
+    program.mcpState = preferences.getUChar("mcpState", 0);
+    program.twoWireState = preferences.getUChar("twoWireState", 0);
+    program.adsState = preferences.getUChar("adsState", 0);
     program.bootcount = preferences.getULong("bootcount", 0);
     Serial.println("Boot count: " + String(program.bootcount));
     program.bootcount = program.bootcount + 1;
@@ -107,7 +127,7 @@ uint8_t ESPdata::loadConfig(){
     Serial.println("  Server IP: " + String(ota.ipAddr));
     Serial.println("  Server Port: " + String(ota.port));
     Serial.println("=== End Configuration ===");
-    program.state = 1;
+    // program.state = 1;
     return 1; // Success
 }
 
@@ -117,8 +137,15 @@ bool ESPdata::setBootMode(uint8_t mode){
     return true;
 }
 
+bool ESPdata::setState(uint8_t state){
+    program.state = state;
+    preferences.putUChar("state", program.state);
+    return true;
+}
+
 uint8_t ESPdata::saveConfig(){
     // Save all configuration to Preferences
+    preferences.putUChar("state", program.state);
     preferences.putUChar("ip0", wifi.ips[0]);
     preferences.putUChar("ip1", wifi.ips[1]);
     preferences.putUChar("ip2", wifi.ips[2]);

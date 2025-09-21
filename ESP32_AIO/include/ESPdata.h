@@ -23,7 +23,12 @@ public:
     uint8_t updateSteer();
     uint8_t getStrapping();
     uint8_t saveWASzero();
+    bool setState(uint8_t state);
     bool setBootMode(uint8_t mode);
+    bool setMCPstate(uint8_t state);
+    bool setTwoWireState(uint8_t state);
+    bool setADSstate(uint8_t state);
+
     
     // Constructor remains public for backward compatibility
     ESPdata();
@@ -140,6 +145,7 @@ public:
             uint32_t lastDebugRequest;
             uint32_t bootcount;
             uint8_t bootMode;
+            uint8_t twoWireState;
         } program;
 
         struct OTA {

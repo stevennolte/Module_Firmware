@@ -16,6 +16,9 @@
 #include "ESPsteer.h"
 #include <ESPAsyncWebServer.h>
 #include "littlefs.h"
+#include <WiFi.h>
+#include <ArduinoJson.h>
+#include "esp_system.h"
 
 //TODO: add wifi connect timer to ap mode
 
@@ -48,16 +51,18 @@ AsyncWebServer server(80);
 ESPsteer espSteer(&espData, &ads);  // MCPManager accessed via singleton inside class
 std::vector<String> debugVars;
 
+// Function declarations
+void updateDebugVars();
+void updateRecoveryDebugVars();
+void recoveryBoot();
+void normalboot();
 
 bool I2Csetup(){
   if(!twoWire.setPins(espData.pins.SDA_PIN, espData.pins.SCL_PIN)){
     Serial.println("Wire failed to set pins");
     return false;
   }
-  // if(!twoWire.setClock(1000000)){
-  //   Serial.println("Wire failed to set clock");
-  //   return false;
-  // }
+ 
   if(!twoWire.begin()){
     Serial.println("Wire failed to begin");
     return false;
@@ -163,7 +168,7 @@ bool I2Csetup(){
 
 // Function to serve the file list as JSON
 void handleFileList(AsyncWebServerRequest *request) {
-  DynamicJsonDocument doc(1024);
+  JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
 
   // Open LittleFS root directory and list files
@@ -171,7 +176,7 @@ void handleFileList(AsyncWebServerRequest *request) {
   File file = root.openNextFile();
   
   while (file) {
-    JsonObject fileObject = array.createNestedObject();
+    JsonObject fileObject = array.add<JsonObject>();
     fileObject["name"] = String(file.name());
     fileObject["size"] = file.size();
     file = root.openNextFile();
@@ -314,10 +319,60 @@ void updateDebugVars() {
   
 }
 
+// Recovery mode specific debug variables
+void updateRecoveryDebugVars() {
+  debugVars.clear(); // Clear the list to update it dynamically
+  debugVars.push_back("=== RECOVERY MODE ===");
+  debugVars.push_back("Program: " + String(NAME));
+  debugVars.push_back("Recovery Boot Timestamp [s]: " + String((float)(millis())/1000.0));
+  debugVars.push_back("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+  debugVars.push_back("Used PSRAM: " + String(ESP.getPsramSize() - ESP.getFreePsram()) + " bytes");
+  debugVars.push_back("Version: " + String(VERSION));
+  debugVars.push_back("Chip Model: " + String(ESP.getChipModel()));
+  debugVars.push_back("Chip Revision: " + String(ESP.getChipRevision()));
+  debugVars.push_back("CPU Frequency: " + String(ESP.getCpuFreqMHz()) + " MHz");
+  debugVars.push_back("Flash Size: " + String(ESP.getFlashChipSize()) + " bytes");
+  debugVars.push_back("Flash Speed: " + String(ESP.getFlashChipSpeed()) + " Hz");
+  debugVars.push_back("MAC Address: " + WiFi.macAddress());
+  debugVars.push_back("");
+  debugVars.push_back("=== RECOVERY WIFI ===");
+  debugVars.push_back("AP SSID: " + String(NAME) + "_RECOVERY");
+  debugVars.push_back("AP Password: recovery123");
+  debugVars.push_back("AP IP: 192.168.4.1");
+  debugVars.push_back("WiFi Mode: AP (Access Point)");
+  debugVars.push_back("Connected Clients: " + String(WiFi.softAPgetStationNum()));
+  debugVars.push_back("");
+  debugVars.push_back("=== SYSTEM STATUS ===");
+  debugVars.push_back("Config Load Result: " + String(espData.program.confRes));
+  debugVars.push_back("Program State: " + String(espData.program.state));
+  debugVars.push_back("Reset Reason Core 0: " + String(esp_reset_reason()));
+  debugVars.push_back("Reset Reason Core 1: " + String(esp_reset_reason()));
+  debugVars.push_back("Wake Reason: " + String(esp_sleep_get_wakeup_cause()));
+  debugVars.push_back("");
+  debugVars.push_back("=== HARDWARE STATUS ===");
+  debugVars.push_back("MCP23017 State: " + String(espData.program.mcpState));
+  debugVars.push_back("ADS1115 State: " + String(espData.program.adsState));
+  debugVars.push_back("IMU State: " + String(espData.gps.imuState));
+  debugVars.push_back("I2C0 SDA/SCL: " + String(SDA) + "/" + String(SCL));
+  debugVars.push_back("I2C0 SDA/SCL: " + String(espData.pins.SDA_PIN) + "/" + String(espData.pins.SCL_PIN));
+  debugVars.push_back("");
+  debugVars.push_back("=== FILE SYSTEM ===");
+  debugVars.push_back("LittleFS Total: " + String(LittleFS.totalBytes()) + " bytes");
+  debugVars.push_back("LittleFS Used: " + String(LittleFS.usedBytes()) + " bytes");
+  debugVars.push_back("LittleFS Free: " + String(LittleFS.totalBytes() - LittleFS.usedBytes()) + " bytes");
+  debugVars.push_back("");
+  debugVars.push_back("=== RECOVERY ACTIONS ===");
+  debugVars.push_back("• Upload new firmware via /update");
+  debugVars.push_back("• Download/upload config files via /upload");
+  debugVars.push_back("• Factory reset via /factoryReset");
+  debugVars.push_back("• Force normal boot via /forceNormalBoot");
+  debugVars.push_back("• Reboot system via /reboot");
+}
+
 // Function to serve the debug variables as JSON
 void handleDebugVars(AsyncWebServerRequest *request) {
   updateDebugVars();  // Update the debug variables just before sending
-  DynamicJsonDocument doc(1024);
+  JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
   
   for (const auto& var : debugVars) {
@@ -401,6 +456,158 @@ void handleToggleAPMode(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", apModeState ? "AP_Mode is ON" : "AP_Mode is OFF");
 }
 
+
+// Recovery boot function with WiFi AP and debug web server
+void recoveryBoot() {
+  Serial.println("=== ENTERING RECOVERY MODE ===");
+  
+  // Set all LEDs to error flash pattern to indicate recovery mode
+  // mcpManager.setAllLEDs(LEDState::ERROR_FLASH);
+  
+  // Initialize LittleFS for file operations
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed - Formatting...");
+    LittleFS.format();
+    LittleFS.begin();
+  }
+  
+  // Setup WiFi AP for recovery access
+  String recoverySSID = String(NAME) + "_RECOVERY";
+  const char* recoveryPassword = "recovery123";
+  
+  Serial.println("Setting up Recovery WiFi AP...");
+  Serial.println("SSID: " + recoverySSID);
+  Serial.println("Password: " + String(recoveryPassword));
+  
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(recoverySSID.c_str(), recoveryPassword);
+  
+  // Configure AP IP address
+  IPAddress local_IP(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  
+  Serial.println("Recovery AP IP: " + WiFi.softAPIP().toString());
+  
+  // Setup recovery web server
+  Serial.println("Starting Recovery Web Server...");
+  
+  // Serve recovery main page
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<!DOCTYPE html><html><head><title>ESP32 Recovery Mode</title>";
+    html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body { font-family: Arial; margin: 20px; background: #f0f0f0; }";
+    html += ".container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }";
+    html += ".header { background: #d32f2f; color: white; padding: 15px; margin: -20px -20px 20px -20px; border-radius: 8px 8px 0 0; }";
+    html += ".section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 5px; }";
+    html += ".debug-vars { font-family: monospace; white-space: pre-wrap; background: #000; color: #0f0; padding: 10px; border-radius: 5px; max-height: 400px; overflow-y: auto; }";
+    html += ".button { background: #1976d2; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }";
+    html += ".button:hover { background: #1565c0; } .button.danger { background: #d32f2f; }";
+    html += ".button.danger:hover { background: #c62828; } .file-input { margin: 10px 0; }</style></head>";
+    html += "<body><div class='container'><div class='header'>";
+    html += "<h1>🔧 ESP32 Recovery Mode</h1><p>System failed to boot normally - Recovery interface active</p></div>";
+    html += "<div class='section'><h2>🔧 Recovery Actions</h2>";
+    html += "<button class='button' onclick='location.href=\"/factoryReset\"'>Factory Reset</button>";
+    html += "<button class='button' onclick='location.href=\"/forceNormalBoot\"'>Force Normal Boot</button>";
+    html += "<button class='button' onclick='location.href=\"/reboot\"'>Reboot System</button>";
+    html += "<button class='button' onclick='refreshDebug()'>Refresh Debug Info</button></div>";
+    html += "<div class='section'><h2>📤 Firmware Update</h2>";
+    html += "<form id='updateForm' enctype='multipart/form-data'>";
+    html += "<div class='file-input'><input type='file' id='firmwareFile' accept='.bin' required>";
+    html += "<button type='submit' class='button'>Upload Firmware</button></div></form></div>";
+    html += "<div class='section'><h2>📁 File Management</h2><div>";
+    html += "<input type='file' id='configFile' accept='.json'>";
+    html += "<button class='button' onclick='uploadConfig()'>Upload Config</button>";
+    html += "<button class='button' onclick='downloadConfig()'>Download Config</button></div></div>";
+    html += "<div class='section'><h2>🔍 System Debug Information</h2>";
+    html += "<div id='debugInfo' class='debug-vars'>Loading debug information...</div></div></div>";
+    html += "<script>function refreshDebug() { fetch('/getRecoveryDebug').then(response => response.json())";
+    html += ".then(data => { document.getElementById('debugInfo').textContent = data.join('\\n'); }); }";
+    html += "setInterval(refreshDebug, 5000); refreshDebug();";
+    html += "document.getElementById('updateForm').addEventListener('submit', function(e) {";
+    html += "e.preventDefault(); const fileInput = document.getElementById('firmwareFile');";
+    html += "if (fileInput.files[0]) { const formData = new FormData();";
+    html += "formData.append('firmware', fileInput.files[0]);";
+    html += "fetch('/update', { method: 'POST', body: formData }).then(response => {";
+    html += "alert('Firmware upload ' + (response.ok ? 'successful!' : 'failed!')); }); } });";
+    html += "function uploadConfig() { const fileInput = document.getElementById('configFile');";
+    html += "if (fileInput.files[0]) { const formData = new FormData();";
+    html += "formData.append('config', fileInput.files[0]);";
+    html += "fetch('/upload', { method: 'POST', body: formData }).then(response => {";
+    html += "alert('Config upload ' + (response.ok ? 'successful!' : 'failed!')); }); } }";
+    html += "function downloadConfig() { window.open('/download?file=config.json', '_blank'); }";
+    html += "</script></body></html>";
+    
+    request->send(200, "text/html", html);
+  });
+  
+  // Recovery-specific debug endpoint
+  server.on("/getRecoveryDebug", HTTP_GET, [](AsyncWebServerRequest *request) {
+    updateRecoveryDebugVars();
+    JsonDocument doc;
+    JsonArray array = doc.to<JsonArray>();
+    
+    for (const auto& var : debugVars) {
+      array.add(var);
+    }
+    
+    String jsonResponse;
+    serializeJson(doc, jsonResponse);
+    request->send(200, "application/json", jsonResponse);
+  });
+  
+  // Factory reset endpoint
+  // server.on("/factoryReset", HTTP_GET, [](AsyncWebServerRequest *request) {
+  //   Serial.println("Factory reset requested");
+  //   request->send(200, "text/plain", "Factory reset initiated. Device will reboot...");
+  //   delay(1000);
+  //   LittleFS.format();
+  //   ESP.restart();
+  // });
+  
+  // Force normal boot endpoint
+  server.on("/forceNormalBoot", HTTP_GET, [](AsyncWebServerRequest *request) {
+    Serial.println("Force normal boot requested");
+    espData.program.state = 1; // Set to normal boot state
+    espData.saveConfig();
+    request->send(200, "text/plain", "Normal boot forced. Device will reboot...");
+    delay(1000);
+    ESP.restart();
+  });
+  
+  // Existing handlers for compatibility
+  server.on("/getDebugVars", HTTP_GET, [](AsyncWebServerRequest *request) {
+    updateRecoveryDebugVars();
+    JsonDocument doc;
+    JsonArray array = doc.to<JsonArray>();
+    
+    for (const auto& var : debugVars) {
+      array.add(var);
+    }
+    
+    String jsonResponse;
+    serializeJson(doc, jsonResponse);
+    request->send(200, "application/json", jsonResponse);
+  });
+  
+  server.on("/getFiles", HTTP_GET, handleFileList);
+  server.on("/download", HTTP_GET, handleFileDownload);
+  server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFileUpload);
+  server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFirmwareUpload);
+  server.on("/reboot", HTTP_GET, handleReboot);
+  
+  // Start the recovery server
+  server.begin();
+  Serial.println("Recovery Web Server started!");
+  Serial.println("Connect to WiFi: " + recoverySSID);
+  Serial.println("Password: " + String(recoveryPassword));
+  Serial.println("Open browser to: http://192.168.4.1");
+  Serial.println("=====================================");
+  
+}
+
+
 #pragma endregion
 
 #pragma region Buttons
@@ -436,7 +643,41 @@ void normalboot(){
   // Normal boot sequence
   /** @brief Normal boot sequence */
   Serial.println("Normal Boot Sequence Initiated");
-  espData.program.state = 2;
+
+  espData.setState(2);
+  
+  // Start other Serial Ports
+  bnoSerial.setPins(espData.pins.BNO_PIN, 10);
+  bnoSerial.begin(115200);
+  gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
+  gpsSerial.begin(115200);
+  
+  // Grab the config
+  
+
+  // Start I2C and check for hardware
+  
+  if(!I2Csetup()){
+    Serial.println("I2C setup failed");
+    ESP.restart();
+  }
+  if (espData.program.mcpState == 1){
+    if (mcpManager.begin(&espData, 0x20, &twoWire)) {
+      Serial.println("MCPManager initialized successfully");
+    } else {
+      Serial.println("MCPManager initialization failed");
+    }
+  }
+  if (espData.program.adsState == 1){
+    ads.begin(0x48, &twoWire);
+  }
+  
+  // Start GPS
+  // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):
+  gps.init(&espUdp);
+    // If everything is good, turn on power to autosteer
+  mainPower.startTask();
+
   while (espData.wifi.state != 1){
     espData.wifi.state = espWifi.connect();
     /** @brief Check for WiFi connection, if times out, create AP */
@@ -484,7 +725,7 @@ void normalboot(){
         server.on("/setGpsSource", HTTP_POST, [](AsyncWebServerRequest *request){},
         NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            StaticJsonDocument<128> doc;
+            JsonDocument doc;
             DeserializationError error = deserializeJson(doc, data, len);
             if (error) {
                 request->send(400, "text/plain", "Invalid JSON");
@@ -509,81 +750,30 @@ void normalboot(){
         server.begin();
       #pragma endregion
 
-  // Start other Serial Ports
-  bnoSerial.setPins(espData.pins.BNO_PIN, 10);
-  bnoSerial.begin(115200);
-  gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
-  gpsSerial.begin(115200);
-  
-  // Grab the config
-  
 
-  // Start I2C and check for hardware
-  
-  if(!I2Csetup()){
-    Serial.println("I2C setup failed");
-    espData.program.state = 3;
-    while(1){
-      delay(1000);
-    }
-  }
-  if (espData.program.mcpState == 1){
-    // Initialize the original MCP instance for backward compatibility
-    // mcp.begin_I2C(0x20, &twoWire);
-    
-    // Initialize the MCPManager singleton
-    // MCPManager& mcpManager = MCPManager::getInstance();
-    if (mcpManager.begin(&espData, 0x20, &twoWire)) {
-      Serial.println("MCPManager initialized successfully");
-    } else {
-      Serial.println("MCPManager initialization failed");
-    }
-    
-    // mcp.pinMode(espConfig.gpioDefs.rtkFix, OUTPUT);
-    // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, HIGH);
-    // delay(1000);
-    // mcp.digitalWrite(espConfig.gpioDefs.rtkFix, LOW);
-  }
-  if (espData.program.adsState == 1){
-    ads.begin(0x48, &twoWire);
-  }
-  
-  
-  // Start GPS
-  // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):
-  gps.init(&espUdp);
-  
-  // Traditional approach using MCP pointer injection:
-  // gps.init(&espUdp);  // Would use MCP pointer if provided in constructor
-  
-  // Alternative explicit singleton method:
-  // gps.initWithSingleton(&espUdp);
-
-  // If everything is good, turn on power to autosteer
-  mainPower.startTask();
   espSteer.begin(&espUdp);
   
-  // Scan for Wifi networks
-  // espWifi.connect();
-  
+
   // UDP setup
   espUdp.begin(&gps);
   Serial.println("Network setup complete");
   // delay(5000);
-  espData.program.state = 1;
+  espData.setState(1);
 
   // Add your normal boot logic here
 }
 
 void setup(){
   Serial.begin(115200);
+  myLED.startTask();
+  myLED.setErrorState(LEDErrorState::NO_ERROR);
   delay(1000); // Give time for serial to initialize
   Serial.println("\n\nStarting up...");
-  myLED.startTask();
+  
   espData.program.confRes = espData.loadConfig();
   if (espData.program.state != 1){
     Serial.println(" Booting into Recovery Mode");
-    // recoveryBoot();
+    recoveryBoot();
   } else {
     normalboot();
   }
