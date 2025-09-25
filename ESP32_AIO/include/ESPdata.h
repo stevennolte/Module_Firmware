@@ -56,6 +56,10 @@ public:
             uint8_t WORK_SWITCH_PIN = 4;
         } pins;
         
+        struct ADSConfig {
+            uint8_t mainPowerISpin = 3;
+        } adsConfig;
+
         struct MCPgpio {
             struct inputs{
                 uint8_t work_switch = 0;
@@ -92,6 +96,13 @@ public:
             uint16_t ntripPort = 2233;
             uint16_t modPort = 8888;
         } wifi;
+
+        struct Power {
+            float mainCurrent;
+            uint16_t mainCurrentRaw;
+        } power;
+
+
 
         struct GPS {
             uint8_t state;

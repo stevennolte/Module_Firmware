@@ -7,7 +7,7 @@ uint32_t updateTimer = 0;
 
 MyLED::MyLED(ESPdata* vars) : pixel(1, 48, NEO_GRB + NEO_KHZ800) {
   espData = vars;
-  currentErrorState = LEDErrorState::NO_ERROR;
+  currentErrorState = LEDState::NO_ERROR;
   errorOverride = false;
   specialMode = false;
   lastBlinkTime = 0;
@@ -22,7 +22,7 @@ void MyLED::showColor(uint32_t color) {
     pixel.show();  // Send the color data to the strip
 }
 
-void MyLED::setErrorState(LEDErrorState errorState) {
+void MyLED::setLEDState(LEDState errorState) {
     currentErrorState = errorState;
     errorOverride = true;
 }
@@ -30,11 +30,16 @@ void MyLED::setErrorState(LEDErrorState errorState) {
 void MyLED::setSpecialMode(bool enabled) {
     specialMode = enabled;
     if (enabled) {
-        currentErrorState = LEDErrorState::SPECIAL_MODE;
+        currentErrorState = LEDState::SPECIAL_MODE;
         errorOverride = true;
     } else {
         errorOverride = false; // Return to automatic error detection
     }
+}
+
+void MyLED::updateBrightness() {
+    pixel.setBrightness(espData->program.ledBrht);
+    // Note: The brightness change will take effect on the next pixel.show() call
 }
 
 // Task handler, runs in a separate task
@@ -48,7 +53,7 @@ void MyLED::taskHandler(void *param) {
 void MyLED::startTask() {
   
   pixel.begin();
-  pixel.setBrightness(25);
+  pixel.setBrightness(espData->program.ledBrht);
   xTaskCreate(
         taskHandler,   // Task function
         "TaskA",       // Name of the task
@@ -80,54 +85,54 @@ void MyLED::continuousLoop() {
 }
 
 // Detect current system error state based on ESPdata
-LEDErrorState MyLED::detectErrorState() {
+LEDState MyLED::detectErrorState() {
     int errorCount = 0;
-    LEDErrorState primaryError = LEDErrorState::NO_ERROR;
+    LEDState primaryError = LEDState::NO_ERROR;
     
     // Check configuration load result
     if (espData->program.confRes != 1) {
         errorCount++;
-        if (primaryError == LEDErrorState::NO_ERROR) primaryError = LEDErrorState::CONFIG_ERROR;
+        if (primaryError == LEDState::NO_ERROR) primaryError = LEDState::CONFIG_ERROR;
     }
     
     // Check MCP23017 state
     if (espData->program.mcpState != 1) {
         errorCount++;
-        if (primaryError == LEDErrorState::NO_ERROR) primaryError = LEDErrorState::MCP_ERROR;
+        if (primaryError == LEDState::NO_ERROR) primaryError = LEDState::MCP_ERROR;
     }
     
     // Check ADS1115 state
     if (espData->program.adsState != 1) {
         errorCount++;
-        if (primaryError == LEDErrorState::NO_ERROR) primaryError = LEDErrorState::ADS_ERROR;
+        if (primaryError == LEDState::NO_ERROR) primaryError = LEDState::ADS_ERROR;
     }
     
     // Check I2C communication state
     if (espData->program.twoWireState != 1) {
         errorCount++;
-        if (primaryError == LEDErrorState::NO_ERROR) primaryError = LEDErrorState::I2C_ERROR;
+        if (primaryError == LEDState::NO_ERROR) primaryError = LEDState::I2C_ERROR;
     }
     
     // Check GPS/IMU state
     if (espData->gps.imuState != 1) {
         errorCount++;
-        if (primaryError == LEDErrorState::NO_ERROR) primaryError = LEDErrorState::GPS_ERROR;
+        if (primaryError == LEDState::NO_ERROR) primaryError = LEDState::GPS_ERROR;
     }
     
     // Check WiFi state (only if WiFi is expected to be connected)
     if (espData->wifi.state == 0) {
         errorCount++;
-        if (primaryError == LEDErrorState::NO_ERROR) primaryError = LEDErrorState::WIFI_ERROR;
+        if (primaryError == LEDState::NO_ERROR) primaryError = LEDState::WIFI_ERROR;
     }
     
     // Check if in recovery mode (program state != 1) - this indicates system-level issue
     if (espData->program.state == 0 || espData->program.confRes == 0) {
-        return LEDErrorState::RECOVERY_MODE;
+        return LEDState::RECOVERY_MODE;
     }
     
     // Return multiple errors if more than one issue detected
     if (errorCount > 1) {
-        return LEDErrorState::MULTIPLE_ERRORS;
+        return LEDState::MULTIPLE_ERRORS;
     }
     
     return primaryError;
@@ -136,12 +141,12 @@ LEDErrorState MyLED::detectErrorState() {
 // Update LED display based on current error state
 void MyLED::updateErrorDisplay() {
     switch (currentErrorState) {
-        case LEDErrorState::NO_ERROR:
+        case LEDState::NO_ERROR:
             // Always show green when no errors are detected
             pixel.setPixelColor(0, pixel.Color(0, 255, 0)); // Green - All systems normal
             break;
             
-        case LEDErrorState::SPECIAL_MODE:
+        case LEDState::SPECIAL_MODE:
             // Rainbow effect for special mode
             pixel.setPixelColor(0, pixel.gamma32(pixel.ColorHSV(firstPixelHue)));
             firstPixelHue = firstPixelHue + 256;
@@ -150,8 +155,8 @@ void MyLED::updateErrorDisplay() {
             }
             break;
             
-        case LEDErrorState::MULTIPLE_ERRORS:
-        case LEDErrorState::RECOVERY_MODE:
+        case LEDState::MULTIPLE_ERRORS:
+        case LEDState::RECOVERY_MODE:
             handleBlinkingStates(currentErrorState);
             return; // Skip pixel.show() as it's handled in handleBlinkingStates
             
@@ -165,27 +170,27 @@ void MyLED::updateErrorDisplay() {
 }
 
 // Get color for specific error state
-uint32_t MyLED::getErrorColor(LEDErrorState state) {
+uint32_t MyLED::getErrorColor(LEDState state) {
     switch (state) {
-        case LEDErrorState::NO_ERROR:
+        case LEDState::NO_ERROR:
             return pixel.Color(0, 255, 0);      // Green
-        case LEDErrorState::CONFIG_ERROR:
+        case LEDState::CONFIG_ERROR:
             return pixel.Color(255, 0, 0);      // Red
-        case LEDErrorState::MCP_ERROR:
+        case LEDState::MCP_ERROR:
             return pixel.Color(255, 165, 0);    // Orange
-        case LEDErrorState::ADS_ERROR:
+        case LEDState::ADS_ERROR:
             return pixel.Color(255, 255, 0);    // Yellow
-        case LEDErrorState::I2C_ERROR:
+        case LEDState::I2C_ERROR:
             return pixel.Color(128, 0, 128);    // Purple
-        case LEDErrorState::GPS_ERROR:
+        case LEDState::GPS_ERROR:
             return pixel.Color(0, 0, 255);      // Blue
-        case LEDErrorState::WIFI_ERROR:
+        case LEDState::WIFI_ERROR:
             return pixel.Color(0, 255, 255);    // Cyan
-        case LEDErrorState::MULTIPLE_ERRORS:
+        case LEDState::MULTIPLE_ERRORS:
             return pixel.Color(255, 0, 0);      // Red (for blinking)
-        case LEDErrorState::RECOVERY_MODE:
+        case LEDState::RECOVERY_MODE:
             return pixel.Color(255, 255, 255);  // White (for blinking)
-        case LEDErrorState::SPECIAL_MODE:
+        case LEDState::SPECIAL_MODE:
             return pixel.Color(128, 128, 255);  // Light blue (fallback, usually uses rainbow)
         default:
             return pixel.Color(255, 0, 255);    // Magenta - Unknown error
@@ -193,13 +198,13 @@ uint32_t MyLED::getErrorColor(LEDErrorState state) {
 }
 
 // Handle blinking states for errors that need attention
-void MyLED::handleBlinkingStates(LEDErrorState state) {
+void MyLED::handleBlinkingStates(LEDState state) {
     unsigned long currentTime = millis();
     unsigned long blinkInterval;
     
-    if (state == LEDErrorState::MULTIPLE_ERRORS) {
+    if (state == LEDState::MULTIPLE_ERRORS) {
         blinkInterval = 200; // Fast blink for multiple errors (5 Hz)
-    } else if (state == LEDErrorState::RECOVERY_MODE) {
+    } else if (state == LEDState::RECOVERY_MODE) {
         blinkInterval = 500; // Medium blink for recovery mode (1 Hz)
     } else {
         blinkInterval = 300; // Default blink rate for other blinking states

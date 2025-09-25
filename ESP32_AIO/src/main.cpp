@@ -414,6 +414,330 @@ void handleReboot(AsyncWebServerRequest *request) {
   ESP.restart();
 }
 
+// Settings page handler
+void handleSettingsPage(AsyncWebServerRequest *request) {
+  Serial.println("=== SETTINGS PAGE REQUEST ===");
+  Serial.println("Client IP: " + request->client()->remoteIP().toString());
+  Serial.println("Request Method: " + String(request->methodToString()));
+  Serial.println("Request URL: " + request->url());
+  Serial.println("Serving settings page HTML...");
+  
+  String html = "<!DOCTYPE html><html><head><title>ESP32 Settings</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<style>";
+  html += "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }";
+  html += ".container { max-width: 800px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }";
+  html += ".header { text-align: center; color: #333; margin-bottom: 30px; }";
+  html += ".section { margin-bottom: 25px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }";
+  html += ".section-title { font-weight: bold; color: #0066cc; margin-bottom: 15px; font-size: 18px; }";
+  html += ".form-group { margin-bottom: 15px; display: flex; align-items: center; }";
+  html += ".form-group label { min-width: 200px; font-weight: bold; }";
+  html += ".form-group input, .form-group select { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }";
+  html += ".button { background-color: #0066cc; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 5px; font-size: 16px; }";
+  html += ".button:hover { background-color: #0052a3; }";
+  html += ".button.danger { background-color: #cc0000; }";
+  html += ".button.danger:hover { background-color: #a30000; }";
+  html += ".status { margin-top: 20px; padding: 10px; border-radius: 5px; text-align: center; }";
+  html += ".status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }";
+  html += ".status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }";
+  html += "@media (max-width: 600px) { .form-group { flex-direction: column; align-items: flex-start; } .form-group label { min-width: auto; margin-bottom: 5px; } }";
+  html += "</style></head><body>";
+  
+  html += "<div class='container'>";
+  html += "<div class='header'><h1>ESP32-AIO Settings</h1></div>";
+  
+  // Network Settings Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>Network Configuration</div>";
+  html += "<div class='form-group'><label>IP Address:</label><input type='text' id='ipAddress' placeholder='192.168.1.100'></div>";
+  html += "<div class='form-group'><label>WiFi SSID 1:</label><input type='text' id='ssid1' placeholder='Network Name'></div>";
+  html += "<div class='form-group'><label>WiFi Password 1:</label><input type='password' id='password1' placeholder='Network Password'></div>";
+  html += "<div class='form-group'><label>WiFi SSID 2:</label><input type='text' id='ssid2' placeholder='Backup Network'></div>";
+  html += "<div class='form-group'><label>WiFi Password 2:</label><input type='password' id='password2' placeholder='Backup Password'></div>";
+  html += "</div>";
+  
+  // Steering Settings Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>Steering Configuration</div>";
+  html += "<div class='form-group'><label>PID Gain (Kp):</label><input type='number' id='kp' step='0.1' min='0' max='255'></div>";
+  html += "<div class='form-group'><label>High PWM:</label><input type='number' id='highPWM' min='0' max='255'></div>";
+  html += "<div class='form-group'><label>Low PWM:</label><input type='number' id='lowPWM' min='0' max='255'></div>";
+  html += "<div class='form-group'><label>Min PWM:</label><input type='number' id='minPWM' min='0' max='255'></div>";
+  html += "<div class='form-group'><label>Counts Per Degree:</label><input type='number' id='countsPerDeg' step='0.1' min='0'></div>";
+  html += "<div class='form-group'><label>WAS Offset:</label><input type='number' id='wasOffset' step='1' min='-2048' max='2048'></div>";
+  html += "<div class='form-group'><label>PID Input Filter:</label><input type='number' id='pidInputFilt' step='0.01' min='0' max='1'></div>";
+  html += "<div class='form-group'><label>PID Output Filter:</label><input type='number' id='pidOutputFilt' step='0.01' min='0' max='1'></div>";
+  html += "<div class='form-group'><label>Use ADS1115:</label><select id='useADS'><option value='1'>Yes</option><option value='0'>No</option></select></div>";
+  html += "</div>";
+  
+  // System Settings Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>System Configuration</div>";
+  html += "<div class='form-group'><label>LED Brightness (0-255):</label><input type='number' id='ledBrightness' min='0' max='255'></div>";
+  html += "<div class='form-group'><label>ADS Address:</label><select id='adsAddress'><option value='0x48'>0x48</option><option value='0x49'>0x49</option><option value='0x4A'>0x4A</option><option value='0x4B'>0x4B</option></select></div>";
+  html += "</div>";
+  
+  // Action buttons
+  html += "<div style='text-align: center; margin-top: 30px;'>";
+  html += "<button class='button' onclick='loadSettings()'>Load Current Settings</button>";
+  html += "<button class='button' onclick='saveSettings()'>Save Settings</button>";
+  html += "<button class='button' onclick='resetToDefaults()'>Reset to Defaults</button>";
+  html += "<button class='button danger' onclick='window.history.back()'>Back</button>";
+  html += "</div>";
+  
+  html += "<div id='status' class='status' style='display: none;'></div>";
+  html += "</div>";
+  
+  // JavaScript
+  html += "<script>";
+  html += "function showStatus(message, isError) {";
+  html += "  const status = document.getElementById('status');";
+  html += "  status.textContent = message;";
+  html += "  status.className = 'status ' + (isError ? 'error' : 'success');";
+  html += "  status.style.display = 'block';";
+  html += "  setTimeout(() => status.style.display = 'none', 5000);";
+  html += "}";
+  
+  html += "function loadSettings() {";
+  html += "  console.log('Loading settings from server...');";
+  html += "  fetch('/getSettings')";
+  html += "    .then(response => {";
+  html += "      console.log('Settings response status:', response.status);";
+  html += "      if (!response.ok) throw new Error('Network response was not ok');";
+  html += "      return response.json();";
+  html += "    })";
+  html += "    .then(data => {";
+  html += "      console.log('Settings data received:', data);";
+  html += "      document.getElementById('ipAddress').value = data.ip0 + '.' + data.ip1 + '.' + data.ip2 + '.' + data.ip3;";
+  html += "      document.getElementById('kp').value = data.kp;";
+  html += "      document.getElementById('highPWM').value = data.highPWM;";
+  html += "      document.getElementById('lowPWM').value = data.lowPWM;";
+  html += "      document.getElementById('minPWM').value = data.minPWM;";
+  html += "      document.getElementById('countsPerDeg').value = data.countsPerDeg;";
+  html += "      document.getElementById('wasOffset').value = data.wasOffset;";
+  html += "      document.getElementById('pidInputFilt').value = data.pidInputFilt;";
+  html += "      document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
+  html += "      document.getElementById('useADS').value = data.useADS;";
+  html += "      document.getElementById('ledBrightness').value = data.ledBrightness;";
+  html += "      document.getElementById('adsAddress').value = data.adsAddress;";
+  html += "      showStatus('Settings loaded successfully', false);";
+  html += "    })";
+  html += "    .catch(error => { console.log('Settings load error:', error); showStatus('Failed to load settings: ' + error, true); });";
+  html += "}";
+  
+  html += "function saveSettings() {";
+  html += "  const ipParts = document.getElementById('ipAddress').value.split('.');";
+  html += "  if (ipParts.length !== 4) { showStatus('Invalid IP address format', true); return; }";
+  html += "  const formData = new FormData();";
+  html += "  formData.append('ip0', parseInt(ipParts[0]) || 192);";
+  html += "  formData.append('ip1', parseInt(ipParts[1]) || 168);";
+  html += "  formData.append('ip2', parseInt(ipParts[2]) || 1);";
+  html += "  formData.append('ip3', parseInt(ipParts[3]) || 100);";
+  html += "  formData.append('kp', parseFloat(document.getElementById('kp').value) || 50);";
+  html += "  formData.append('highPWM', parseInt(document.getElementById('highPWM').value) || 255);";
+  html += "  formData.append('lowPWM', parseInt(document.getElementById('lowPWM').value) || 10);";
+  html += "  formData.append('minPWM', parseInt(document.getElementById('minPWM').value) || 5);";
+  html += "  formData.append('countsPerDeg', parseFloat(document.getElementById('countsPerDeg').value) || 10);";
+  html += "  formData.append('wasOffset', parseInt(document.getElementById('wasOffset').value) || 0);";
+  html += "  formData.append('pidInputFilt', parseFloat(document.getElementById('pidInputFilt').value) || 0.1);";
+  html += "  formData.append('pidOutputFilt', parseFloat(document.getElementById('pidOutputFilt').value) || 0.1);";
+  html += "  formData.append('useADS', document.getElementById('useADS').value);";
+  html += "  formData.append('ledBrightness', parseInt(document.getElementById('ledBrightness').value) || 100);";
+  html += "  fetch('/saveSettings', {";
+  html += "    method: 'POST',";
+  html += "    body: formData";
+  html += "  })";
+  html += "    .then(response => response.text())";
+  html += "    .then(data => showStatus(data, false))";
+  html += "    .catch(error => showStatus('Failed to save settings: ' + error, true));";
+  html += "}";
+  
+  html += "function resetToDefaults() {";
+  html += "  if (confirm('Reset all settings to defaults? This will require a reboot.')) {";
+  html += "    document.getElementById('ipAddress').value = '192.168.1.100';";
+  html += "    document.getElementById('kp').value = '50';";
+  html += "    document.getElementById('highPWM').value = '255';";
+  html += "    document.getElementById('lowPWM').value = '10';";
+  html += "    document.getElementById('minPWM').value = '5';";
+  html += "    document.getElementById('countsPerDeg').value = '10';";
+  html += "    document.getElementById('wasOffset').value = '0';";
+  html += "    document.getElementById('pidInputFilt').value = '0.1';";
+  html += "    document.getElementById('pidOutputFilt').value = '0.1';";
+  html += "    document.getElementById('useADS').value = '1';";
+  html += "    document.getElementById('ledBrightness').value = '100';";
+  html += "    document.getElementById('adsAddress').value = '0x48';";
+  html += "    showStatus('Default values loaded - click Save to apply', false);";
+  html += "  }";
+  html += "}";
+  
+  html += "window.onload = loadSettings;";
+  html += "</script>";
+  html += "</body></html>";
+  
+  Serial.println("Settings page HTML generated, size: " + String(html.length()) + " bytes");
+  request->send(200, "text/html", html);
+  Serial.println("Settings page sent successfully");
+}
+
+// Get current settings as JSON
+void handleGetSettings(AsyncWebServerRequest *request) {
+  Serial.println("=== GET SETTINGS REQUEST ===");
+  Serial.println("Client IP: " + request->client()->remoteIP().toString());
+  Serial.println("Preparing settings JSON response...");
+  
+  StaticJsonDocument<1024> doc;
+  
+  // Network settings
+  doc["ip0"] = espData.wifi.ips[0];
+  doc["ip1"] = espData.wifi.ips[1];
+  doc["ip2"] = espData.wifi.ips[2];
+  doc["ip3"] = espData.wifi.ips[3];
+  
+  // Steering settings
+  doc["kp"] = espData.steer.gainP;
+  doc["highPWM"] = espData.steer.highPWM;
+  doc["lowPWM"] = espData.steer.lowPWM;
+  doc["minPWM"] = espData.steer.minPWM;
+  doc["countsPerDeg"] = espData.steer.countsPerDeg;
+  doc["wasOffset"] = espData.steer.steerOffset;
+  doc["pidInputFilt"] = espData.steer.pidInputFilt;
+  doc["pidOutputFilt"] = espData.steer.pidOutputFilt;
+  doc["useADS"] = espData.steer.useADS;
+  
+  // System settings
+  doc["ledBrightness"] = espData.program.ledBrht;
+  doc["adsAddress"] = "0x48"; // Default, could be made configurable
+  
+  String response;
+  serializeJson(doc, response);
+  
+  Serial.println("Settings JSON prepared:");
+  Serial.println("  Network: " + String(espData.wifi.ips[0]) + "." + String(espData.wifi.ips[1]) + "." + String(espData.wifi.ips[2]) + "." + String(espData.wifi.ips[3]));
+  Serial.println("  Kp: " + String(espData.steer.gainP));
+  Serial.println("  High PWM: " + String(espData.steer.highPWM));
+  Serial.println("  Low PWM: " + String(espData.steer.lowPWM));
+  Serial.println("  Min PWM: " + String(espData.steer.minPWM));
+  Serial.println("  Use ADS: " + String(espData.steer.useADS ? "true" : "false"));
+  Serial.println("JSON Response size: " + String(response.length()) + " bytes");
+  
+  request->send(200, "application/json", response);
+  Serial.println("Settings JSON sent successfully");
+}
+
+// Save settings from JSON POST
+void handleSaveSettings(AsyncWebServerRequest *request) {
+  Serial.println("=== SAVE SETTINGS REQUEST ===");
+  Serial.println("Client IP: " + request->client()->remoteIP().toString());
+  Serial.println("Request Method: " + String(request->methodToString()));
+  Serial.println("Number of parameters: " + String(request->params()));
+  
+  // Log all received parameters
+  for (int i = 0; i < request->params(); i++) {
+    const AsyncWebParameter* p = request->getParam(i);
+    Serial.println("Parameter [" + String(i) + "]: " + p->name() + " = " + p->value());
+  }
+  
+  // This will be called when the request has parameters
+  // We'll use a simpler approach with URL parameters for now
+  
+  Serial.println("Processing network settings...");
+  // Update network settings if provided
+  if (request->hasParam("ip0", true)) {
+    int oldValue = espData.wifi.ips[0];
+    espData.wifi.ips[0] = request->getParam("ip0", true)->value().toInt();
+    Serial.println("  IP0: " + String(oldValue) + " -> " + String(espData.wifi.ips[0]));
+  }
+  if (request->hasParam("ip1", true)) {
+    int oldValue = espData.wifi.ips[1];
+    espData.wifi.ips[1] = request->getParam("ip1", true)->value().toInt();
+    Serial.println("  IP1: " + String(oldValue) + " -> " + String(espData.wifi.ips[1]));
+  }
+  if (request->hasParam("ip2", true)) {
+    int oldValue = espData.wifi.ips[2];
+    espData.wifi.ips[2] = request->getParam("ip2", true)->value().toInt();
+    Serial.println("  IP2: " + String(oldValue) + " -> " + String(espData.wifi.ips[2]));
+  }
+  if (request->hasParam("ip3", true)) {
+    int oldValue = espData.wifi.ips[3];
+    espData.wifi.ips[3] = request->getParam("ip3", true)->value().toInt();
+    Serial.println("  IP3: " + String(oldValue) + " -> " + String(espData.wifi.ips[3]));
+  }
+  
+  Serial.println("Processing steering settings...");
+  // Update steering settings if provided
+  if (request->hasParam("kp", true)) {
+    float oldValue = espData.steer.gainP;
+    espData.steer.gainP = request->getParam("kp", true)->value().toFloat();
+    Serial.println("  Kp: " + String(oldValue) + " -> " + String(espData.steer.gainP));
+  }
+  if (request->hasParam("highPWM", true)) {
+    int oldValue = espData.steer.highPWM;
+    espData.steer.highPWM = request->getParam("highPWM", true)->value().toInt();
+    Serial.println("  High PWM: " + String(oldValue) + " -> " + String(espData.steer.highPWM));
+  }
+  if (request->hasParam("lowPWM", true)) {
+    int oldValue = espData.steer.lowPWM;
+    espData.steer.lowPWM = request->getParam("lowPWM", true)->value().toInt();
+    Serial.println("  Low PWM: " + String(oldValue) + " -> " + String(espData.steer.lowPWM));
+  }
+  if (request->hasParam("minPWM", true)) {
+    int oldValue = espData.steer.minPWM;
+    espData.steer.minPWM = request->getParam("minPWM", true)->value().toInt();
+    Serial.println("  Min PWM: " + String(oldValue) + " -> " + String(espData.steer.minPWM));
+  }
+  if (request->hasParam("countsPerDeg", true)) {
+    float oldValue = espData.steer.countsPerDeg;
+    espData.steer.countsPerDeg = request->getParam("countsPerDeg", true)->value().toFloat();
+    Serial.println("  Counts Per Deg: " + String(oldValue) + " -> " + String(espData.steer.countsPerDeg));
+  }
+  if (request->hasParam("wasOffset", true)) {
+    int oldValue = espData.steer.steerOffset;
+    espData.steer.steerOffset = request->getParam("wasOffset", true)->value().toInt();
+    Serial.println("  WAS Offset: " + String(oldValue) + " -> " + String(espData.steer.steerOffset));
+  }
+  if (request->hasParam("pidInputFilt", true)) {
+    float oldValue = espData.steer.pidInputFilt;
+    espData.steer.pidInputFilt = request->getParam("pidInputFilt", true)->value().toFloat();
+    Serial.println("  PID Input Filter: " + String(oldValue) + " -> " + String(espData.steer.pidInputFilt));
+  }
+  if (request->hasParam("pidOutputFilt", true)) {
+    float oldValue = espData.steer.pidOutputFilt;
+    espData.steer.pidOutputFilt = request->getParam("pidOutputFilt", true)->value().toFloat();
+    Serial.println("  PID Output Filter: " + String(oldValue) + " -> " + String(espData.steer.pidOutputFilt));
+  }
+  if (request->hasParam("useADS", true)) {
+    bool oldValue = espData.steer.useADS;
+    String rawValue = request->getParam("useADS", true)->value();
+    espData.steer.useADS = rawValue.toInt();
+    Serial.println("  Use ADS raw value: '" + rawValue + "'");
+    Serial.println("  Use ADS: " + String(oldValue ? "true" : "false") + " -> " + String(espData.steer.useADS ? "true" : "false"));
+  }
+  
+  Serial.println("Processing system settings...");
+  // Update system settings if provided
+  if (request->hasParam("ledBrightness", true)) {
+    int oldValue = espData.program.ledBrht;
+    espData.program.ledBrht = request->getParam("ledBrightness", true)->value().toInt();
+    Serial.println("  LED Brightness: " + String(oldValue) + " -> " + String(espData.program.ledBrht));
+    // Apply the new brightness immediately
+    myLED.updateBrightness();
+    Serial.println("  LED brightness updated immediately");
+  }
+  
+  Serial.println("Attempting to save configuration to NVS...");
+  // Save to preferences
+  bool saveResult = espData.saveConfig();
+  
+  if (saveResult) {
+    Serial.println("Configuration saved successfully to NVS");
+    request->send(200, "text/plain", "Settings saved successfully! Some changes may require a reboot.");
+  } else {
+    Serial.println("ERROR: Failed to save configuration to NVS");
+    request->send(500, "text/plain", "Failed to save settings to memory");
+  }
+  Serial.println("=== SAVE SETTINGS COMPLETE ===");
+}
+
 // File download handler
 // void handleFileDownload(AsyncWebServerRequest *request) {
 //   if (request->hasParam("filename")) {
@@ -462,7 +786,7 @@ void recoveryBoot() {
   Serial.println("=== ENTERING RECOVERY MODE ===");
   
   // Set all LEDs to error flash pattern to indicate recovery mode
-  // mcpManager.setAllLEDs(LEDState::ERROR_FLASH);
+  // mcpManager.setAllLEDs(MCPLEDState::ERROR_FLASH);
   
   // Initialize LittleFS for file operations
   if (!LittleFS.begin(true)) {
@@ -508,6 +832,7 @@ void recoveryBoot() {
     html += "<body><div class='container'><div class='header'>";
     html += "<h1>🔧 ESP32 Recovery Mode</h1><p>System failed to boot normally - Recovery interface active</p></div>";
     html += "<div class='section'><h2>🔧 Recovery Actions</h2>";
+    html += "<button class='button' onclick='location.href=\"/settings\"'>⚙️ Settings</button>";
     html += "<button class='button' onclick='location.href=\"/factoryReset\"'>Factory Reset</button>";
     html += "<button class='button' onclick='location.href=\"/forceNormalBoot\"'>Force Normal Boot</button>";
     html += "<button class='button' onclick='location.href=\"/reboot\"'>Reboot System</button>";
@@ -591,6 +916,11 @@ void recoveryBoot() {
     request->send(200, "application/json", jsonResponse);
   });
   
+  Serial.println("Registering settings endpoints for recovery mode...");
+  server.on("/settings", HTTP_GET, handleSettingsPage);
+  server.on("/getSettings", HTTP_GET, handleGetSettings);
+  server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+  Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings");
   server.on("/getFiles", HTTP_GET, handleFileList);
   server.on("/download", HTTP_GET, handleFileDownload);
   server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFileUpload);
@@ -699,6 +1029,11 @@ void normalboot(){
         // Route to get debug variables as JSON
         server.on("/getDebugVars", HTTP_GET, handleDebugVars);
         // Route to list files as JSON
+        Serial.println("Registering settings endpoints for normal mode...");
+        server.on("/settings", HTTP_GET, handleSettingsPage);
+        server.on("/getSettings", HTTP_GET, handleGetSettings);
+        server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+        Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings");
         server.on("/getFiles", HTTP_GET, handleFileList);
         // Route to download files
         server.on("/download", HTTP_GET, handleFileDownload);
@@ -766,13 +1101,18 @@ void normalboot(){
 void setup(){
   Serial.begin(115200);
   myLED.startTask();
-  myLED.setErrorState(LEDErrorState::NO_ERROR);
+  // myLED.setLEDState(LEDState::NO_ERROR);
   delay(1000); // Give time for serial to initialize
   Serial.println("\n\nStarting up...");
   
   espData.program.confRes = espData.loadConfig();
+  // Update LED brightness from loaded configuration
+  myLED.updateBrightness();
+  Serial.println("LED brightness set to: " + String(espData.program.ledBrht));
+  
   if (espData.program.state != 1){
     Serial.println(" Booting into Recovery Mode");
+    myLED.setLEDState(LEDState::RECOVERY_MODE);
     recoveryBoot();
   } else {
     normalboot();

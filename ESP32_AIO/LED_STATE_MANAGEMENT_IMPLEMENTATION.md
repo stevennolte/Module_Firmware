@@ -31,12 +31,12 @@ enum class LEDState {
 ```cpp
 struct LEDIndicator {
     uint8_t pin;
-    LEDState state;
+    MCPLEDState state;
     unsigned long lastToggle;
     bool currentState;
     uint8_t flashCount;    // For error flash pattern
     
-    LEDIndicator() : pin(0), state(LEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
+    LEDIndicator() : pin(0), state(MCPLEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
 };
 ```
 
@@ -100,39 +100,39 @@ void setAllLEDs(LEDState state);
 ### Basic LED Control
 ```cpp
 // Power system status
-mcpManager.setPowerLED(LEDState::ON);           // System running normally
-mcpManager.setPowerLED(LEDState::ERROR_FLASH);  // Power system error
+mcpManager.setPowerLED(MCPLEDState::ON);           // System running normally
+mcpManager.setPowerLED(MCPLEDState::ERROR_FLASH);  // Power system error
 
 // GPS status indication
-mcpManager.setGPSLED(LEDState::FAST_PULSE);     // Searching for satellites
-mcpManager.setGPSLED(LEDState::ON);             // GPS fix acquired
-mcpManager.setGPSLED(LEDState::ERROR_FLASH);    // GPS communication error
+mcpManager.setGPSLED(MCPLEDState::FAST_PULSE);     // Searching for satellites
+mcpManager.setGPSLED(MCPLEDState::ON);             // GPS fix acquired
+mcpManager.setGPSLED(MCPLEDState::ERROR_FLASH);    // GPS communication error
 
 // RTK status
-mcpManager.setRTKLED(LEDState::SLOW_PULSE);     // RTK base searching
-mcpManager.setRTKLED(LEDState::HEARTBEAT);      // RTK corrections active
-mcpManager.setRTKLED(LEDState::ON);             // RTK fixed position
+mcpManager.setRTKLED(MCPLEDState::SLOW_PULSE);     // RTK base searching
+mcpManager.setRTKLED(MCPLEDState::HEARTBEAT);      // RTK corrections active
+mcpManager.setRTKLED(MCPLEDState::ON);             // RTK fixed position
 
 // Ethernet connectivity
-mcpManager.setEthLED(LEDState::ON);             // Network connected
-mcpManager.setEthLED(LEDState::FAST_PULSE);     // Connecting
-mcpManager.setEthLED(LEDState::ERROR_FLASH);    // Network error
+mcpManager.setEthLED(MCPLEDState::ON);             // Network connected
+mcpManager.setEthLED(MCPLEDState::FAST_PULSE);     // Connecting
+mcpManager.setEthLED(MCPLEDState::ERROR_FLASH);    // Network error
 
 // Steering system
-mcpManager.setSteerStandbyLED(LEDState::SLOW_PULSE); // Standby mode
-mcpManager.setSteerActiveLED(LEDState::ON);          // Active steering
+mcpManager.setSteerStandbyLED(MCPLEDState::SLOW_PULSE); // Standby mode
+mcpManager.setSteerActiveLED(MCPLEDState::ON);          // Active steering
 ```
 
 ### Bulk Operations
 ```cpp
 // System startup - all LEDs off
-mcpManager.setAllLEDs(LEDState::OFF);
+mcpManager.setAllLEDs(MCPLEDState::OFF);
 
 // System test - all LEDs solid on
-mcpManager.setAllLEDs(LEDState::ON);
+mcpManager.setAllLEDs(MCPLEDState::ON);
 
 // Error condition - all LEDs flash error pattern
-mcpManager.setAllLEDs(LEDState::ERROR_FLASH);
+mcpManager.setAllLEDs(MCPLEDState::ERROR_FLASH);
 ```
 
 ## Technical Implementation Notes

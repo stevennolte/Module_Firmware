@@ -44,13 +44,12 @@ void MainPower::continuousLoop()
 {
     while (1)
     {
-        // getCurrent();
-        vTaskDelay(1000);
+        getCurrent();
+        vTaskDelay(100 / portTICK_PERIOD_MS); // Delay for 100 milliseconds
     }
 }
 
 void MainPower::getCurrent(){
-    int16_t adc3;
-    adc3 = _ads->readADC_SingleEnded(3);
-    Serial.print("AIN0: "); Serial.println(adc3);
+    // _data->power.mainCurrent = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin) * 3; // Example conversion factor, adjust as needed
+    _data->power.mainCurrentRaw = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin);
 }

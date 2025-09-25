@@ -46,9 +46,9 @@ When no errors are present, the LED follows original program state behavior:
 ### Manual Error State Override
 ```cpp
 // Manually set a specific error state (overrides auto-detection for 10 seconds)
-myLED.setErrorState(LEDErrorState::CONFIG_ERROR);  // Force red LED
-myLED.setErrorState(LEDErrorState::RECOVERY_MODE); // Force blinking white
-myLED.setErrorState(LEDErrorState::NO_ERROR);      // Force green (normal)
+myLED.setLEDState(LEDState::CONFIG_ERROR);  // Force red LED
+myLED.setLEDState(LEDState::RECOVERY_MODE); // Force blinking white
+myLED.setLEDState(LEDState::NO_ERROR);      // Force green (normal)
 ```
 
 ### Custom Color Display

@@ -5,8 +5,8 @@
 #include "ESPdata.h"
 #include <Adafruit_NeoPixel.h>
 
-// LED Error State Definitions
-enum class LEDErrorState {
+// LED State Definitions
+enum class LEDState {
     NO_ERROR = 0,           // Green - All systems normal
     CONFIG_ERROR,           // Red - Configuration load failed
     MCP_ERROR,             // Orange - MCP23017 initialization failed
@@ -23,14 +23,15 @@ class MyLED{
     public:
         MyLED(ESPdata* vars);
         void showColor(uint32_t color);
-        void setErrorState(LEDErrorState errorState);
+        void setLEDState(LEDState errorState);
         void setSpecialMode(bool enabled);  // Enable/disable special rainbow mode
+        void updateBrightness();  // Update brightness from configuration
         void startTask();  // Start the parallel task
         
     private:
         ESPdata* espData;
         Adafruit_NeoPixel pixel;
-        LEDErrorState currentErrorState;
+        LEDState currentErrorState;
         bool errorOverride;
         bool specialMode;
         unsigned long lastBlinkTime;
@@ -39,9 +40,9 @@ class MyLED{
         static void taskHandler(void *param);  // Task handler
         void continuousLoop();  // Function to run in the background task
         void updateErrorDisplay();
-        LEDErrorState detectErrorState();
-        uint32_t getErrorColor(LEDErrorState state);
-        void handleBlinkingStates(LEDErrorState state);
+        LEDState detectErrorState();
+        uint32_t getErrorColor(LEDState state);
+        void handleBlinkingStates(LEDState state);
 };
 
 #endif

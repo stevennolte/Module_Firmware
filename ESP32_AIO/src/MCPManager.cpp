@@ -56,37 +56,37 @@ bool MCPManager::begin(ESPdata* espDataPtr, uint8_t address, TwoWire* wire) {
         
         // Initialize LED indicators
         ledPowerOn.pin = espData->mcpPins.outputs.power_on;
-        ledPowerOn.state = LEDState::OFF;
+        ledPowerOn.state = MCPLEDState::OFF;
         ledPowerOn.lastToggle = 0;
         ledPowerOn.currentState = false;
         ledPowerOn.flashCount = 0;
         
         ledGPSFix.pin = espData->mcpPins.outputs.gps_fix;
-        ledGPSFix.state = LEDState::OFF;
+        ledGPSFix.state = MCPLEDState::OFF;
         ledGPSFix.lastToggle = 0;
         ledGPSFix.currentState = false;
         ledGPSFix.flashCount = 0;
         
         ledRTKFix.pin = espData->mcpPins.outputs.rtk_fix;
-        ledRTKFix.state = LEDState::OFF;
+        ledRTKFix.state = MCPLEDState::OFF;
         ledRTKFix.lastToggle = 0;
         ledRTKFix.currentState = false;
         ledRTKFix.flashCount = 0;
         
         ledEthGood.pin = espData->mcpPins.outputs.eth_good;
-        ledEthGood.state = LEDState::OFF;
+        ledEthGood.state = MCPLEDState::OFF;
         ledEthGood.lastToggle = 0;
         ledEthGood.currentState = false;
         ledEthGood.flashCount = 0;
         
         ledSteerStandby.pin = espData->mcpPins.outputs.steer_standby;
-        ledSteerStandby.state = LEDState::OFF;
+        ledSteerStandby.state = MCPLEDState::OFF;
         ledSteerStandby.lastToggle = 0;
         ledSteerStandby.currentState = false;
         ledSteerStandby.flashCount = 0;
         
         ledSteerActive.pin = espData->mcpPins.outputs.steer_active;
-        ledSteerActive.state = LEDState::OFF;
+        ledSteerActive.state = MCPLEDState::OFF;
         ledSteerActive.lastToggle = 0;
         ledSteerActive.currentState = false;
         ledSteerActive.flashCount = 0;
@@ -383,15 +383,15 @@ void MCPManager::updateLED(LEDIndicator& led) {
     bool shouldBeOn = false;
     
     switch (led.state) {
-        case LEDState::OFF:
+        case MCPLEDState::OFF:
             shouldBeOn = false;
             break;
             
-        case LEDState::ON:
+        case MCPLEDState::ON:
             shouldBeOn = true;
             break;
             
-        case LEDState::SLOW_PULSE:  // 0.5 Hz (1 second on, 1 second off)
+        case MCPLEDState::SLOW_PULSE:  // 0.5 Hz (1 second on, 1 second off)
             if (currentTime - led.lastToggle >= 1000) {
                 led.currentState = !led.currentState;
                 led.lastToggle = currentTime;
@@ -399,7 +399,7 @@ void MCPManager::updateLED(LEDIndicator& led) {
             shouldBeOn = led.currentState;
             break;
             
-        case LEDState::FAST_PULSE:  // 2 Hz (250ms on, 250ms off)
+        case MCPLEDState::FAST_PULSE:  // 2 Hz (250ms on, 250ms off)
             if (currentTime - led.lastToggle >= 250) {
                 led.currentState = !led.currentState;
                 led.lastToggle = currentTime;
@@ -407,7 +407,7 @@ void MCPManager::updateLED(LEDIndicator& led) {
             shouldBeOn = led.currentState;
             break;
             
-        case LEDState::RAPID_PULSE:  // 5 Hz (100ms on, 100ms off)
+        case MCPLEDState::RAPID_PULSE:  // 5 Hz (100ms on, 100ms off)
             if (currentTime - led.lastToggle >= 100) {
                 led.currentState = !led.currentState;
                 led.lastToggle = currentTime;
@@ -415,7 +415,7 @@ void MCPManager::updateLED(LEDIndicator& led) {
             shouldBeOn = led.currentState;
             break;
             
-        case LEDState::ERROR_FLASH:  // 3 quick flashes, then pause
+        case MCPLEDState::ERROR_FLASH:  // 3 quick flashes, then pause
             if (led.flashCount < 6) { // 3 on/off cycles = 6 state changes
                 if (currentTime - led.lastToggle >= 100) {
                     led.currentState = !led.currentState;
@@ -434,7 +434,7 @@ void MCPManager::updateLED(LEDIndicator& led) {
             }
             break;
             
-        case LEDState::HEARTBEAT:  // Double pulse pattern
+        case MCPLEDState::HEARTBEAT:  // Double pulse pattern
             {
                 unsigned long cycleTime = currentTime % 2000; // 2 second cycle
                 if ((cycleTime < 100) || (cycleTime >= 200 && cycleTime < 300)) {
@@ -453,49 +453,49 @@ void MCPManager::updateLED(LEDIndicator& led) {
 }
 
 // LED State Management Methods
-void MCPManager::setPowerLED(LEDState state) {
+void MCPManager::setPowerLED(MCPLEDState state) {
     ledPowerOn.state = state;
     ledPowerOn.lastToggle = millis();
     ledPowerOn.flashCount = 0;
     ledPowerOn.currentState = false;
 }
 
-void MCPManager::setGPSLED(LEDState state) {
+void MCPManager::setGPSLED(MCPLEDState state) {
     ledGPSFix.state = state;
     ledGPSFix.lastToggle = millis();
     ledGPSFix.flashCount = 0;
     ledGPSFix.currentState = false;
 }
 
-void MCPManager::setRTKLED(LEDState state) {
+void MCPManager::setRTKLED(MCPLEDState state) {
     ledRTKFix.state = state;
     ledRTKFix.lastToggle = millis();
     ledRTKFix.flashCount = 0;
     ledRTKFix.currentState = false;
 }
 
-void MCPManager::setEthLED(LEDState state) {
+void MCPManager::setEthLED(MCPLEDState state) {
     ledEthGood.state = state;
     ledEthGood.lastToggle = millis();
     ledEthGood.flashCount = 0;
     ledEthGood.currentState = false;
 }
 
-void MCPManager::setSteerStandbyLED(LEDState state) {
+void MCPManager::setSteerStandbyLED(MCPLEDState state) {
     ledSteerStandby.state = state;
     ledSteerStandby.lastToggle = millis();
     ledSteerStandby.flashCount = 0;
     ledSteerStandby.currentState = false;
 }
 
-void MCPManager::setSteerActiveLED(LEDState state) {
+void MCPManager::setSteerActiveLED(MCPLEDState state) {
     ledSteerActive.state = state;
     ledSteerActive.lastToggle = millis();
     ledSteerActive.flashCount = 0;
     ledSteerActive.currentState = false;
 }
 
-void MCPManager::setAllLEDs(LEDState state) {
+void MCPManager::setAllLEDs(MCPLEDState state) {
     setPowerLED(state);
     setGPSLED(state);
     setRTKLED(state);

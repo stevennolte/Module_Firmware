@@ -7,7 +7,7 @@
 #include "ESPdata.h"
 
 // LED State Management
-enum class LEDState {
+enum class MCPLEDState {
     OFF,                    // LED off
     ON,                     // LED solid on
     SLOW_PULSE,            // Slow pulse (1 Hz)
@@ -19,13 +19,13 @@ enum class LEDState {
 
 struct LEDIndicator {
     uint8_t pin;
-    LEDState state;
+    MCPLEDState state;
     unsigned long lastToggle;
     bool currentState;
     uint8_t flashCount;    // For error flash pattern
     
-    LEDIndicator() : pin(0), state(LEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
-    LEDIndicator(uint8_t p) : pin(p), state(LEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
+    LEDIndicator() : pin(0), state(MCPLEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
+    LEDIndicator(uint8_t p) : pin(p), state(MCPLEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
 };
 
 class MCPManager {
@@ -107,13 +107,13 @@ public:
     void setRTKFix(bool state);      // Uses ESPdata pin definitions
     
     // LED State Management methods
-    void setPowerLED(LEDState state);
-    void setGPSLED(LEDState state);
-    void setRTKLED(LEDState state);
-    void setEthLED(LEDState state);
-    void setSteerStandbyLED(LEDState state);
-    void setSteerActiveLED(LEDState state);
-    void setAllLEDs(LEDState state);
+    void setPowerLED(MCPLEDState state);
+    void setGPSLED(MCPLEDState state);
+    void setRTKLED(MCPLEDState state);
+    void setEthLED(MCPLEDState state);
+    void setSteerStandbyLED(MCPLEDState state);
+    void setSteerActiveLED(MCPLEDState state);
+    void setAllLEDs(MCPLEDState state);
     
     // Get direct access to MCP object (for advanced usage or backward compatibility)
     Adafruit_MCP23X17* getMCP();
