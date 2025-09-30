@@ -186,6 +186,7 @@ uint8_t ESPdata::loadConfig(){
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
     ota.port = preferences.getUShort("serverPort", 8080);
+    gps.externalGPS = preferences.getBool("externalGPS", false);
     // Print entire configuration to serial monitor
     Serial.println("=== ESP32 Configuration ===");
     Serial.println("Program:");
@@ -269,6 +270,7 @@ uint8_t ESPdata::saveConfig(){
     // Save server configuration
     preferences.putUChar("serverAdr", ota.ipAddr);
     preferences.putUShort("serverPort", ota.port);
+    preferences.putBool("externalGPS", gps.externalGPS);
 
     return 1; // Success
 }

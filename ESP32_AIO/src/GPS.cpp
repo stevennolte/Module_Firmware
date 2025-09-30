@@ -90,33 +90,35 @@ void ESPGPS::init(ESPudp* espUdp){
         espData->gps.imuState = 2;
         Serial.println("RVC Start Failed");
     }
+    if (!espData.gps.externalGPS){
+        Serial.println("Trying to start UM980");
+        uint8_t gpsTryCnt = 0;
+        while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 2){
+            gpsTryCnt++;
+            delay(250);
+            Serial.print(".");
+            
+        }
+        Serial.println();
+        if (!myGNSS.isConnected()) //Give the serial port over to the library
+        {
+            espData->gps.state = 2;
+            Serial.println("UM980 failed to respond. Check ports and baud rates.");
+            
+        } else {
+            espData->gps.state = 1;
+            Serial.println("UM980 detected!");
+            myGNSS.disableOutput();
+            myGNSS.setModeRoverAutomotive();
+            myGNSS.setNMEAMessage("GPGGA", .1); 
+            myGNSS.setNMEAMessage("GPGSA", .1); 
+            myGNSS.setNMEAMessage("GPGST", .1); 
+            myGNSS.setNMEAMessage("GPRMC", .1); 
+            myGNSS.setNMEAMessage("GPGSV", .1);
+            // myGNSS.
+            myGNSS.saveConfiguration();
+        }
     
-    Serial.println("Trying to start UM980");
-    uint8_t gpsTryCnt = 0;
-    while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 2){
-        gpsTryCnt++;
-        delay(250);
-        Serial.print(".");
-        
-    }
-    Serial.println();
-    if (!myGNSS.isConnected()) //Give the serial port over to the library
-    {
-        espData->gps.state = 2;
-        Serial.println("UM980 failed to respond. Check ports and baud rates. Freezing...");
-        
-    } else {
-        espData->gps.state = 1;
-        Serial.println("UM980 detected!");
-        myGNSS.disableOutput();
-        myGNSS.setModeRoverAutomotive();
-        myGNSS.setNMEAMessage("GPGGA", .1); 
-        myGNSS.setNMEAMessage("GPGSA", .1); 
-        myGNSS.setNMEAMessage("GPGST", .1); 
-        myGNSS.setNMEAMessage("GPRMC", .1); 
-        myGNSS.setNMEAMessage("GPGSV", .1);
-        // myGNSS.
-        myGNSS.saveConfiguration();
         xTaskCreatePinnedToCore(taskHandler, "taskHandler", 10000, this, 1, NULL, 0);
     }
     
