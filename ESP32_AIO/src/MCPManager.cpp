@@ -54,6 +54,33 @@ bool MCPManager::begin(ESPdata* espDataPtr, uint8_t address, TwoWire* wire) {
         mcp.digitalWrite(espData->mcpPins.outputs.motor_enb, LOW);
         mcp.digitalWrite(espData->mcpPins.outputs.motor_ena, LOW);
         
+        mcp.digitalWrite(espData->mcpPins.outputs.power_on, HIGH);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.power_on, LOW);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.eth_good, HIGH);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.eth_good, LOW);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.gps_fix, HIGH);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.gps_fix, LOW);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.rtk_fix, HIGH);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.rtk_fix, LOW);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.steer_standby, HIGH);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.steer_standby, LOW);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.steer_active, HIGH);
+        delay(250);
+        mcp.digitalWrite(espData->mcpPins.outputs.steer_active, LOW);
+        delay(250);
+        
+
+
         // Initialize LED indicators
         ledPowerOn.pin = espData->mcpPins.outputs.power_on;
         ledPowerOn.state = MCPLEDState::OFF;

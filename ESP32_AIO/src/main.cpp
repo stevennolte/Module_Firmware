@@ -473,6 +473,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   // System Settings Section
   html += "<div class='section'>";
   html += "<div class='section-title'>System Configuration</div>";
+  html += "<div class='form-group'><label>GPS Source:</label><select id='gpsSource'><option value='0'>On-board GPS</option><option value='1'>Wireless GPS</option></select></div>";
+  html += "<div class='form-group'><label>WAS Source:</label><select id='wasSource'><option value='0'>Wired WAS</option><option value='1'>Wireless WAS</option></select></div>";
   html += "<div class='form-group'><label>LED Brightness (0-255):</label><input type='number' id='ledBrightness' min='0' max='255'></div>";
   html += "<div class='form-group'><label>ADS Address:</label><select id='adsAddress'><option value='0x48'>0x48</option><option value='0x49'>0x49</option><option value='0x4A'>0x4A</option><option value='0x4B'>0x4B</option></select></div>";
   html += "</div>";
@@ -518,6 +520,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      document.getElementById('pidInputFilt').value = data.pidInputFilt;";
   html += "      document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
   html += "      document.getElementById('useADS').value = data.useADS;";
+  html += "      document.getElementById('gpsSource').value = data.gpsSource;";
+  html += "      document.getElementById('wasSource').value = data.wasSource;";
   html += "      document.getElementById('ledBrightness').value = data.ledBrightness;";
   html += "      document.getElementById('adsAddress').value = data.adsAddress;";
   html += "      showStatus('Settings loaded successfully', false);";
@@ -542,6 +546,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('pidInputFilt', parseFloat(document.getElementById('pidInputFilt').value) || 0.1);";
   html += "  formData.append('pidOutputFilt', parseFloat(document.getElementById('pidOutputFilt').value) || 0.1);";
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
+  html += "  formData.append('gpsSource', document.getElementById('gpsSource').value);";
+  html += "  formData.append('wasSource', document.getElementById('wasSource').value);";
   html += "  formData.append('ledBrightness', parseInt(document.getElementById('ledBrightness').value) || 100);";
   html += "  fetch('/saveSettings', {";
   html += "    method: 'POST',";
@@ -564,6 +570,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "    document.getElementById('pidInputFilt').value = '0.1';";
   html += "    document.getElementById('pidOutputFilt').value = '0.1';";
   html += "    document.getElementById('useADS').value = '1';";
+  html += "    document.getElementById('gpsSource').value = '0';";
+  html += "    document.getElementById('wasSource').value = '0';";
   html += "    document.getElementById('ledBrightness').value = '100';";
   html += "    document.getElementById('adsAddress').value = '0x48';";
   html += "    showStatus('Default values loaded - click Save to apply', false);";
@@ -605,6 +613,8 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["useADS"] = espData.steer.useADS;
   
   // System settings
+  doc["gpsSource"] = espData.gps.externalGPS ? 1 : 0;
+  doc["wasSource"] = espData.steer.wirelessWAS ? 1 : 0;
   doc["ledBrightness"] = espData.program.ledBrht;
   doc["adsAddress"] = "0x48"; // Default, could be made configurable
   
@@ -715,6 +725,16 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   
   Serial.println("Processing system settings...");
   // Update system settings if provided
+  if (request->hasParam("gpsSource", true)) {
+    bool oldValue = espData.gps.externalGPS;
+    espData.gps.externalGPS = request->getParam("gpsSource", true)->value().toInt();
+    Serial.println("  GPS Source: " + String(oldValue ? "Wireless" : "On-board") + " -> " + String(espData.gps.externalGPS ? "Wireless" : "On-board"));
+  }
+  if (request->hasParam("wasSource", true)) {
+    bool oldValue = espData.steer.wirelessWAS;
+    espData.steer.wirelessWAS = request->getParam("wasSource", true)->value().toInt();
+    Serial.println("  WAS Source: " + String(oldValue ? "Wireless" : "Wired") + " -> " + String(espData.steer.wirelessWAS ? "Wireless" : "Wired"));
+  }
   if (request->hasParam("ledBrightness", true)) {
     int oldValue = espData.program.ledBrht;
     espData.program.ledBrht = request->getParam("ledBrightness", true)->value().toInt();
@@ -807,10 +827,14 @@ void recoveryBoot() {
   WiFi.softAP(recoverySSID.c_str(), recoveryPassword);
   
   // Configure AP IP address
-  IPAddress local_IP(192, 168, 4, 1);
-  IPAddress gateway(192, 168, 4, 1);
+  IPAddress local_IP(192, 168, 1, 1);
+  IPAddress gateway(192, 168, 1, 1);
   IPAddress subnet(255, 255, 255, 0);
   WiFi.softAPConfig(local_IP, gateway, subnet);
+  espData.wifi.ips[0] = 192;
+  espData.wifi.ips[1] = 168;
+  espData.wifi.ips[2] = 1;
+  espData.wifi.ips[3] = 1;
   
   Serial.println("Recovery AP IP: " + WiFi.softAPIP().toString());
   
@@ -895,6 +919,7 @@ void recoveryBoot() {
   server.on("/forceNormalBoot", HTTP_GET, [](AsyncWebServerRequest *request) {
     Serial.println("Force normal boot requested");
     espData.program.state = 1; // Set to normal boot state
+    espData.program.bootcount = 0; // Reset boot count
     espData.saveConfig();
     request->send(200, "text/plain", "Normal boot forced. Device will reboot...");
     delay(1000);
@@ -996,6 +1021,7 @@ void normalboot(){
       Serial.println("MCPManager initialized successfully");
     } else {
       Serial.println("MCPManager initialization failed");
+      ESP.restart();
     }
   }
   if (espData.program.adsState == 1){
@@ -1004,14 +1030,15 @@ void normalboot(){
   
   // Start GPS
   // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):
-  gps.init(&espUdp);
+ 
     // If everything is good, turn on power to autosteer
-  mainPower.startTask();
-
+  
+    
+  uint32_t wifiStart = millis();
   while (espData.wifi.state != 1){
     espData.wifi.state = espWifi.connect();
     /** @brief Check for WiFi connection, if times out, create AP */
-    if (millis() > 120000){
+    if (millis()-wifiStart > 120000){
       Serial.println("Wifi connection timed out");
       Serial.println("Switching to AP mode");
       espData.wifi.state = espWifi.makeAP();
@@ -1084,8 +1111,9 @@ void normalboot(){
         // });
         server.begin();
       #pragma endregion
-
-
+  
+  mainPower.startTask();
+  gps.init(&espUdp);
   espSteer.begin(&espUdp);
   
 
@@ -1094,7 +1122,7 @@ void normalboot(){
   Serial.println("Network setup complete");
   // delay(5000);
   espData.setState(1);
-
+  espData.setBootCount(0);
   // Add your normal boot logic here
 }
 
@@ -1110,34 +1138,132 @@ void setup(){
   myLED.updateBrightness();
   Serial.println("LED brightness set to: " + String(espData.program.ledBrht));
   
-  if (espData.program.state != 1){
+  if (espData.program.state != 1 && espData.program.bootcount > 2){
     Serial.println(" Booting into Recovery Mode");
     myLED.setLEDState(LEDState::RECOVERY_MODE);
     recoveryBoot();
   } else {
     normalboot();
   }
+  
+  // Serial command interface ready
+  Serial.println("\n=== Serial Command Interface Ready ===");
+  Serial.println("Type 'help' for available commands");
+  Serial.print("> ");
+  
   // Start Wifi AP and Webserver for diagnostics
   // espConfig.wifiCfg.state = espWifi.connect();
 
 }
 
-void debugPrint(){
-  Serial.printf("Timestamp since boot [ms]: %lu", millis());
-  Serial.printf(" progName: %s", espData.program.name);
-  Serial.printf(" progState: %lu", espData.program.state);
-  Serial.printf(" confRes: %lu", espData.program.confRes);
-  Serial.printf(" wifiRes: %lu", espData.wifi.state);
-  Serial.printf(" gpsFix: %lu", espData.gps.fixQualityInt);
-  Serial.printf(" ip[0]: %d", espData.wifi.ips[0]);
-  Serial.printf(" ip[1]: %d", espData.wifi.ips[1]);
-  Serial.printf(" ip[2]: %d", espData.wifi.ips[2]);
-  Serial.printf(" ip[3]: %d", espData.wifi.ips[3]);
+// Function to handle runtime serial commands
+void handleSerialCommands() {
+  static String inputBuffer = "";
+  
+  while (Serial.available()) {
+    char c = Serial.read();
+    
+    if (c == '\n' || c == '\r') {
+      if (inputBuffer.length() > 0) {
+        inputBuffer.trim();
+        inputBuffer.toLowerCase();
+        
+        Serial.println(""); // New line after command
+        
+        if (inputBuffer == "help" || inputBuffer == "?") {
+          Serial.println("=== Available Serial Commands ===");
+          Serial.println("help or ?         - Show this help");
+          Serial.println("reboot            - Restart ESP32");
+          Serial.println("recovery          - Reboot into recovery mode");
+          Serial.println("normal            - Reboot into normal mode");
+          Serial.println("status            - Show system status");
+          Serial.println("config            - Show configuration");
+          Serial.println("====================================");
+          
+        } else if (inputBuffer == "reboot") {
+          Serial.println("SERIAL COMMAND: Rebooting ESP32...");
+          delay(100);
+          ESP.restart();
+          
+        } else if (inputBuffer == "recovery") {
+          Serial.println("SERIAL COMMAND: Setting recovery mode and rebooting...");
+          espData.program.state = 0; // Force recovery state
+          espData.updateRTCBeforeReboot(0); // Update RTC before reboot
+          espData.saveConfig();
+          delay(100);
+          ESP.restart();
+          
+        } else if (inputBuffer == "normal") {
+          Serial.println("SERIAL COMMAND: Setting normal mode and rebooting...");
+          espData.program.state = 1; // Force normal state
+          espData.updateRTCBeforeReboot(1); // Update RTC before reboot
+          espData.saveConfig();
+          delay(100);
+          ESP.restart();
+          
+        } else if (inputBuffer == "status") {
+          Serial.println("=== System Status ===");
+          Serial.println("Program: " + String(NAME));
+          Serial.println("Boot Mode: " + String(espData.program.state == 1 ? "Normal" : "Recovery"));
+          Serial.println("NVS Boot Count: " + String(espData.program.bootcount));
+          Serial.println("Software Boots (since power cycle): " + String(espData.getSoftwareBootCount()));
+          Serial.println("Uptime: " + String(millis()/1000) + " seconds");
+          Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+          Serial.println("WiFi State: " + String(espData.wifi.state));
+          Serial.println("GPS Fix: " + String(espData.gps.fixQuality));
+          Serial.println("====================");
+          
+        } else if (inputBuffer == "config") {
+          Serial.println("=== Configuration ===");
+          Serial.println("IP: " + String(espData.wifi.ips[0]) + "." + String(espData.wifi.ips[1]) + "." + String(espData.wifi.ips[2]) + "." + String(espData.wifi.ips[3]));
+          Serial.println("GPS Source: " + String(espData.gps.externalGPS ? "Wireless" : "On-board"));
+          Serial.println("WAS Source: " + String(espData.steer.wirelessWAS ? "Wireless" : "Wired"));
+          Serial.println("Use ADS: " + String(espData.steer.useADS ? "Yes" : "No"));
+          Serial.println("LED Brightness: " + String(espData.program.ledBrht));
+          Serial.println("PID Kp: " + String(espData.steer.gainP));
+          Serial.println("====================");
+          
+        } else if (inputBuffer.length() > 0) {
+          Serial.println("Unknown command: " + inputBuffer);
+          Serial.println("Type 'help' for available commands");
+        }
+        
+        inputBuffer = "";
+        Serial.print("> "); // Command prompt
+      }
+    } else if (c >= 32 && c <= 126) { // Printable characters only
+      inputBuffer += c;
+      Serial.print(c); // Echo character
+    }
+  }
+}
 
+void debugPrint(){
+  Serial.print("Timestamp: ");
+  Serial.println(millis());
+  Serial.print("\tprogName: ");
+  Serial.print(String(NAME));
+  Serial.print("\tprogState: ");
+  Serial.print(espData.program.state);
+  Serial.print("\tconfRes: ");
+  Serial.print(espData.program.confRes);
+  Serial.print("\twifiRes: ");
+  Serial.print(espData.wifi.state);
+  Serial.print("\tgpsFix: ");
+  Serial.print(espData.gps.fixQualityInt);
+  Serial.print("\tip: ");
+  Serial.print(espData.wifi.ips[0]);
+  Serial.print(".");
+  Serial.print(espData.wifi.ips[1]);
+  Serial.print(".");
+  Serial.print(espData.wifi.ips[2]);
+  Serial.print(".");
+  Serial.print(espData.wifi.ips[3]);
+  Serial.println();
 
   
   // Serial.printf(" gpsAge: %lu", espConfig.gpsData.);
-  Serial.println();
+  
   // Serial.println(twoWire.requestFrom(0x22, 0x01));
   // Serial.printf("Mag x: %.2f mT, y: %.2f mT, z: %.2f mT, Temp: %.2f °C\n", espConfig.magData.x, espConfig.magData.y, espConfig.magData.z, (espConfig.magData.t*1.8)+32);
   // Serial.println();
@@ -1146,6 +1272,9 @@ void debugPrint(){
 }
 
 void loop(){
+  
+  // Handle serial commands
+  handleSerialCommands();
   
   debugPrint();
   

@@ -1,5 +1,9 @@
 #include "ESPdata.h"
 
+// RTC Data that persists across software reboots but resets on power cycle
+RTC_DATA_ATTR RTCData rtcData;
+const uint32_t RTC_MAGIC = 0xDEADBEEF;
+
 // Static member initialization
 ESPdata* ESPdata::instance = nullptr;
 
@@ -66,8 +70,13 @@ uint8_t ESPdata::loadConfig(){
     program.mcpState = preferences.getUChar("mcpState", 0);
     program.twoWireState = preferences.getUChar("twoWireState", 0);
     program.adsState = preferences.getUChar("adsState", 0);
+    
+    // Initialize RTC data first (handles power cycle detection)
+    initRTCData();
+    
+    // Load bootcount (may have been reset by initRTCData on power cycle)
     program.bootcount = preferences.getULong("bootcount", 0);
-    Serial.println("Boot count: " + String(program.bootcount));
+    Serial.println("NVS Boot count: " + String(program.bootcount));
     program.bootcount = program.bootcount + 1;
     preferences.putULong("bootcount", program.bootcount);
     
@@ -96,6 +105,10 @@ uint8_t ESPdata::loadConfig(){
     steer.countsPerDeg = preferences.getFloat("countsPerDeg", 10.0);
     steer.steerOffset = preferences.getFloat("wasOffset", 0.0);
     steer.useADS = preferences.getBool("useADS", true);
+    steer.wirelessWAS = preferences.getBool("wirelessWAS", false);
+
+    // Load GPS configuration
+    gps.externalGPS = preferences.getBool("externalGPS", false);
 
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
@@ -131,6 +144,12 @@ uint8_t ESPdata::loadConfig(){
     return 1; // Success
 }
 
+bool ESPdata::setBootCount(uint32_t count){
+    program.bootcount = count;
+    preferences.putULong("bootcount", program.bootcount);
+    return true;
+}
+
 bool ESPdata::setBootMode(uint8_t mode){
     program.bootMode = mode;
     preferences.putUChar("bootMode", program.bootMode);
@@ -145,6 +164,9 @@ bool ESPdata::setState(uint8_t state){
 
 uint8_t ESPdata::saveConfig(){
     // Save all configuration to Preferences
+
+    preferences.putUChar("bootMode", program.bootMode);
+    preferences.putULong("bootcount", program.bootcount);
     preferences.putUChar("state", program.state);
     preferences.putUChar("ip0", wifi.ips[0]);
     preferences.putUChar("ip1", wifi.ips[1]);
@@ -166,6 +188,10 @@ uint8_t ESPdata::saveConfig(){
     preferences.putFloat("countsPerDeg", steer.countsPerDeg);
     preferences.putFloat("wasOffset", steer.steerOffset);
     preferences.putBool("useADS", steer.useADS);
+    preferences.putBool("wirelessWAS", steer.wirelessWAS);
+
+    // Save GPS configuration
+    preferences.putBool("externalGPS", gps.externalGPS);
 
     // Save server configuration
     preferences.putUChar("serverAdr", ota.ipAddr);
@@ -208,4 +234,122 @@ uint8_t ESPdata::saveWASzero(){
     preferences.putFloat("wasZero", steer.wasZeroAngle);
     Serial.println(F("Successfully updated WAS zero in Preferences"));
     return 1;
+}
+
+// RTC Data methods
+void ESPdata::initRTCData() {
+    Serial.println("=== RTC Data Debug ===");
+    Serial.println("RTC Magic Value: 0x" + String(rtcData.magic, HEX));
+    Serial.println("Expected Magic: 0x" + String(RTC_MAGIC, HEX));
+    Serial.println("Reset Reason: " + String(esp_reset_reason()));
+    
+    // Check various reset reasons to determine if it's really a power cycle
+    esp_reset_reason_t resetReason = esp_reset_reason();
+    bool isPowerCycle = false;
+    
+    if (rtcData.magic != RTC_MAGIC) {
+        Serial.println("Magic number mismatch detected");
+        
+        // Check reset reason to determine if it's actually a power cycle
+        switch (resetReason) {
+            case ESP_RST_POWERON:
+                Serial.println("Reset Reason: Power-on reset");
+                isPowerCycle = true;
+                break;
+            case ESP_RST_EXT:
+                Serial.println("Reset Reason: External reset");
+                isPowerCycle = true;
+                break;
+            case ESP_RST_SW:
+                Serial.println("Reset Reason: Software reset");
+                isPowerCycle = false;
+                break;
+            case ESP_RST_PANIC:
+                Serial.println("Reset Reason: Exception/panic reset");
+                isPowerCycle = false;
+                break;
+            case ESP_RST_INT_WDT:
+                Serial.println("Reset Reason: Interrupt watchdog reset");
+                isPowerCycle = false;
+                break;
+            case ESP_RST_TASK_WDT:
+                Serial.println("Reset Reason: Task watchdog reset");
+                isPowerCycle = false;
+                break;
+            case ESP_RST_WDT:
+                Serial.println("Reset Reason: Other watchdog reset");
+                isPowerCycle = false;
+                break;
+            case ESP_RST_DEEPSLEEP:
+                Serial.println("Reset Reason: Deep sleep reset");
+                isPowerCycle = false;
+                break;
+            case ESP_RST_BROWNOUT:
+                Serial.println("Reset Reason: Brownout reset");
+                isPowerCycle = true;
+                break;
+            case ESP_RST_SDIO:
+                Serial.println("Reset Reason: SDIO reset");
+                isPowerCycle = false;
+                break;
+            default:
+                Serial.println("Reset Reason: Unknown (" + String(resetReason) + ")");
+                isPowerCycle = true;
+                break;
+        }
+        
+        if (isPowerCycle) {
+            // True power cycle detected - initialize RTC data
+            Serial.println("TRUE POWER CYCLE DETECTED: Initializing RTC data");
+            rtcData.magic = RTC_MAGIC;
+            rtcData.softwareBoots = 0;
+            rtcData.lastUptime = 0;
+            rtcData.lastBootMode = 1; // Default to normal mode
+            rtcData.lastResetReason = resetReason;
+            
+            // Reset bootcount in NVS on power cycle
+            program.bootcount = 0;
+            preferences.putULong("bootcount", program.bootcount);
+            Serial.println("NVS bootcount reset to 0 due to power cycle");
+            
+            // Reset program state to normal on power cycle
+            program.state = 1;
+            preferences.putUChar("state", program.state);
+            Serial.println("Program state reset to normal (1) due to power cycle");
+        } else {
+            // Software reset but RTC memory was lost - reinitialize but don't reset NVS
+            Serial.println("SOFTWARE RESET with RTC memory loss - reinitializing RTC only");
+            rtcData.magic = RTC_MAGIC;
+            rtcData.softwareBoots = 1; // Start at 1 since this is a software reset
+            rtcData.lastUptime = 0;
+            rtcData.lastBootMode = program.state; // Use current state from NVS
+            rtcData.lastResetReason = resetReason;
+            // Do NOT reset NVS values for software resets
+        }
+    } else {
+        // Software reboot - RTC data preserved
+        Serial.println("SOFTWARE REBOOT: RTC data preserved");
+        Serial.println("Software boots since power cycle: " + String(rtcData.softwareBoots));
+        Serial.println("Last uptime: " + String(rtcData.lastUptime) + " ms");
+        Serial.println("Last boot mode: " + String(rtcData.lastBootMode == 1 ? "Normal" : "Recovery"));
+    }
+    
+    rtcData.softwareBoots++;
+    Serial.println("Current software boot count: " + String(rtcData.softwareBoots));
+    Serial.println("======================");
+}
+
+bool ESPdata::isPowerCycle() {
+    return (rtcData.magic != RTC_MAGIC);
+}
+
+void ESPdata::updateRTCBeforeReboot(uint8_t newBootMode) {
+    rtcData.lastUptime = millis();
+    rtcData.lastBootMode = newBootMode;
+    rtcData.lastResetReason = esp_reset_reason();
+    Serial.println("RTC updated before reboot - Mode: " + String(newBootMode == 1 ? "Normal" : "Recovery"));
+}
+
+uint32_t ESPdata::getSoftwareBootCount() {
+    return rtcData.softwareBoots;
 }

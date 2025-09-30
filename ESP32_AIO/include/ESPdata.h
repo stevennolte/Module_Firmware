@@ -4,6 +4,15 @@
 #include "Preferences.h"
 #include "Version.h"
 
+// RTC Data structure that persists across software reboots but resets on power cycle
+struct RTCData {
+    uint32_t magic;           // Validation number to detect power cycles
+    uint32_t softwareBoots;   // Count of software reboots since power cycle
+    uint32_t lastUptime;      // Uptime before last reboot
+    uint8_t lastBootMode;     // Last requested boot mode
+    uint32_t lastResetReason; // Last reset reason
+};
+
 class ESPdata
 {
 private:
@@ -28,7 +37,13 @@ public:
     bool setMCPstate(uint8_t state);
     bool setTwoWireState(uint8_t state);
     bool setADSstate(uint8_t state);
-
+    bool setBootCount(uint32_t count);
+    
+    // RTC Data methods
+    void initRTCData();
+    bool isPowerCycle();
+    void updateRTCBeforeReboot(uint8_t newBootMode);
+    uint32_t getSoftwareBootCount();
     
     // Constructor remains public for backward compatibility
     ESPdata();

@@ -12,7 +12,13 @@
         "regex": "cpp",
         "bitset": "cpp",
         "*.tcc": "cpp",
-        "optional": "cpp"
+        "optional": "cpp",
+        "numeric": "cpp",
+        "fstream": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "system_error": "cpp",
+        "typeinfo": "cpp"
     },
     "files.exclude": {
         "**/.git": true,

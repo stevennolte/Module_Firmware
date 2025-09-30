@@ -83,6 +83,7 @@ void ESPGPS::init(ESPudp* espUdp){
     // if (!rvc.begin(&bnoSerial)){
     //     Serial.println("BNO08x not detected");
     // }
+    Serial.println("Starting BNO08x");
     if (rvc.begin(bnoSerial)){
         espData->gps.imuState = 1;
     } else {
@@ -90,12 +91,15 @@ void ESPGPS::init(ESPudp* espUdp){
         Serial.println("RVC Start Failed");
     }
     
+    Serial.println("Trying to start UM980");
     uint8_t gpsTryCnt = 0;
-    while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 5){
+    while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 2){
         gpsTryCnt++;
         delay(250);
-        Serial.println("Trying to start UM980");
+        Serial.print(".");
+        
     }
+    Serial.println();
     if (!myGNSS.isConnected()) //Give the serial port over to the library
     {
         espData->gps.state = 2;
@@ -120,47 +124,6 @@ void ESPGPS::init(ESPudp* espUdp){
     
 }
 
-// Alternative method using MCPManager singleton
-void ESPGPS::initWithSingleton(ESPudp* espUdp){
-    this->espUdp = espUdp;
-    
-    // Setup GPS indicators using MCPManager member
-    if (mcpManager.isInitialized()) {
-        mcpManager.setupGPSIndicators(_gpsFixIndPin, _rtkFixIndPin);
-        mcpManager.testGPSIndicators(_gpsFixIndPin, _rtkFixIndPin);
-        Serial.println("GPS: Using MCPManager for indicator setup");
-    } else {
-        Serial.println("GPS: MCPManager not initialized");
-    }
-    
-    // Rest of initialization is the same as original init method
-    parser.addHandler("G-GGA", staticGGA_Handler);
-    
-    if (rvc.begin(bnoSerial)){
-        espData->gps.imuState = 1;
-    } else {
-        espData->gps.imuState = 2;
-        Serial.println("RVC Start Failed");
-    }
-    
-    uint8_t gpsTryCnt = 0;
-    while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 5){
-        gpsTryCnt++;
-        delay(250);
-        Serial.println("Trying to start UM980");
-    }
-    if (!myGNSS.isConnected()) {
-        espData->gps.state = 2;
-        Serial.print("UM980 Failed to Respond on Serial, State: ");
-        Serial.println(espData->gps.state);
-    } else {
-        Serial.println("UM980 Connected and ready");
-        espData->gps.state = 1;
-        xTaskCreatePinnedToCore(taskHandler, "taskHandler", 10000, this, 1, NULL, 0);
-    }
-    
-    delay(1000);
-}
 
 void ESPGPS::calculateChecksum(void)
 {
