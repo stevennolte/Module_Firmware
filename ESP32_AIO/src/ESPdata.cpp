@@ -1,18 +1,56 @@
+/**
+ * @file ESPdata.cpp
+ * @brief Implementation of centralized data management system for ESP32-AIO
+ * 
+ * @details This file implements the ESPdata singleton class that manages all system
+ *          configuration, runtime data, and persistent storage. Provides NVS-based
+ *          configuration persistence with power cycle detection using RTC memory.
+ *          
+ *          Key features implemented:
+ *          - Thread-safe singleton pattern for data access
+ *          - NVS (Non-Volatile Storage) persistence for configuration
+ *          - RTC memory power cycle detection and boot counting
+ *          - Configuration load/save with validation and error recovery
+ *          - System state management and component status tracking
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see ESPdata.h for class interface definition
+ * @see main.cpp for usage examples
+ */
+
 #include "ESPdata.h"
 
-// RTC Data that persists across software reboots but resets on power cycle
+/// @brief RTC memory data structure that persists across software reboots but resets on power cycle
 RTC_DATA_ATTR RTCData rtcData;
+
+/// @brief Magic number for RTC memory validation (0xDEADBEEF indicates valid data)
 const uint32_t RTC_MAGIC = 0xDEADBEEF;
 
-// Static member initialization
+/// @brief Static singleton instance pointer
 ESPdata* ESPdata::instance = nullptr;
 
+/**
+ * @brief Default constructor for ESPdata singleton
+ * 
+ * @details Initializes the data management system. The Preferences object
+ *          is initialized but not opened until loadConfig() is called.
+ */
 ESPdata::ESPdata() {
     // Initialize Preferences in constructor
-    
 }
 
-// Singleton implementation
+/**
+ * @brief Gets the singleton instance using thread-safe lazy initialization
+ * 
+ * @return ESPdata& Reference to the unique ESPdata instance
+ * 
+ * @details Creates the singleton instance on first call and returns the same
+ *          instance on subsequent calls. Thread-safe implementation ensures
+ *          only one instance is created in multi-threaded environments.
+ */
 ESPdata& ESPdata::getInstance() {
     if (instance == nullptr) {
         instance = new ESPdata();
@@ -20,6 +58,12 @@ ESPdata& ESPdata::getInstance() {
     return *instance;
 }
 
+/**
+ * @brief Destroys the singleton instance and cleans up resources
+ * 
+ * @details Properly closes the NVS preferences handle and deallocates
+ *          the singleton instance. Should be called during system shutdown.
+ */
 void ESPdata::destroyInstance() {
     if (instance != nullptr) {
         instance->preferences.end(); // Close preferences before destroying
@@ -28,6 +72,17 @@ void ESPdata::destroyInstance() {
     }
 }
 
+/**
+ * @brief Reads GPIO strapping pins for hardware configuration detection
+ * 
+ * @return uint8_t Hardware strapping configuration value
+ * 
+ * @details Reads analog voltage on strapping pin to determine hardware
+ *          configuration variant. Used for automatic hardware detection
+ *          and configuration selection.
+ * 
+ * @todo Add complete strapping logic implementation
+ */
 uint8_t ESPdata::getStrapping(){
     pinMode(4, INPUT);
     uint32_t measurement = analogReadMilliVolts(4);
@@ -35,12 +90,30 @@ uint8_t ESPdata::getStrapping(){
     return 1;
 }
 
+/**
+ * @brief Sets the MCP23017 I/O expander component state
+ * 
+ * @param state Component state (1=active, 2=failed, other=unknown)
+ * @return true Always returns true (operation cannot fail)
+ * 
+ * @details Updates the MCP23017 status in both RAM and NVS storage.
+ *          Used for tracking hardware component health and system diagnostics.
+ */
 bool ESPdata::setMCPstate(uint8_t state){
     program.mcpState = state;
     preferences.putUChar("mcpState", program.mcpState);
     return true;
 }
 
+/**
+ * @brief Sets the I2C two-wire interface state
+ * 
+ * @param state Interface state (1=active, 2=failed, other=unknown)
+ * @return true Always returns true (operation cannot fail)
+ * 
+ * @details Updates the I2C interface status in both RAM and NVS storage.
+ *          Used for tracking communication bus health and troubleshooting.
+ */
 bool ESPdata::setTwoWireState(uint8_t state){
     program.twoWireState = state;
     preferences.putUChar("twoWireState", program.twoWireState);

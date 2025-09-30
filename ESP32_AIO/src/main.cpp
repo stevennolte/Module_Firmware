@@ -1,3 +1,26 @@
+/**
+ * @file main.cpp
+ * @brief ESP32 All-In-One Agricultural Controller Main Application
+ * 
+ * This file contains the main application logic for the ESP32-AIO agricultural controller.
+ * It manages GPS, steering control, wireless communication, web interface, and various
+ * hardware peripherals for precision agriculture applications.
+ * 
+ * @author Steve Nolte
+ * @date 2025
+ * @version 1.0
+ * 
+ * Features:
+ * - GPS/IMU integration with UM982 and BNO08x
+ * - Wheel Angle Sensor (WAS) support (wired/wireless)
+ * - PID-based steering control
+ * - Web-based configuration interface
+ * - Serial command interface
+ * - Recovery mode for field servicing
+ * - Power cycle detection using RTC memory
+ * - UDP communication for AgOpen GPS integration
+ */
+
 #include <Arduino.h>
 #include "nvs_flash.h"
 #include "ESPdata.h"
@@ -22,41 +45,82 @@
 
 //TODO: add wifi connect timer to ap mode
 
+/// @brief I2C bus 0 for primary peripherals
 TwoWire twoWire = TwoWire(0);
+/// @brief I2C bus 1 for secondary peripherals  
 TwoWire twoWire1 = TwoWire(1);
+/// @brief Hardware serial port 2 for BNO08x IMU communication
 HardwareSerial bnoSerial(2);
+/// @brief Hardware serial port 1 for GPS communication
 HardwareSerial gpsSerial(1);
 
 // Adafruit_MCP23X17 mcp;
+/// @brief ADS1115 16-bit ADC for analog sensor readings
 Adafruit_ADS1115 ads;
 
 // Using singleton pattern - single access point for configuration
+/// @brief Global configuration and data storage singleton instance
 ESPdata& espData = ESPdata::getInstance();
+/// @brief MCP23017 I/O expander manager singleton instance
 MCPManager& mcpManager = MCPManager::getInstance();
-// MCPManager singleton instance will be initialized in setup()
-// Usage example:
-// MCPManager& mcpMgr = MCPManager::getInstance();
-// mcpMgr.setupMotorPins(pin1, pin2);
-// mcpMgr.enableMotor(pin1, pin2);
 
-// Components using singleton instance
+/// @brief GPS/IMU manager with UM982 GPS and BNO08x IMU support
 ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // MCPManager accessed via singleton inside class
+/// @brief LED status indicator controller with error state management
 MyLED myLED(&espData);
+/// @brief Main power control and monitoring system
 MainPower mainPower(&espData, &ads);  // MCPManager accessed via singleton inside class
+/// @brief WiFi connection and AP mode manager
 ESPWifi espWifi(&espData);
+/// @brief UDP communication handler for AgOpen GPS protocol
 ESPudp espUdp(&espData);
+/// @brief Over-The-Air firmware update manager
 ESP32OTAPull ota;
+/// @brief Async web server for configuration interface (port 80)
 AsyncWebServer server(80);
 
+/// @brief Steering control system with PID feedback and motor control
 ESPsteer espSteer(&espData, &ads);  // MCPManager accessed via singleton inside class
+/// @brief Debug variables vector for web interface display
 std::vector<String> debugVars;
 
 // Function declarations
+/**
+ * @brief Update debug variables for normal operation mode
+ */
 void updateDebugVars();
+
+/**
+ * @brief Update debug variables for recovery mode
+ */
 void updateRecoveryDebugVars();
+
+/**
+ * @brief Initialize and start recovery mode with minimal functionality
+ */
 void recoveryBoot();
+
+/**
+ * @brief Initialize and start normal operation mode with full functionality
+ */
 void normalboot();
 
+/**
+ * @brief Initializes I2C bus and detects connected hardware components
+ * 
+ * @details This function configures the I2C interface and scans for essential hardware:
+ *          - Sets up I2C pins (SDA/SCL) from configuration
+ *          - Initializes the Wire library for I2C communication
+ *          - Scans for MCP23017 I/O expander at address 0x20
+ *          - Scans for ADS1115 ADC at address 0x48
+ *          - Updates component state flags in espData structure
+ * 
+ * @return true if all required hardware components are detected
+ * @return false if any essential component is missing or I2C setup fails
+ * 
+ * @note Both MCP23017 and ADS1115 are required for normal operation
+ * @see normalboot(), espData.program.mcpState, espData.program.adsState
+ */
 bool I2Csetup(){
   if(!twoWire.setPins(espData.pins.SDA_PIN, espData.pins.SCL_PIN)){
     Serial.println("Wire failed to set pins");
@@ -105,7 +169,7 @@ bool I2Csetup(){
   
 }
 
-// #pragma region OTA
+#pragma region OTA
 // const char *errtext(int code)
 // {
 // 	switch(code)
@@ -162,7 +226,7 @@ bool I2Csetup(){
 //   Serial.printf("CheckForOTAUpdate returned %d (%s)\n\n", ret, errtext(ret));
 // }
 
-// #pragma endregion
+#pragma endregion
 
 #pragma region Webserver
 
@@ -244,6 +308,20 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_
 }
 
 
+/**
+ * @brief Updates the debug variables vector with current system status information
+ * 
+ * @details This function clears and repopulates the debugVars vector with real-time
+ *          system information including:
+ *          - Program name, version, and uptime
+ *          - Memory usage and heap information
+ *          - WiFi connection status and IP address
+ *          - Hardware component states (MCP23017, ADS1115, IMU)
+ *          - GPS data (position, satellites, fix quality)
+ *          - Steering system status and configuration
+ *          - Power management information
+ *          Used for web interface diagnostics and system monitoring
+ */
 void updateDebugVars() {
   debugVars.clear(); // Clear the list to update it dynamically
   debugVars.push_back("Program: " + String(NAME));
@@ -319,7 +397,18 @@ void updateDebugVars() {
   
 }
 
-// Recovery mode specific debug variables
+/**
+ * @brief Updates debug variables specifically for recovery mode display
+ * 
+ * @details This function populates the debugVars vector with recovery mode
+ *          specific information including:
+ *          - Recovery mode indicators and timestamps
+ *          - Hardware specifications (chip model, CPU frequency, flash)
+ *          - Recovery WiFi AP configuration details
+ *          - System status and reset reason information
+ *          - Memory usage statistics including PSRAM
+ *          Used for diagnostics when the system is in recovery mode
+ */
 void updateRecoveryDebugVars() {
   debugVars.clear(); // Clear the list to update it dynamically
   debugVars.push_back("=== RECOVERY MODE ===");
@@ -801,7 +890,224 @@ void handleToggleAPMode(AsyncWebServerRequest *request) {
 }
 
 
-// Recovery boot function with WiFi AP and debug web server
+
+#pragma endregion
+
+#pragma region Buttons
+/**
+ * @brief Interrupt service routine for handling steering switch activation
+ * 
+ * @details This ISR is triggered when the steering switch is pressed. It implements
+ *          debouncing logic with a 100ms minimum interval between triggers.
+ *          Sets the steerSwitch flag and updates the last trigger timestamp.
+ *          Must be declared with IRAM_ATTR for interrupt handling on ESP32.
+ * 
+ * @note This function runs in interrupt context - keep execution time minimal
+ * @see handleWorkSwitch(), buttonSetup()
+ */
+void IRAM_ATTR handleSteerSwitch() {
+  unsigned long currentTime = millis();
+  if (currentTime - espData.steer.steerSwitchLastTime > 100) {
+      espData.steer.steerSwitch = true; // Set the flag
+      espData.steer.steerSwitchLastTime = currentTime; // Update the debounce timestamp
+    }
+}
+
+/**
+ * @brief Interrupt service routine for handling work switch activation
+ * 
+ * @details This ISR is triggered when the work switch is pressed. It implements
+ *          debouncing logic with a 100ms minimum interval between triggers.
+ *          Sets the workSwitch flag and updates the last trigger timestamp.
+ *          Must be declared with IRAM_ATTR for interrupt handling on ESP32.
+ * 
+ * @note This function runs in interrupt context - keep execution time minimal
+ * @see handleSteerSwitch(), buttonSetup()
+ */
+void IRAM_ATTR handleWorkSwitch() {
+  unsigned long currentTime = millis();
+  if (currentTime - espData.switches.workSwitchLastTime > 100) {
+      espData.switches.workSwitch = true; // Set the flag
+      espData.switches.workSwitchLastTime = currentTime; // Update the debounce timestamp
+  }
+}
+
+/**
+ * @brief Configures GPIO pins and interrupt handlers for physical switches
+ * 
+ * @details This function initializes the hardware button interface by:
+ *          - Setting steering and work switch pins as INPUT_PULLUP
+ *          - Attaching interrupt handlers for FALLING edge detection
+ *          - Enabling hardware debouncing through interrupt configuration
+ * 
+ * @note Called once during system initialization in setup()
+ * @see handleSteerSwitch(), handleWorkSwitch()
+ */
+void buttonSetup(){
+  // Set up the GPIO pins for the buttons
+  pinMode(espData.pins.STEER_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(espData.pins.WORK_SWITCH_PIN, INPUT_PULLUP);
+
+  // Attach interrupts to the buttons
+  attachInterrupt(digitalPinToInterrupt(espData.pins.STEER_SWITCH_PIN), handleSteerSwitch, FALLING);
+  attachInterrupt(digitalPinToInterrupt(espData.pins.WORK_SWITCH_PIN), handleWorkSwitch, FALLING);
+}
+#pragma endregion
+
+
+/**
+ * @brief Handles runtime serial commands for system control and diagnostics
+ * 
+ * @details This function processes serial input commands for remote system management:
+ *          - "help" - Display available commands and usage
+ *          - "status" - Show current system status and debug information
+ *          - "reboot" - Perform immediate system restart
+ *          - "recovery" - Set recovery mode flag and restart
+ *          - "normal" - Clear recovery mode flag and restart
+ * 
+ *          Uses a static input buffer for command line parsing with newline termination.
+ *          Commands are case-insensitive and provide immediate feedback.
+ * 
+ * @note Called continuously in main loop() for real-time command processing
+ * @see setup(), loop()
+ */
+void handleSerialCommands() {
+  static String inputBuffer = "";
+  
+  while (Serial.available()) {
+    char c = Serial.read();
+    
+    if (c == '\n' || c == '\r') {
+      if (inputBuffer.length() > 0) {
+        inputBuffer.trim();
+        inputBuffer.toLowerCase();
+        
+        Serial.println(""); // New line after command
+        
+        if (inputBuffer == "help" || inputBuffer == "?") {
+          Serial.println("=== Available Serial Commands ===");
+          Serial.println("help or ?         - Show this help");
+          Serial.println("reboot            - Restart ESP32");
+          Serial.println("recovery          - Reboot into recovery mode");
+          Serial.println("normal            - Reboot into normal mode");
+          Serial.println("status            - Show system status");
+          Serial.println("config            - Show configuration");
+          Serial.println("====================================");
+          
+        } else if (inputBuffer == "reboot") {
+          Serial.println("SERIAL COMMAND: Rebooting ESP32...");
+          delay(100);
+          ESP.restart();
+          
+        } else if (inputBuffer == "recovery") {
+          Serial.println("SERIAL COMMAND: Setting recovery mode and rebooting...");
+          espData.program.state = 0; // Force recovery state
+          espData.updateRTCBeforeReboot(0); // Update RTC before reboot
+          espData.saveConfig();
+          delay(100);
+          ESP.restart();
+          
+        } else if (inputBuffer == "normal") {
+          Serial.println("SERIAL COMMAND: Setting normal mode and rebooting...");
+          espData.program.state = 1; // Force normal state
+          espData.updateRTCBeforeReboot(1); // Update RTC before reboot
+          espData.saveConfig();
+          delay(100);
+          ESP.restart();
+          
+        } else if (inputBuffer == "status") {
+          Serial.println("=== System Status ===");
+          Serial.println("Program: " + String(NAME));
+          Serial.println("Boot Mode: " + String(espData.program.state == 1 ? "Normal" : "Recovery"));
+          Serial.println("NVS Boot Count: " + String(espData.program.bootcount));
+          Serial.println("Software Boots (since power cycle): " + String(espData.getSoftwareBootCount()));
+          Serial.println("Uptime: " + String(millis()/1000) + " seconds");
+          Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+          Serial.println("WiFi State: " + String(espData.wifi.state));
+          Serial.println("GPS Fix: " + String(espData.gps.fixQuality));
+          Serial.println("====================");
+          
+        } else if (inputBuffer == "config") {
+          Serial.println("=== Configuration ===");
+          Serial.println("IP: " + String(espData.wifi.ips[0]) + "." + String(espData.wifi.ips[1]) + "." + String(espData.wifi.ips[2]) + "." + String(espData.wifi.ips[3]));
+          Serial.println("GPS Source: " + String(espData.gps.externalGPS ? "Wireless" : "On-board"));
+          Serial.println("WAS Source: " + String(espData.steer.wirelessWAS ? "Wireless" : "Wired"));
+          Serial.println("Use ADS: " + String(espData.steer.useADS ? "Yes" : "No"));
+          Serial.println("LED Brightness: " + String(espData.program.ledBrht));
+          Serial.println("PID Kp: " + String(espData.steer.gainP));
+          Serial.println("====================");
+          
+        } else if (inputBuffer.length() > 0) {
+          Serial.println("Unknown command: " + inputBuffer);
+          Serial.println("Type 'help' for available commands");
+        }
+        
+        inputBuffer = "";
+        Serial.print("> "); // Command prompt
+      }
+    } else if (c >= 32 && c <= 126) { // Printable characters only
+      inputBuffer += c;
+      Serial.print(c); // Echo character
+    }
+  }
+}
+
+/**
+ * @brief Outputs basic system debug information to serial console
+ * 
+ * @details This function prints essential system status to the serial interface:
+ *          - Current timestamp (milliseconds since boot)
+ *          - Program name and current operational state
+ *          - Steering angle and target steering values
+ *          - WiFi connection status and assigned IP address
+ * 
+ *          Uses tab-separated format for easy parsing and debugging.
+ *          Called periodically for monitoring system operation.
+ * 
+ * @note Less detailed than status command output, optimized for frequent calls
+ * @see handleSerialCommands()
+ */
+void debugPrint(){
+  Serial.print("Timestamp: ");
+  Serial.println(millis());
+  Serial.print("\tprogName: ");
+  Serial.print(String(NAME));
+  Serial.print("\tprogState: ");
+  Serial.print(espData.program.state);
+  Serial.print("\tconfRes: ");
+  Serial.print(espData.program.confRes);
+  Serial.print("\twifiRes: ");
+  Serial.print(espData.wifi.state);
+  Serial.print("\tgpsFix: ");
+  Serial.print(espData.gps.fixQualityInt);
+  Serial.print("\tip: ");
+  Serial.print(espData.wifi.ips[0]);
+  Serial.print(".");
+  Serial.print(espData.wifi.ips[1]);
+  Serial.print(".");
+  Serial.print(espData.wifi.ips[2]);
+  Serial.print(".");
+  Serial.print(espData.wifi.ips[3]);
+  Serial.println();
+}
+
+#pragma region Setup and Loop
+/**
+ * @brief Initializes the system in recovery mode with AP WiFi and basic web interface
+ * 
+ * @details Recovery mode provides emergency access when normal boot fails:
+ *          - Creates WiFi Access Point "ESP32_AIO_RECOVERY" with password "recovery123"
+ *          - Sets up minimal web server on 192.168.4.1 for configuration access
+ *          - Loads recovery-specific debug variables for system diagnostics
+ *          - Provides file system access for configuration recovery
+ *          - Enables serial command interface for remote management
+ * 
+ *          This mode bypasses normal hardware initialization and network connection,
+ *          allowing system recovery when configuration is corrupted or unreachable.
+ * 
+ * @note Only essential services are started to minimize resource usage
+ * @see normalboot(), setup()
+ */
 void recoveryBoot() {
   Serial.println("=== ENTERING RECOVERY MODE ===");
   
@@ -958,42 +1264,27 @@ void recoveryBoot() {
   Serial.println("Connect to WiFi: " + recoverySSID);
   Serial.println("Password: " + String(recoveryPassword));
   Serial.println("Open browser to: http://192.168.4.1");
-  Serial.println("=====================================");
-  
+  Serial.println("=====================================");  
 }
 
-
-#pragma endregion
-
-#pragma region Buttons
-void IRAM_ATTR handleSteerSwitch() {
-  unsigned long currentTime = millis();
-  if (currentTime - espData.steer.steerSwitchLastTime > 100) {
-      espData.steer.steerSwitch = true; // Set the flag
-      espData.steer.steerSwitchLastTime = currentTime; // Update the debounce timestamp
-    }
-}
-
-void IRAM_ATTR handleWorkSwitch() {
-  unsigned long currentTime = millis();
-  if (currentTime - espData.switches.workSwitchLastTime > 100) {
-      espData.switches.workSwitch = true; // Set the flag
-      espData.switches.workSwitchLastTime = currentTime; // Update the debounce timestamp
-  }
-}
-
-void buttonSetup(){
-  // Set up the GPIO pins for the buttons
-  pinMode(espData.pins.STEER_SWITCH_PIN, INPUT_PULLUP);
-  pinMode(espData.pins.WORK_SWITCH_PIN, INPUT_PULLUP);
-
-  // Attach interrupts to the buttons
-  attachInterrupt(digitalPinToInterrupt(espData.pins.STEER_SWITCH_PIN), handleSteerSwitch, FALLING);
-  attachInterrupt(digitalPinToInterrupt(espData.pins.WORK_SWITCH_PIN), handleWorkSwitch, FALLING);
-}
-#pragma endregion
-
-
+/**
+ * @brief Executes normal system boot sequence with full hardware initialization
+ * 
+ * @details Normal boot mode performs complete system startup including:
+ *          - Serial port configuration for GPS and IMU communication
+ *          - I2C bus initialization and hardware component detection
+ *          - Network configuration and WiFi connection establishment
+ *          - Web server startup with full feature set
+ *          - GPS module initialization and NTRIP client setup
+ *          - Steering system calibration and motor driver configuration
+ *          - LED indicators and switch interface setup
+ * 
+ *          This is the primary operational mode providing full system functionality.
+ *          All hardware components are initialized and operational services started.
+ * 
+ * @note Only called when system passes configuration validation checks
+ * @see recoveryBoot(), setup(), I2Csetup()
+ */
 void normalboot(){
   // Normal boot sequence
   /** @brief Normal boot sequence */
@@ -1126,6 +1417,23 @@ void normalboot(){
   // Add your normal boot logic here
 }
 
+/**
+ * @brief Main Arduino setup function - system initialization entry point
+ * 
+ * @details This is the primary system initialization function that:
+ *          - Initializes serial communication and LED task scheduler
+ *          - Loads system configuration from NVS storage
+ *          - Determines boot mode based on configuration state and boot count
+ *          - Routes to either recoveryBoot() or normalboot() based on system health
+ *          - Implements recovery mode fallback for corrupted configurations
+ * 
+ *          Boot mode selection logic:
+ *          - Recovery mode: If config invalid AND boot count > 2
+ *          - Normal mode: If configuration loads successfully
+ * 
+ * @note Called once by Arduino framework at system startup
+ * @see loop(), recoveryBoot(), normalboot()
+ */
 void setup(){
   Serial.begin(115200);
   myLED.startTask();
@@ -1156,121 +1464,22 @@ void setup(){
 
 }
 
-// Function to handle runtime serial commands
-void handleSerialCommands() {
-  static String inputBuffer = "";
-  
-  while (Serial.available()) {
-    char c = Serial.read();
-    
-    if (c == '\n' || c == '\r') {
-      if (inputBuffer.length() > 0) {
-        inputBuffer.trim();
-        inputBuffer.toLowerCase();
-        
-        Serial.println(""); // New line after command
-        
-        if (inputBuffer == "help" || inputBuffer == "?") {
-          Serial.println("=== Available Serial Commands ===");
-          Serial.println("help or ?         - Show this help");
-          Serial.println("reboot            - Restart ESP32");
-          Serial.println("recovery          - Reboot into recovery mode");
-          Serial.println("normal            - Reboot into normal mode");
-          Serial.println("status            - Show system status");
-          Serial.println("config            - Show configuration");
-          Serial.println("====================================");
-          
-        } else if (inputBuffer == "reboot") {
-          Serial.println("SERIAL COMMAND: Rebooting ESP32...");
-          delay(100);
-          ESP.restart();
-          
-        } else if (inputBuffer == "recovery") {
-          Serial.println("SERIAL COMMAND: Setting recovery mode and rebooting...");
-          espData.program.state = 0; // Force recovery state
-          espData.updateRTCBeforeReboot(0); // Update RTC before reboot
-          espData.saveConfig();
-          delay(100);
-          ESP.restart();
-          
-        } else if (inputBuffer == "normal") {
-          Serial.println("SERIAL COMMAND: Setting normal mode and rebooting...");
-          espData.program.state = 1; // Force normal state
-          espData.updateRTCBeforeReboot(1); // Update RTC before reboot
-          espData.saveConfig();
-          delay(100);
-          ESP.restart();
-          
-        } else if (inputBuffer == "status") {
-          Serial.println("=== System Status ===");
-          Serial.println("Program: " + String(NAME));
-          Serial.println("Boot Mode: " + String(espData.program.state == 1 ? "Normal" : "Recovery"));
-          Serial.println("NVS Boot Count: " + String(espData.program.bootcount));
-          Serial.println("Software Boots (since power cycle): " + String(espData.getSoftwareBootCount()));
-          Serial.println("Uptime: " + String(millis()/1000) + " seconds");
-          Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
-          Serial.println("WiFi State: " + String(espData.wifi.state));
-          Serial.println("GPS Fix: " + String(espData.gps.fixQuality));
-          Serial.println("====================");
-          
-        } else if (inputBuffer == "config") {
-          Serial.println("=== Configuration ===");
-          Serial.println("IP: " + String(espData.wifi.ips[0]) + "." + String(espData.wifi.ips[1]) + "." + String(espData.wifi.ips[2]) + "." + String(espData.wifi.ips[3]));
-          Serial.println("GPS Source: " + String(espData.gps.externalGPS ? "Wireless" : "On-board"));
-          Serial.println("WAS Source: " + String(espData.steer.wirelessWAS ? "Wireless" : "Wired"));
-          Serial.println("Use ADS: " + String(espData.steer.useADS ? "Yes" : "No"));
-          Serial.println("LED Brightness: " + String(espData.program.ledBrht));
-          Serial.println("PID Kp: " + String(espData.steer.gainP));
-          Serial.println("====================");
-          
-        } else if (inputBuffer.length() > 0) {
-          Serial.println("Unknown command: " + inputBuffer);
-          Serial.println("Type 'help' for available commands");
-        }
-        
-        inputBuffer = "";
-        Serial.print("> "); // Command prompt
-      }
-    } else if (c >= 32 && c <= 126) { // Printable characters only
-      inputBuffer += c;
-      Serial.print(c); // Echo character
-    }
-  }
-}
-
-void debugPrint(){
-  Serial.print("Timestamp: ");
-  Serial.println(millis());
-  Serial.print("\tprogName: ");
-  Serial.print(String(NAME));
-  Serial.print("\tprogState: ");
-  Serial.print(espData.program.state);
-  Serial.print("\tconfRes: ");
-  Serial.print(espData.program.confRes);
-  Serial.print("\twifiRes: ");
-  Serial.print(espData.wifi.state);
-  Serial.print("\tgpsFix: ");
-  Serial.print(espData.gps.fixQualityInt);
-  Serial.print("\tip: ");
-  Serial.print(espData.wifi.ips[0]);
-  Serial.print(".");
-  Serial.print(espData.wifi.ips[1]);
-  Serial.print(".");
-  Serial.print(espData.wifi.ips[2]);
-  Serial.print(".");
-  Serial.print(espData.wifi.ips[3]);
-  Serial.println();
-
-  
-  // Serial.printf(" gpsAge: %lu", espConfig.gpsData.);
-  
-  // Serial.println(twoWire.requestFrom(0x22, 0x01));
-  // Serial.printf("Mag x: %.2f mT, y: %.2f mT, z: %.2f mT, Temp: %.2f °C\n", espConfig.magData.x, espConfig.magData.y, espConfig.magData.z, (espConfig.magData.t*1.8)+32);
-  // Serial.println();
-  // Serial.println(espConfig.progCfg.name);
-  // Serial.println();
-}
-
+/**
+ * @brief Main Arduino loop function - continuous system operation
+ * 
+ * @details This function runs continuously after setup() completes and provides:
+ *          - Serial command processing for runtime system control
+ *          - Periodic debug output for system monitoring (every 5 seconds)
+ *          - System health monitoring and status updates
+ * 
+ *          The loop maintains system responsiveness while providing regular
+ *          status feedback through the serial interface. All real-time operations
+ *          and hardware interfaces are managed through interrupt handlers and
+ *          background tasks.
+ * 
+ * @note Called continuously by Arduino framework - keep execution time minimal
+ * @see setup(), handleSerialCommands(), debugPrint()
+ */
 void loop(){
   
   // Handle serial commands
@@ -1280,3 +1489,4 @@ void loop(){
   
   delay(5000);
 }
+#pragma endregion
