@@ -22,7 +22,7 @@ void WAS::loop(){
     #ifndef WAS_DEBUG
 
     if(espData->steer.wirelessWAS){
-
+        vTaskDelay(1000);
     } else {
         if (espData->steer.useADS == 1){
             espData->steer.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
