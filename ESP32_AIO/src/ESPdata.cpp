@@ -178,7 +178,7 @@ uint8_t ESPdata::loadConfig(){
     String configName = preferences.getString("name", "ESP32_AIO");
     
     
-    
+    program.ledBrht = preferences.getUChar("ledBrightness", 128);
     // Load PID values
     steer.pidInputFilt = preferences.getFloat("pidInputFilt", 0.1);
     steer.pidOutputFilt = preferences.getFloat("pidOutputFilt", 0.1);
@@ -264,7 +264,7 @@ uint8_t ESPdata::saveConfig(){
     preferences.putUChar("ip1", wifi.ips[1]);
     preferences.putUChar("ip2", wifi.ips[2]);
     preferences.putUChar("ip3", wifi.ips[3]);
-
+    preferences.putUChar("ledBrightness", program.ledBrht);
     preferences.putFloat("wasZero", steer.wasZeroAngle);
     preferences.putString("name", program.name);
 
