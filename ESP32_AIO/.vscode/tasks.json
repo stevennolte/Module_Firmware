@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build ESP32-AIO",
+			"type": "shell",
+			"command": "platformio",
+			"args": [
+				"run"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build ESP32-AIO Fix",
+			"type": "shell",
+			"command": "platformio",
+			"args": [
+				"run"
+			],
+			"group": "build"
+		}
+	]
+}

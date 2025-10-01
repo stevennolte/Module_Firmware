@@ -1,15 +1,63 @@
+/**
+ * @file ESPsteer.cpp
+ * @brief Implementation of precision steering control system
+ * 
+ * @details This file implements the ESPsteer class which provides comprehensive
+ *          steering control for precision agriculture applications including:
+ *          - PID-based closed-loop steering control with auto-tuning
+ *          - Real-time wheel angle feedback processing
+ *          - Motor driver control with current monitoring
+ *          - Multi-threaded operation for real-time performance
+ *          - Safety systems and emergency override functionality
+ *          - Configurable steering parameters and calibration
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see ESPsteer.h for class interface definition
+ * @see MotorDriver.h for motor control functionality
+ * @see WAS.h for wheel angle sensor interface
+ */
+
 #include "ESPsteer.h"
 
 // #define PRINT_PID_DEBUG
 
 //TODO: SET STEER ANGLE, IMU DATA, ETC DURING TIMEOUT
 
+/**
+ * @brief Constructor for steering control system
+ * 
+ * @param vars Pointer to ESPdata singleton for configuration and data storage
+ * @param ads Pointer to ADS1115 ADC for analog sensor readings
+ * 
+ * @details Initializes steering control system with motor driver, wheel angle sensor,
+ *          PID controller, and MCP manager integration. Sets up the complete steering
+ *          control architecture for precision guidance applications.
+ */
 ESPsteer::ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads) 
     : motorDriver(vars), was(vars, ads), pid(-1.0,1.0, TuningMethod::Manual), mcpManager(MCPManager::getInstance()) {
     espData = vars;
     this->ads = ads;
 }
 
+/**
+ * @brief Main steering control loop running in dedicated FreeRTOS task
+ * 
+ * @details Continuously processes steering control operations including:
+ *          - Configuration updates and PID parameter adjustments
+ *          - Wheel angle sensor data processing
+ *          - Motor current monitoring for load detection
+ *          - Test state monitoring for manual override
+ *          - Steering control mode selection (test vs automatic)
+ *          - Real-time steering command processing
+ * 
+ *          Runs in a dedicated task with 3ms cycle time for responsive control.
+ * 
+ * @note This function runs indefinitely in a FreeRTOS task context
+ * @see steerLoop(), steerTestLoop(), taskHandler()
+ */
 void ESPsteer::continuousLoop() {
     while (true) {
         vTaskDelay(3);

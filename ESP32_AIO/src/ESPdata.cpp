@@ -126,6 +126,24 @@ bool ESPdata::setADSstate(uint8_t state){
     return true;
 }
 
+/**
+ * @brief Loads system configuration from NVS storage and initializes runtime data
+ *
+ * @return uint8_t Status code (1=success, 0=failure)
+ *
+ * @details Loads all persistent configuration parameters from NVS (Non-Volatile Storage)
+ *          including network settings, steering calibration, PID gains, and boot state.
+ *          Initializes RTC memory for power cycle detection and increments boot counter.
+ *          Prints the loaded configuration to the serial monitor for diagnostics.
+ *
+ *          - Loads WiFi IP address and mode
+ *          - Loads steering system calibration and PID parameters
+ *          - Loads GPS and OTA server configuration
+ *          - Handles RTC memory for power cycle and boot count tracking
+ *
+ * @note This function must be called before using any configuration-dependent features.
+ * @see saveConfig(), initRTCData(), ESPdata.h
+ */
 uint8_t ESPdata::loadConfig(){
     // Set default IP if not found in preferences
     if (!preferences.begin("agopen", false)) { // "agopen" namespace, read-write mode

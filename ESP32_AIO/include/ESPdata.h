@@ -398,56 +398,64 @@ public:
         uint16_t maxCmd;            ///< @brief Maximum motor command value
         float minScalar;            ///< @brief Minimum scaling factor
         float maxScalar;            ///< @brief Maximum scaling factor
-            uint32_t lastWAStime;
-            uint32_t watchdog;
-            float pidCmd;
-            uint8_t byte1;
-            uint8_t byte2;
-            uint8_t byte3;
-            uint8_t byte4;
-            float absAngle;
-            uint8_t settingsUpdated;
-            uint8_t gainP = 1;
-            uint8_t highPWM;
-            uint8_t lowPWM;
-            uint8_t minPWM;
-            uint8_t countsPerDeg;
-            uint16_t steerOffset;
-            uint8_t ackermanFix;
-            uint8_t set0;
-            uint8_t pulseCount;
-            uint8_t minSpeed;
-            uint8_t set1;
-            uint16_t steerMsgRate = 100;
-            float pidInputFilt;
-            float pidOutputFilt;
-            uint8_t useADS;
-            bool wirelessWAS;
-            float wasZeroAngle;
-        } steer;
+        uint32_t lastWAStime;       ///< @brief Timestamp of last wheel angle sensor reading
+        uint32_t watchdog;          ///< @brief Steering system watchdog timer
+        float pidCmd;               ///< @brief PID controller command value
+        uint8_t byte1;              ///< @brief Steering data byte 1 (protocol specific)
+        uint8_t byte2;              ///< @brief Steering data byte 2 (protocol specific)
+        uint8_t byte3;              ///< @brief Steering data byte 3 (protocol specific)
+        uint8_t byte4;              ///< @brief Steering data byte 4 (protocol specific)
+        float absAngle;             ///< @brief Absolute steering angle (degrees)
+        uint8_t settingsUpdated;    ///< @brief Flag indicating steering settings have been updated
+        uint8_t gainP = 1;          ///< @brief PID proportional gain value
+        uint8_t highPWM;            ///< @brief High-speed PWM limit for motor control
+        uint8_t lowPWM;             ///< @brief Low-speed PWM limit for motor control
+        uint8_t minPWM;             ///< @brief Minimum PWM threshold for motor activation
+        uint8_t countsPerDeg;       ///< @brief Sensor counts per degree of steering angle
+        uint16_t steerOffset;       ///< @brief Steering angle offset calibration value
+        uint8_t ackermanFix;        ///< @brief Ackerman steering geometry correction factor
+        uint8_t set0;               ///< @brief Configuration setting 0 (multipurpose)
+        uint8_t pulseCount;         ///< @brief Pulse counter for encoder-based sensors
+        uint8_t minSpeed;           ///< @brief Minimum vehicle speed for steering activation
+        uint8_t set1;               ///< @brief Configuration setting 1 (multipurpose)
+        uint16_t steerMsgRate = 100; ///< @brief Steering message update rate (milliseconds)
+        float pidInputFilt;         ///< @brief PID input filter coefficient (0.0-1.0)
+        float pidOutputFilt;        ///< @brief PID output filter coefficient (0.0-1.0)
+        uint8_t useADS;             ///< @brief Flag to use ADS1115 ADC for analog sensors
+        bool wirelessWAS;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
+        float wasZeroAngle;         ///< @brief Wheel angle sensor zero calibration value
+    } steer;
 
-        struct CAN {
-            uint8_t txPin;
-            uint8_t rxPin;
-            uint16_t baudRate;
-        } can;
+    /**
+     * @brief CAN bus communication configuration
+     * @details Future expansion for CAN bus integration with agricultural implements
+     */
+    struct CAN {
+        uint8_t txPin;              ///< @brief CAN transmit pin assignment
+        uint8_t rxPin;              ///< @brief CAN receive pin assignment
+        uint16_t baudRate;          ///< @brief CAN bus communication baud rate
+    } can;
    
-       
-        struct Joystick {
-            uint8_t state;
-            bool joyStickActive = false;
-            uint32_t lastMsgRecieved;
-            uint8_t switchStates[8];
-        } joystick;
-        
-        struct Switch {
-            bool steerSwitch;
-            bool workSwitch;
-            uint32_t workSwitchLastTime;
-
-        } switches;
-
-
+    /**
+     * @brief Joystick control interface data structure
+     * @details Future expansion for joystick/gamepad control integration
+     */
+    struct Joystick {
+        uint8_t state;              ///< @brief Joystick connection state
+        bool joyStickActive = false; ///< @brief Joystick active flag
+        uint32_t lastMsgRecieved;   ///< @brief Timestamp of last joystick message (note: keeping original spelling for compatibility)
+        uint8_t switchStates[8];    ///< @brief Array of joystick switch states
+    } joystick;
+    
+    /**
+     * @brief Physical switch input monitoring
+     * @details Tracks state of physical switches for manual control override
+     */
+    struct Switch {
+        bool steerSwitch;           ///< @brief Steering engage/disengage switch state
+        bool workSwitch;            ///< @brief Work/implement control switch state
+        uint32_t workSwitchLastTime; ///< @brief Last work switch activation timestamp (for debouncing)
+    } switches;
 };
 
 #endif

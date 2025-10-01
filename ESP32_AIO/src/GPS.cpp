@@ -1,8 +1,44 @@
+/**
+ * @file GPS.cpp
+ * @brief Implementation of GPS receiver and IMU sensor management system
+ * 
+ * @details This file implements the ESPGPS class which provides comprehensive
+ *          navigation and positioning functionality for precision agriculture.
+ *          Integrates GPS receiver, IMU sensor, and NTRIP correction data handling
+ *          for centimeter-level positioning accuracy.
+ *          
+ *          Key features implemented:
+ *          - NMEA sentence parsing for GPS data extraction
+ *          - IMU sensor integration for heading and attitude
+ *          - Position quality monitoring and status indication
+ *          - NTRIP client for differential correction data
+ *          - Multi-constellation GNSS support
+ *          - Real-time position and navigation data processing
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see GPS.h for class interface definition
+ * @see ESPudp.h for NTRIP client functionality
+ */
+
 #include "GPS.h"
 
+/// @brief Static singleton instance pointer for GPS management
 ESPGPS* ESPGPS::instance = nullptr;
 
-// New constructor using MCPManager singleton (no MCP pointer needed)
+/**
+ * @brief Constructor for GPS and IMU management system
+ * 
+ * @param vars Pointer to ESPdata singleton for configuration and data storage
+ * @param gpsSerial Pointer to hardware serial port for GPS communication
+ * @param bnoSerial Pointer to hardware serial port for BNO055 IMU communication
+ * 
+ * @details Initializes GPS receiver and IMU interfaces using singleton pattern.
+ *          Sets up serial communication ports and configures status indicator pins.
+ *          Links to central data management system for configuration access.
+ */
 ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSerial) 
     : parser(), rvc(), myGNSS(), mcpManager(MCPManager::getInstance()) {
     espData = vars;
@@ -14,8 +50,24 @@ ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSeri
     instance = this;
 }
 
-
-
+/**
+ * @brief NMEA GGA sentence handler for GPS position data
+ * 
+ * @details Parses NMEA GGA (Global Positioning System Fix Data) sentences to extract:
+ *          - Fix time (UTC)
+ *          - Latitude and longitude coordinates
+ *          - Fix quality indicator
+ *          - Number of satellites in use
+ *          - Horizontal dilution of precision (HDOP)
+ *          - Altitude above mean sea level
+ *          - Age of differential GPS corrections
+ * 
+ *          Updates the GPS data structure with parsed values for use by
+ *          navigation and guidance systems.
+ * 
+ * @note Called automatically by NMEA parser when GGA sentence is received
+ * @see VTG_Handler(), parser.h
+ */
 void ESPGPS::GGA_Handler() //Rec'd GGA
 {
     // fix time
@@ -90,7 +142,7 @@ void ESPGPS::init(ESPudp* espUdp){
         espData->gps.imuState = 2;
         Serial.println("RVC Start Failed");
     }
-    if (!espData.gps.externalGPS){
+    if (!espData->gps.externalGPS){
         Serial.println("Trying to start UM980");
         uint8_t gpsTryCnt = 0;
         while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 2){

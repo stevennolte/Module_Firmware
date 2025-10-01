@@ -1,12 +1,48 @@
+/**
+ * @file MCPManager.cpp
+ * @brief Implementation of MCP23017 I/O expander management with LED control
+ * 
+ * @details This file implements the MCPManager singleton class that provides
+ *          comprehensive management of the MCP23017 16-bit I/O expander including:
+ *          - Thread-safe singleton pattern for system-wide access
+ *          - GPIO pin configuration and real-time control
+ *          - Advanced LED state management with multiple animation patterns
+ *          - Input monitoring for switches and sensor feedback
+ *          - Status indication system for operational states
+ *          - Multi-threaded LED animation processing
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see MCPManager.h for class interface definition
+ * @see ESPdata.h for pin assignments and configuration
+ */
+
 #include "MCPManager.h"
 
-// Static member initialization
+/// @brief Static singleton instance pointer
 MCPManager* MCPManager::instance = nullptr;
 
+/**
+ * @brief Default constructor for MCPManager singleton
+ * 
+ * @details Initializes the MCP manager with default values. The actual
+ *          hardware initialization occurs in the begin() method.
+ */
 MCPManager::MCPManager() : initialized(false), espData(nullptr) {
     // Constructor initializes with default values
 }
 
+/**
+ * @brief Gets the singleton instance using thread-safe lazy initialization
+ * 
+ * @return MCPManager& Reference to the unique MCPManager instance
+ * 
+ * @details Creates the singleton instance on first call and returns the same
+ *          instance on subsequent calls. Thread-safe implementation ensures
+ *          only one instance exists in multi-threaded environments.
+ */
 MCPManager& MCPManager::getInstance() {
     if (instance == nullptr) {
         instance = new MCPManager();
@@ -14,6 +50,12 @@ MCPManager& MCPManager::getInstance() {
     return *instance;
 }
 
+/**
+ * @brief Destroys the singleton instance and cleans up resources
+ * 
+ * @details Properly deallocates the singleton instance. Should be called
+ *          during system shutdown for clean resource management.
+ */
 void MCPManager::destroyInstance() {
     if (instance != nullptr) {
         delete instance;
@@ -21,7 +63,21 @@ void MCPManager::destroyInstance() {
     }
 }
 
-
+/**
+ * @brief Initializes the MCP23017 I/O expander hardware
+ * 
+ * @param espDataPtr Pointer to ESPdata singleton for configuration access
+ * @param address I2C address of the MCP23017 (default 0x20)
+ * @param wire Pointer to TwoWire I2C interface (default &Wire)
+ * @return true if initialization successful, false otherwise
+ * 
+ * @details Configures the MCP23017 chip including:
+ *          - I2C communication setup
+ *          - GPIO pin direction configuration
+ *          - Input pull-up resistor configuration
+ *          - LED indicator initialization
+ *          - Status indication setup
+ */
 bool MCPManager::begin(ESPdata* espDataPtr, uint8_t address, TwoWire* wire) {
     espData = espDataPtr;  // Store ESPdata reference
     
