@@ -1,16 +1,42 @@
+/**
+ * @file AutoTunePID.h
+ * @brief Advanced PID controller with auto-tuning capabilities
+ * 
+ * @details This header defines the AutoTunePID class which provides comprehensive
+ *          PID control functionality with automatic parameter tuning including:
+ *          - Multiple auto-tuning algorithms (Ziegler-Nichols, Cohen-Coon, etc.)
+ *          - Real-time PID parameter adjustment and optimization
+ *          - Operational mode management (Normal, Reverse, Hold, Tune)
+ *          - System identification for process characterization
+ *          - Advanced tuning methods for various control applications
+ *          - Performance monitoring and optimization metrics
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see AutoTunePID.cpp for implementation details
+ * @see ESPsteer.h for steering system integration
+ */
+
 #ifndef AUTOTUNEPID_H
 #define AUTOTUNEPID_H
 
 #include <Arduino.h>
 
-// Enumeration for different tuning methods
+/**
+ * @brief Enumeration for different PID auto-tuning methods
+ * 
+ * @details Defines various automatic tuning algorithms available for
+ *          PID parameter optimization based on system response characteristics:
+ */
 enum class TuningMethod {
-    ZieglerNichols, // Ziegler-Nichols tuning method
-    CohenCoon, // Cohen-Coon tuning method
-    IMC, // Internal Model Control tuning method
-    TyreusLuyben, // Tyreus-Luyben tuning method
-    LambdaTuning, // Lambda Tuning (CLD) method
-    Manual // Manual tuning method
+    ZieglerNichols,    ///< @brief Ziegler-Nichols tuning method - classic approach for general systems
+    CohenCoon,         ///< @brief Cohen-Coon tuning method - better for systems with delay
+    IMC,              ///< @brief Internal Model Control tuning method - robust for process control
+    TyreusLuyben,     ///< @brief Tyreus-Luyben tuning method - conservative tuning for stability
+    LambdaTuning,     ///< @brief Lambda Tuning (CLD) method - user-specified closed-loop response
+    Manual            ///< @brief Manual tuning method - user-specified parameters
 };
 
 // Backward compatibility for tuning methods
@@ -21,13 +47,18 @@ constexpr auto TyreusLuyben = TuningMethod::TyreusLuyben;
 constexpr auto LambdaTuning = TuningMethod::LambdaTuning;
 constexpr auto Manual = TuningMethod::Manual;
 
-// Enumeration for operational modes
+/**
+ * @brief Enumeration for PID operational modes
+ * 
+ * @details Defines different operational states for the PID controller
+ *          to optimize performance and resource usage:
+ */
 enum class OperationalMode {
-    Normal, // Normal PID operation
-    Reverse, // Reverse PID operation (e.g., for cooling systems)
-    Hold, // Hold the PID calculations to save resources
-    Preserve, // Preserve mode: minimal calculations, keep the system responsive
-    Tune, // Tune mode: perform auto-tuning to get Tu and Ku
+    Normal,     ///< @brief Normal PID operation - standard control mode
+    Reverse,    ///< @brief Reverse PID operation - for cooling systems or reverse-acting processes
+    Hold,       ///< @brief Hold PID calculations - pause control to save resources
+    Preserve,   ///< @brief Preserve mode - minimal calculations while keeping system responsive
+    Tune,       ///< @brief Tune mode - perform auto-tuning to determine ultimate gain and period
     Auto // Auto mode: automatically determine the best operational mode
 };
 

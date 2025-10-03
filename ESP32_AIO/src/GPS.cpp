@@ -108,7 +108,7 @@ void ESPGPS::GGA_Handler() //Rec'd GGA
         bool hasRTKFix = (quality == 4 || quality == 5);
         mcpManager.setRTKFix(hasRTKFix);  // Uses ESPdata pin definitions
     }
-
+    imuHandler();
     buildNmea();
 }
 void ESPGPS::staticGGA_Handler(){
@@ -144,19 +144,72 @@ void ESPGPS::init(ESPudp* espUdp){
     }
     if (!espData->gps.externalGPS){
         Serial.println("Trying to start UM980");
+        uint32_t gpsStart = millis();
         uint8_t gpsTryCnt = 0;
-        while (myGNSS.begin(*gpsSerial) == false && gpsTryCnt < 2){
-            gpsTryCnt++;
-            delay(250);
-            Serial.print(".");
+        bool gpsConnected = false;
+        
+        // Structure to pass parameters to GPS initialization task
+        struct GPSInitParams {
+            UM980* gnss;
+            HardwareSerial* serial;
+            volatile bool* completed;
+            volatile bool* result;
+        };
+        
+        while (gpsTryCnt < 2 && !gpsConnected){
+            Serial.print("GPS connection attempt ");
+            Serial.print(gpsTryCnt + 1);
+            Serial.print("/2: ");
             
+            // Task completion and result flags
+            volatile bool taskCompleted = false;
+            volatile bool connectionResult = false;
+            
+            // Parameters for the task
+            GPSInitParams params = {
+                &myGNSS,
+                gpsSerial,
+                &taskCompleted,
+                &connectionResult
+            };
+            
+            TaskHandle_t gpsInitTask = NULL;
+            
+            // Create GPS initialization task
+            xTaskCreate([](void* param) {
+                GPSInitParams* p = (GPSInitParams*)param;
+                *p->result = p->gnss->begin(*p->serial);
+                *p->completed = true;
+                vTaskDelete(NULL);
+            }, "GPSInit", 4096, &params, 1, &gpsInitTask);
+            
+            // Wait for completion or timeout (2 seconds)
+            uint32_t attemptStart = millis();
+            while (!taskCompleted && (millis() - attemptStart < 2000)) {
+                delay(100);
+                Serial.print(".");
+            }
+            
+            if (taskCompleted && connectionResult) {
+                Serial.println(" Connected!");
+                gpsConnected = true;
+            } else {
+                Serial.println(" Timeout");
+                if (gpsInitTask != NULL) {
+                    vTaskDelete(gpsInitTask); // Force delete the task if it's still running
+                }
+                gpsTryCnt++;
+            }
         }
         Serial.println();
-        if (!myGNSS.isConnected()) //Give the serial port over to the library
+        if (!gpsConnected) //Give the serial port over to the library
         {
             espData->gps.state = 2;
             Serial.println("UM980 failed to respond. Check ports and baud rates.");
-            
+            uint32_t gpsEnd = millis();
+            Serial.print("GPS initialization time: ");
+            Serial.print(gpsEnd - gpsStart);
+            Serial.println(" ms");
         } else {
             espData->gps.state = 1;
             Serial.println("UM980 detected!");
@@ -170,11 +223,13 @@ void ESPGPS::init(ESPudp* espUdp){
             // myGNSS.
             myGNSS.saveConfiguration();
         }
-    
+        Serial.print("Time to start gps: ");
+        Serial.print(millis() - gpsStart);
+        Serial.println(" ms");
         xTaskCreatePinnedToCore(taskHandler, "taskHandler", 10000, this, 1, NULL, 0);
     }
-    
-    delay(1000);
+    Serial.println("GPS initialization complete");
+    // delay(1000);
     
 }
 
@@ -309,4 +364,41 @@ void ESPGPS::setGPSIndicators(bool hasGPSFix, bool hasRTKFix) {
     }
 }
 
+/**
+ * @brief Handles IMU (Inertial Measurement Unit) data processing
+ * 
+ * This function reads orientation data from the BNO08x sensor when the IMU is active.
+ * It retrieves yaw, pitch, and roll values, converts them to integer representation
+ * by multiplying by 100, and stores them as strings in the GPS data structure.
+ * 
+ * @details The function only processes data when espData->gps.imuState is 1 (active).
+ *          All orientation values are scaled by 100 and converted to string format
+ *          for storage in the corresponding IMU data fields.
+ * 
+ * @note If the RVC sensor read operation fails, the function returns early without
+ *       updating any IMU data fields.
+ */
+void ESPGPS::imuHandler(){
+    if (espData->gps.imuState == 1){
+        BNO08x_RVC_Data heading;
+        if (!rvc.read(&heading)) {
+            return;
+        }
+        int16_t temp = 0;
+        temp = heading.yaw * 100;
+        itoa(temp, espData->gps.imuHeading, 10);
+        temp = heading.pitch * 100;
+        itoa(temp, espData->gps.imuPitch, 10);
+        temp = heading.roll * 100;
+        itoa(temp, espData->gps.imuRoll, 10);
+       
+
+    } else {
+        // IMU not active, do nothing
+        itoa(9999, espData->gps.imuHeading, 10);
+        itoa(9999, espData->gps.imuPitch, 10);
+        itoa(9999, espData->gps.imuRoll, 10);
+        return;
+    }
+}
 

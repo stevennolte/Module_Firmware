@@ -57,7 +57,7 @@ void MyLED::startTask() {
   xTaskCreate(
         taskHandler,   // Task function
         "TaskA",       // Name of the task
-        4096,          // Stack size (in words)
+        8192,          // Stack size (in words) - Increased from 4096 for stability
         this,          // Pass the current instance as the task parameter
         1,             // Priority of the task
         NULL           // Task handle (not needed)

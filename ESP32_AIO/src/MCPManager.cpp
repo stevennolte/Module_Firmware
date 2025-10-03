@@ -174,15 +174,15 @@ bool MCPManager::begin(ESPdata* espDataPtr, uint8_t address, TwoWire* wire) {
         ledSteerActive.currentState = false;
         ledSteerActive.flashCount = 0;
         
-        // Start LED update task
-        xTaskCreate(
-            ledUpdateTask,      // Task function
-            "LED_Update",       // Task name
-            2048,              // Stack size
-            this,              // Task parameter (this instance)
-            1,                 // Priority
-            &ledTaskHandle     // Task handle
-        );
+        // Start LED update task - DISABLED: Conflicts with myLED task
+        // xTaskCreate(
+        //     ledUpdateTask,      // Task function
+        //     "LED_Update",       // Task name
+        //     2048,              // Stack size
+        //     this,              // Task parameter (this instance)
+        //     1,                 // Priority
+        //     &ledTaskHandle     // Task handle
+        // );
         
         return true;
     } else {
@@ -357,6 +357,7 @@ void MCPManager::setupMotorPins() {
         Serial.println("MCPManager: Warning - ESPdata not available");
         return;
     }
+    Serial.println("MCPManager: Setting up motor pins using ESPdata definitions");
     setupMotorPins(espData->mcpPins.outputs.motor_ena, espData->mcpPins.outputs.motor_enb);
 }
 

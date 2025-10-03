@@ -15,7 +15,7 @@ WAS::WAS(ESPdata* vars, Adafruit_ADS1115* ads) {
 
 void WAS::init() {
     Serial.println("\t\tInitializing WAS");
-    
+    return;
 }
 
 void WAS::loop(){

@@ -99,6 +99,7 @@ class ESPGPS{
         // static void errorHandler();
         void GGA_Handler();
         void displayInfo();
+        void imuHandler();
         
         // MCPManager helper methods
         void updateGPSIndicators();

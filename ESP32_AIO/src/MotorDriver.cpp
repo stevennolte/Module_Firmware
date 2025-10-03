@@ -1,3 +1,20 @@
+/**
+ * @file MotorDriver.cpp
+ * @brief Implementation of motor driver control for steering system actuator
+ * 
+ * @details This file implements the MotorDriver class functionality for
+ *          controlling the steering motor including PWM speed control,
+ *          direction switching, and safety management using ESP32 LEDC
+ *          peripheral and MCP23017 I/O expander.
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see MotorDriver.h for class interface definition
+ * @see MCPManager.h for I/O control integration
+ */
+
 /* NOTES:
     ledc_get_duty(mode, channel)
     ledc_set_duty(mode, channel, cmd)
@@ -10,6 +27,14 @@
 #include "MotorDriver.h"
 #include "driver/ledc.h"
 
+/**
+ * @brief Constructor for motor driver control system
+ * 
+ * @param vars Pointer to ESPdata singleton for configuration access
+ * 
+ * @details Initializes motor driver with pin assignments from configuration
+ *          and establishes connection to MCP23017 I/O expander for control signals.
+ */
 MotorDriver::MotorDriver(ESPdata* vars) : mcpManager(MCPManager::getInstance()) {
     espData = vars;
     
@@ -20,8 +45,13 @@ MotorDriver::MotorDriver(ESPdata* vars) : mcpManager(MCPManager::getInstance()) 
     enbPin = espData->pins.ENB;
 }
 
-
-
+/**
+ * @brief Initialize motor driver hardware and PWM system
+ * 
+ * @details Configures ESP32 LEDC peripheral for PWM generation and
+ *          sets up MCP23017 pins for motor direction and enable control.
+ *          Initializes motor in disabled state for safety.
+ */
 void MotorDriver::init(){
     Serial.println("setting ledc");
     ledc_timer_config_t ledc_timer = {
@@ -50,7 +80,7 @@ void MotorDriver::init(){
     pinMode(inaPin, OUTPUT);
     pinMode(inbPin, OUTPUT);
     // pinMode(pwmPin, OUTPUT);
-    
+    Serial.println("Setting up motor pins on MCP");
     if (espData->program.mcpState == 1 && mcpManager.isInitialized()){
         mcpManager.setupMotorPins();  // Uses ESPdata pin definitions automatically
         Serial.println("MotorDriver: Motor pins configured using MCPManager");
@@ -63,7 +93,7 @@ void MotorDriver::init(){
     digitalWrite(inaPin, LOW);
     digitalWrite(inbPin, LOW);
     digitalWrite(pwmPin, LOW);
-    
+    return;
 }
 
 
@@ -91,7 +121,6 @@ void MotorDriver::setOutput(float value){
         value = 0;
         dirCmd = 0;
     }
-    
     
     // Scale value to range [minCMD, maxCMD]
     uint16_t scaledValue = espData->steer.minCmd + value * (espData->steer.maxCmd - espData->steer.minCmd);

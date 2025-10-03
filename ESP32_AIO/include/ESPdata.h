@@ -379,51 +379,51 @@ public:
      *          wheel angle sensing, motor control, and safety monitoring
      */
     struct Steer {
-        bool steerSwitch;           ///< @brief Steering engage switch state (true=engaged)
-        uint32_t steerSwitchLastTime; ///< @brief Last steering switch activation timestamp
-        uint16_t speed;             ///< @brief Vehicle ground speed for speed-dependent control
-        uint8_t status;             ///< @brief Steering system status code
-        float targetSteerAngle;     ///< @brief Target steering angle from guidance system (degrees)
-        uint8_t xte;                ///< @brief Cross-track error magnitude
-        float actSteerAngle;        ///< @brief Actual measured steering angle (degrees)
-        uint8_t switchState;        ///< @brief Physical switch state reading
-        uint8_t pwmDisplay;         ///< @brief PWM value for display purposes
-        uint16_t pwmCmd;            ///< @brief Current PWM command to motor driver
-        uint8_t testState;          ///< @brief Steering test mode state
-        uint32_t lastSteerOutMsgTime; ///< @brief Timestamp of last steering output message
-        uint32_t steerCurrent;      ///< @brief Motor current consumption measurement
-        float pidOutput;            ///< @brief PID controller output value
-        float pidInput;             ///< @brief PID controller input value (angle error)
-        uint16_t minCmd;            ///< @brief Minimum motor command value
-        uint16_t maxCmd;            ///< @brief Maximum motor command value
-        float minScalar;            ///< @brief Minimum scaling factor
-        float maxScalar;            ///< @brief Maximum scaling factor
-        uint32_t lastWAStime;       ///< @brief Timestamp of last wheel angle sensor reading
-        uint32_t watchdog;          ///< @brief Steering system watchdog timer
-        float pidCmd;               ///< @brief PID controller command value
-        uint8_t byte1;              ///< @brief Steering data byte 1 (protocol specific)
-        uint8_t byte2;              ///< @brief Steering data byte 2 (protocol specific)
-        uint8_t byte3;              ///< @brief Steering data byte 3 (protocol specific)
-        uint8_t byte4;              ///< @brief Steering data byte 4 (protocol specific)
-        float absAngle;             ///< @brief Absolute steering angle (degrees)
-        uint8_t settingsUpdated;    ///< @brief Flag indicating steering settings have been updated
+        bool steerSwitch = false;           ///< @brief Steering engage switch state (true=engaged)
+        uint32_t steerSwitchLastTime = 0; ///< @brief Last steering switch activation timestamp
+        uint16_t speed = 0;             ///< @brief Vehicle ground speed for speed-dependent control
+        uint8_t status = 0;             ///< @brief Steering system status code
+        float targetSteerAngle = 0.0;     ///< @brief Target steering angle from guidance system (degrees)
+        uint8_t xte = 0;                ///< @brief Cross-track error magnitude
+        float actSteerAngle = 0.0;        ///< @brief Actual measured steering angle (degrees)
+        uint8_t switchState = 0;        ///< @brief Physical switch state reading
+        uint8_t pwmDisplay = 0;         ///< @brief PWM value for display purposes
+        uint16_t pwmCmd = 0;            ///< @brief Current PWM command to motor driver
+        uint8_t testState = 0;          ///< @brief Steering test mode state
+        uint32_t lastSteerOutMsgTime = 0; ///< @brief Timestamp of last steering output message
+        uint32_t steerCurrent = 0;      ///< @brief Motor current consumption measurement
+        float pidOutput = 0.0;            ///< @brief PID controller output value
+        float pidInput = 0.0;             ///< @brief PID controller input value (angle error)
+        uint16_t minCmd = 0;            ///< @brief Minimum motor command value
+        uint16_t maxCmd = 0;            ///< @brief Maximum motor command value
+        float minScalar = 0.0;            ///< @brief Minimum scaling factor
+        float maxScalar = 0.0;            ///< @brief Maximum scaling factor
+        uint32_t lastWAStime = 0;       ///< @brief Timestamp of last wheel angle sensor reading
+        uint32_t watchdog = 0;          ///< @brief Steering system watchdog timer
+        float pidCmd = 0.0;               ///< @brief PID controller command value
+        uint8_t byte1 = 0;              ///< @brief Steering data byte 1 (protocol specific)
+        uint8_t byte2 = 0;              ///< @brief Steering data byte 2 (protocol specific)
+        uint8_t byte3 = 0;              ///< @brief Steering data byte 3 (protocol specific)
+        uint8_t byte4 = 0;              ///< @brief Steering data byte 4 (protocol specific)
+        float absAngle = 0.0;             ///< @brief Absolute steering angle (degrees)
+        uint8_t settingsUpdated = 0;    ///< @brief Flag indicating steering settings have been updated
         uint8_t gainP = 1;          ///< @brief PID proportional gain value
-        uint8_t highPWM;            ///< @brief High-speed PWM limit for motor control
-        uint8_t lowPWM;             ///< @brief Low-speed PWM limit for motor control
-        uint8_t minPWM;             ///< @brief Minimum PWM threshold for motor activation
-        uint8_t countsPerDeg;       ///< @brief Sensor counts per degree of steering angle
-        uint16_t steerOffset;       ///< @brief Steering angle offset calibration value
-        uint8_t ackermanFix;        ///< @brief Ackerman steering geometry correction factor
-        uint8_t set0;               ///< @brief Configuration setting 0 (multipurpose)
-        uint8_t pulseCount;         ///< @brief Pulse counter for encoder-based sensors
-        uint8_t minSpeed;           ///< @brief Minimum vehicle speed for steering activation
-        uint8_t set1;               ///< @brief Configuration setting 1 (multipurpose)
+        uint8_t highPWM = 255;      ///< @brief High-speed PWM limit for motor control
+        uint8_t lowPWM = 0;         ///< @brief Low-speed PWM limit for motor control
+        uint8_t minPWM = 0;             ///< @brief Minimum PWM threshold for motor activation
+        uint8_t countsPerDeg = 0;       ///< @brief Sensor counts per degree of steering angle
+        uint16_t steerOffset = 0;       ///< @brief Steering angle offset calibration value
+        uint8_t ackermanFix = 0;        ///< @brief Ackerman steering geometry correction factor
+        uint8_t set0 = 0;               ///< @brief Configuration setting 0 (multipurpose)
+        uint8_t pulseCount = 0;         ///< @brief Pulse counter for encoder-based sensors
+        uint8_t minSpeed = 0;           ///< @brief Minimum vehicle speed for steering activation
+        uint8_t set1 = 0;               ///< @brief Configuration setting 1 (multipurpose)
         uint16_t steerMsgRate = 100; ///< @brief Steering message update rate (milliseconds)
-        float pidInputFilt;         ///< @brief PID input filter coefficient (0.0-1.0)
-        float pidOutputFilt;        ///< @brief PID output filter coefficient (0.0-1.0)
-        uint8_t useADS;             ///< @brief Flag to use ADS1115 ADC for analog sensors
-        bool wirelessWAS;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
-        float wasZeroAngle;         ///< @brief Wheel angle sensor zero calibration value
+        float pidInputFilt = 0.0;         ///< @brief PID input filter coefficient (0.0-1.0)
+        float pidOutputFilt = 0.0;        ///< @brief PID output filter coefficient (0.0-1.0)
+        uint8_t useADS = 0;             ///< @brief Flag to use ADS1115 ADC for analog sensors
+        bool wirelessWAS = false;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
+        float wasZeroAngle = 0.0;         ///< @brief Wheel angle sensor zero calibration value
     } steer;
 
     /**

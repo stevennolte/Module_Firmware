@@ -38,7 +38,7 @@
 #include "ESP32OTAPull.h"
 #include "ESPsteer.h"
 #include <ESPAsyncWebServer.h>
-#include "littlefs.h"
+#include <LittleFS.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
 #include "esp_system.h"
@@ -1115,11 +1115,26 @@ void recoveryBoot() {
   // mcpManager.setAllLEDs(MCPLEDState::ERROR_FLASH);
   
   // Initialize LittleFS for file operations
+  Serial.println("Initializing LittleFS...");
   if (!LittleFS.begin(true)) {
-    Serial.println("LittleFS Mount Failed - Formatting...");
-    LittleFS.format();
-    LittleFS.begin();
+    Serial.println("LittleFS Mount Failed - Attempting to format...");
+    // if (LittleFS.format()) {
+    //   Serial.println("LittleFS Format successful");
+    //   if (LittleFS.begin(true)) {
+    //     Serial.println("LittleFS Mount successful after format");
+    //   } else {
+    //     Serial.println("ERROR: LittleFS Mount failed even after format!");
+    //   }
+    // } else {
+      // Serial.println("ERROR: LittleFS Format failed!");
+    // }
+  } else {
+    Serial.println("LittleFS Mount successful");
   }
+  
+  // Verify file system is working
+  Serial.printf("LittleFS Total: %u bytes\n", LittleFS.totalBytes());
+  Serial.printf("LittleFS Used: %u bytes\n", LittleFS.usedBytes());
   
   // Setup WiFi AP for recovery access
   String recoverySSID = String(NAME) + "_RECOVERY";
@@ -1289,7 +1304,7 @@ void normalboot(){
   // Normal boot sequence
   /** @brief Normal boot sequence */
   Serial.println("Normal Boot Sequence Initiated");
-
+  LittleFS.begin(); // Ensure LittleFS is mounted
   espData.setState(2);
   
   // Start other Serial Ports
@@ -1323,10 +1338,10 @@ void normalboot(){
   // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):
  
     // If everything is good, turn on power to autosteer
-  
+  Serial.println("starting wifi");
     
   uint32_t wifiStart = millis();
-  while (espData.wifi.state != 1){
+  while (WiFi.status() != WL_CONNECTED){
     espData.wifi.state = espWifi.connect();
     /** @brief Check for WiFi connection, if times out, create AP */
     if (millis()-wifiStart > 120000){
@@ -1338,11 +1353,72 @@ void normalboot(){
   }
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espData.wifi.state));
+  
+  // ADD NETWORK READINESS CHECK
+  Serial.println("=== NETWORK INITIALIZATION DEBUG ===");
+  Serial.println("WiFi Status: " + String(WiFi.status()));
+  Serial.println("WiFi Mode: " + String(WiFi.getMode()));
+  Serial.println("IP Address: " + WiFi.localIP().toString());
+  Serial.println("Gateway: " + WiFi.gatewayIP().toString());
+  Serial.println("DNS: " + WiFi.dnsIP().toString());
+  
+  // Verify WiFi is actually connected before proceeding
+  if (WiFi.status() != WL_CONNECTED || WiFi.localIP() == IPAddress(0,0,0,0)) {
+    Serial.println("ERROR: WiFi not properly connected! Attempting to fix...");
+    
+    // Try to reconnect or switch to AP mode
+    if (espData.wifi.state == 1) {
+      Serial.println("Forcing AP mode due to invalid network state");
+      espData.wifi.state = espWifi.makeAP();
+      delay(3000); // Give AP mode time to start
+    }
+    
+    // Check again after fix attempt
+    Serial.println("After fix attempt:");
+    Serial.println("WiFi Status: " + String(WiFi.status()));
+    Serial.println("WiFi Mode: " + String(WiFi.getMode()));
+    Serial.println("IP Address: " + WiFi.localIP().toString());
+  }
+  
+  // Wait for network stack to stabilize
+  Serial.println("Waiting for network stack to stabilize...");
+  delay(3000); // Increased delay for stability
+  
+  // Final verification before starting UDP
+  Serial.println("Final network check before UDP:");
+  Serial.println("WiFi Status: " + String(WiFi.status()));
+  Serial.println("IP Address: " + WiFi.localIP().toString());
+  
+  // START UDP SERVICES FIRST - before other components try to use them
+  Serial.println("=== STARTING UDP SERVICES ===");
+  espUdp.begin(&gps);  // Initialize UDP services first
+  Serial.println("=== UDP SERVICES COMPLETE ===");
+  
+  // Now start other components that depend on UDP
+  Serial.println("Starting hardware tasks...");
+  mainPower.startTask();
+
+  Serial.println("Initializing GPS...");
+  gps.init(&espUdp);  // Now UDP is ready
+  
+  Serial.println("Initializing steering...");
+  espSteer.begin(&espUdp);  // Now UDP is ready
+  
+  
+  // UDP setup
+  Serial.println("Network setup complete");
+  // delay(5000);
+  
   #pragma region Server Setup
         // Serve the main HTML page
         server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-          Serial.println("getting index file");
-          request->send(LittleFS, "/index.html");
+          Serial.println("Getting index file");
+          if (LittleFS.exists("/index.html")) {
+            request->send(LittleFS, "/index.html");
+          } else {
+            Serial.println("ERROR: index.html not found in LittleFS");
+            request->send(404, "text/plain", "index.html not found - file system may not be uploaded");
+          }
         });
         // Route to get debug variables as JSON
         server.on("/getDebugVars", HTTP_GET, handleDebugVars);
@@ -1403,15 +1479,6 @@ void normalboot(){
         server.begin();
       #pragma endregion
   
-  mainPower.startTask();
-  gps.init(&espUdp);
-  espSteer.begin(&espUdp);
-  
-
-  // UDP setup
-  espUdp.begin(&gps);
-  Serial.println("Network setup complete");
-  // delay(5000);
   espData.setState(1);
   espData.setBootCount(0);
   // Add your normal boot logic here

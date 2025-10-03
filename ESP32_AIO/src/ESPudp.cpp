@@ -1,11 +1,44 @@
+/**
+ * @file ESPudp.cpp
+ * @brief Implementation of UDP communication services for agricultural guidance
+ * 
+ * @details This file implements the ESPudp class functionality for managing
+ *          multiple UDP communication channels including AgOpen GPS protocol,
+ *          NTRIP corrections, wireless sensors, and control interfaces.
+ * 
+ * @author Steve Gavel
+ * @date 2024
+ * @version 4.6.1
+ * 
+ * @see ESPudp.h for class interface definition
+ */
+
 #include "ESPudp.h"
 #include <Update.h>
 
-
+/**
+ * @brief Constructor initializing UDP communication manager
+ * 
+ * @param vars Pointer to ESPdata singleton for configuration access
+ * 
+ * @details Initializes all UDP service objects and links to central
+ *          data management for protocol configuration and data sharing.
+ */
 ESPudp::ESPudp(ESPdata* vars) : udp(), udpNtrip(), udpGPS(), udpWAS(){
     espData = vars;
 }
 
+/**
+ * @brief Calculate checksum for AgOpen GPS protocol packets
+ * 
+ * @param data Pointer to packet data buffer
+ * @param size Total size of data buffer
+ * @return uint8_t Calculated checksum value
+ * 
+ * @details Computes XOR-based checksum for packet validation according to
+ *          AgOpen GPS protocol specifications. Checksum covers data payload
+ *          excluding header and checksum fields.
+ */
 uint8_t ESPudp::calcChecksum(uint8_t* data, size_t size){
   // Serial.print("Calculating Checksum: ");
   // Serial.println(size);  
@@ -21,9 +54,21 @@ uint8_t ESPudp::calcChecksum(uint8_t* data, size_t size){
     return checksum;
 }
 
+/**
+ * @brief Initialize all UDP communication services
+ * 
+ * @param gps Pointer to GPS manager for NMEA data integration
+ * 
+ * @details Sets up UDP listeners on configured ports and establishes
+ *          packet handlers for each service type including joystick control,
+ *          NTRIP corrections, wireless sensors, and main AgOpen GPS communication.
+ */
+
 void ESPudp::begin(ESPGPS* gps){
+    Serial.println("Starting UDP Services");
     _gps = gps;
 
+    Serial.println("Setting up Joystick UDP on port 8887");
     udpJoystick.listen(8887);
     udpJoystick.onPacket([this](AsyncUDPPacket packet) {
       if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
@@ -40,9 +85,10 @@ void ESPudp::begin(ESPGPS* gps){
             break;
         }}
     });
+    Serial.println("Joystick UDP listener setup complete");
     
 
-    Serial.println("Setting up NTRIP");
+    Serial.println("Setting up NTRIP UDP on port 2233");
     udpNtrip.listen(2233);
     udpNtrip.onPacket([this](AsyncUDPPacket packet) {
       char packetBuffer[255];
@@ -58,6 +104,9 @@ void ESPudp::begin(ESPGPS* gps){
       }
       espData->gps.lastNtripData = ntripStr;
     });
+    Serial.println("NTRIP UDP listener setup complete");
+    
+    Serial.println("Setting up WAS UDP on port 8889");
     udpWAS.listen(8889);
     udpWAS.onPacket([this](AsyncUDPPacket packet){
       if (packet.data()[0]==0x80 && packet.data()[1]==0x81){
@@ -89,8 +138,13 @@ void ESPudp::begin(ESPGPS* gps){
         }
       }
     });
+    Serial.println("WAS UDP listener setup complete");
+    
+    Serial.println("Setting up GPS UDP on port 9999");
     udpGPS.listen(9999);
-    Serial.println("Setting Up UDP");
+    Serial.println("GPS UDP listener setup complete");
+    
+    Serial.println("Setting up main UDP on port 8888");
     
     udp.listen(8888);
     udp.onPacket([this](AsyncUDPPacket packet) {
@@ -204,7 +258,9 @@ void ESPudp::begin(ESPGPS* gps){
           }
         }
     });
-    
+    Serial.println("Main UDP listener setup complete");
+    Serial.println("All UDP Services Started Successfully");
+    return;   
 }
 
 

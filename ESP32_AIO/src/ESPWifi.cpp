@@ -27,6 +27,10 @@ uint8_t ESPWifi::connect(){
                 IPAddress ip = WiFi.localIP();
                 IPAddress local_IP(ip[0],ip[1],ip[2],espData->wifi.ips[3]);
                 IPAddress gateway(ip[0],ip[1],ip[2],1);
+                espData->wifi.ips[0] = ip[0];
+                espData->wifi.ips[1] = ip[1];
+                espData->wifi.ips[2] = ip[2];
+                espData->saveConfig();
                 IPAddress subnet(255,255,255,0);
                 WiFi.config(local_IP,gateway,subnet);
                 MDNS.begin(NAME);

@@ -200,6 +200,7 @@ void ESPsteer::setPIDgains(){
 }
 
 void ESPsteer::begin(ESPudp* espUdp) {
+    Serial.println("Initializing Steering System...");
     this->espUdp = espUdp;
     pinMode(espData->pins.STEER_TEST_PIN, INPUT);
     _status = espData->steer.status;
@@ -211,6 +212,7 @@ void ESPsteer::begin(ESPudp* espUdp) {
 
     // *********Start PID Setup**********
     // pid.enableOutputFilter(espData->steerCfg.pidOutputFilt);
+    Serial.println("\tSetting PID Gains");
     setPIDgains();
     pid.setSetpoint(0); // Target setpoint
     // pid.enableInputFilter(espData->steerCfg.pidInputFilt); // Optional input filtering
