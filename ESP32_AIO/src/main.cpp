@@ -324,6 +324,7 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_
  */
 void updateDebugVars() {
   debugVars.clear(); // Clear the list to update it dynamically
+  Serial.println("Updating normal mode debug variables...");
   debugVars.push_back("Program: " + String(NAME));
   debugVars.push_back("Timestamp since boot [s]: " + String((float)(millis())/1000.0));
   debugVars.push_back("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
@@ -356,6 +357,7 @@ void updateDebugVars() {
   debugVars.push_back("..Last Ntrip Data Length: " + String(espData.gps.lastNtripDataLen));
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Steer Angle: " + String(espData.steer.targetSteerAngle));
+  debugVars.push_back("..Raw ADS Value: " + String(espData.steer.rawADS));
   debugVars.push_back("..Steer Angle: " + String(espData.steer.actSteerAngle));
   debugVars.push_back("..Absolute Angle: " + String(espData.steer.absAngle));
   debugVars.push_back("..ZeroValue: " + String(espData.steer.wasZeroAngle));
@@ -460,6 +462,7 @@ void updateRecoveryDebugVars() {
 
 // Function to serve the debug variables as JSON
 void handleDebugVars(AsyncWebServerRequest *request) {
+  Serial.println("Normal mode debug handler called");
   updateDebugVars();  // Update the debug variables just before sending
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
@@ -470,6 +473,7 @@ void handleDebugVars(AsyncWebServerRequest *request) {
   
   String jsonResponse;
   serializeJson(doc, jsonResponse);
+  Serial.println("Sending " + String(debugVars.size()) + " debug variables");
   request->send(200, "application/json", jsonResponse);
 }
 
@@ -1247,8 +1251,8 @@ void recoveryBoot() {
     ESP.restart();
   });
   
-  // Existing handlers for compatibility
-  server.on("/getDebugVars", HTTP_GET, [](AsyncWebServerRequest *request) {
+  // Recovery-specific debug endpoint to avoid conflicts with normal mode
+  server.on("/getRecoveryDebug", HTTP_GET, [](AsyncWebServerRequest *request) {
     updateRecoveryDebugVars();
     JsonDocument doc;
     JsonArray array = doc.to<JsonArray>();

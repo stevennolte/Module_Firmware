@@ -25,7 +25,8 @@ void WAS::loop(){
         vTaskDelay(1000);
     } else {
         if (espData->steer.useADS == 1){
-            espData->steer.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
+            espData->steer.rawADS = ads->readADC_SingleEnded(0);
+            espData->steer.actSteerAngle = ads->computeVolts(espData->steer.rawADS);
         } else {
             espData->steer.actSteerAngle = 0.0;
         }

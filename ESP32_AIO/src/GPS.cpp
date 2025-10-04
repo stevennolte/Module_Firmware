@@ -319,6 +319,8 @@ void ESPGPS::buildNmea()
 }
 
 void ESPGPS::continuousLoop(){
+    uint32_t lastImuCall = 0; // Track last IMU handler call time
+    
     while (true){
         // myGNSS.update();
         
@@ -326,6 +328,14 @@ void ESPGPS::continuousLoop(){
             // Serial.write(gpsSerial->read());
             parser << gpsSerial->read();
         }
+        
+        // Call IMU handler every 500ms
+        uint32_t currentTime = millis();
+        if (currentTime - lastImuCall >= 500) {
+            imuHandler();
+            lastImuCall = currentTime;
+        }
+        
         vTaskDelay(10);
     }
 }

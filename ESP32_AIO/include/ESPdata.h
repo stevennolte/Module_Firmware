@@ -421,7 +421,8 @@ public:
         uint16_t steerMsgRate = 100; ///< @brief Steering message update rate (milliseconds)
         float pidInputFilt = 0.0;         ///< @brief PID input filter coefficient (0.0-1.0)
         float pidOutputFilt = 0.0;        ///< @brief PID output filter coefficient (0.0-1.0)
-        uint8_t useADS = 0;             ///< @brief Flag to use ADS1115 ADC for analog sensors
+        uint8_t useADS = 0;     
+        uint16_t rawADS = 0;        ///< @brief Raw ADS1115 ADC value for analog sensors
         bool wirelessWAS = false;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
         float wasZeroAngle = 0.0;         ///< @brief Wheel angle sensor zero calibration value
     } steer;
