@@ -30,6 +30,7 @@
 #include "ESPudp.h"
 // #include "Adafruit_MCP23X17.h"
 #include "MCPManager.h"
+#include "ADSManager.h"
 #include <Adafruit_ADS1X15.h>
 // #include "Indicators.h"
 #include "MainPower.h"
@@ -55,8 +56,8 @@ HardwareSerial bnoSerial(2);
 HardwareSerial gpsSerial(1);
 
 // Adafruit_MCP23X17 mcp;
-/// @brief ADS1115 16-bit ADC for analog sensor readings
-Adafruit_ADS1115 ads;
+/// @brief ADS1115 16-bit ADC for analog sensor readings (DEPRECATED - use adsManager instead)
+// Adafruit_ADS1115 ads;  // Replaced by centralized ADSManager to reduce I2C contention
 
 // Using singleton pattern - single access point for configuration
 /// @brief Global configuration and data storage singleton instance
@@ -69,7 +70,7 @@ ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // MCPManager accessed via single
 /// @brief LED status indicator controller with error state management
 MyLED myLED(&espData);
 /// @brief Main power control and monitoring system
-MainPower mainPower(&espData, &ads);  // MCPManager accessed via singleton inside class
+MainPower mainPower(&espData, nullptr);  // Will be migrated to use ADSManager
 /// @brief WiFi connection and AP mode manager
 ESPWifi espWifi(&espData);
 /// @brief UDP communication handler for AgOpen GPS protocol
@@ -80,7 +81,7 @@ ESP32OTAPull ota;
 AsyncWebServer server(80);
 
 /// @brief Steering control system with PID feedback and motor control
-ESPsteer espSteer(&espData, &ads);  // MCPManager accessed via singleton inside class
+ESPsteer espSteer(&espData, nullptr);  // Will be migrated to use ADSManager
 /// @brief Debug variables vector for web interface display
 std::vector<String> debugVars;
 
@@ -335,6 +336,8 @@ void updateDebugVars() {
   debugVars.push_back("Program State: " + String(espData.program.state));
   debugVars.push_back("MCP23017 State: " + String(espData.program.mcpState));
   debugVars.push_back("ADS1115 State: " + String(espData.program.adsState));
+  debugVars.push_back("ADS Manager: " + String(adsManager.isHealthy() ? "Healthy" : "Error"));
+  debugVars.push_back("ADS Reading Age: " + String(adsManager.getReadingAge()) + "ms");
   debugVars.push_back("IMU State: " + String(espData.gps.imuState));
   debugVars.push_back("External GPS: " + String(espData.gps.externalGPS ? "Enabled" : "Disabled"));
   debugVars.push_back("GPS Data: ");
@@ -390,6 +393,7 @@ void updateDebugVars() {
   debugVars.push_back("Switches: ");
   debugVars.push_back("..Steer Switch: " + String(espData.switches.steerSwitch));
   debugVars.push_back("..Work Switch: " + String(espData.switches.workSwitch));
+  debugVars.push_back("..Steer loop time [ms]: " + String(espData.steer.looptime));
 
   String sipValue = String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
@@ -1335,7 +1339,16 @@ void normalboot(){
     }
   }
   if (espData.program.adsState == 1){
-    ads.begin(0x48, &twoWire);
+    // Initialize centralized ADS Manager instead of individual ADS instances
+    if (adsManager.begin(0x48, 100)) {  // 100ms reading interval
+      Serial.println("ADSManager initialized successfully");
+      // Set optimal settings for reduced I2C load
+      adsManager.setDataRate(250);  // 250 SPS for faster readings
+      adsManager.setGain(GAIN_TWOTHIRDS);  // +/- 6.144V range
+    } else {
+      Serial.println("ADSManager initialization failed");
+      ESP.restart();
+    }
   }
   
   // Start GPS

@@ -45,11 +45,18 @@ void MainPower::continuousLoop()
     while (1)
     {
         getCurrent();
-        vTaskDelay(100 / portTICK_PERIOD_MS); // Delay for 100 milliseconds
+        vTaskDelay(200 / portTICK_PERIOD_MS); // Reduced from 100ms to 200ms to reduce I2C bus load
     }
 }
 
 void MainPower::getCurrent(){
-    // _data->power.mainCurrent = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin) * 3; // Example conversion factor, adjust as needed
-    _data->power.mainCurrentRaw = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin);
+    // Read main power current using ADS1115 (temporarily disabled until ADS migration)
+    // TODO: Migrate to use adsManager.getRawReading(_data->adsConfig.mainPowerISpin)
+    if (_ads != nullptr) {
+        // _data->power.mainCurrent = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin) * 3; // Example conversion factor, adjust as needed
+        _data->power.mainCurrentRaw = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin);
+    } else {
+        // Temporary placeholder until ADS Manager migration
+        _data->power.mainCurrentRaw = 0;
+    }
 }

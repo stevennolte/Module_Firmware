@@ -323,7 +323,7 @@ void ESPGPS::continuousLoop(){
     
     while (true){
         // myGNSS.update();
-        
+        vTaskDelay(10);
         while(gpsSerial->available()){
             // Serial.write(gpsSerial->read());
             parser << gpsSerial->read();

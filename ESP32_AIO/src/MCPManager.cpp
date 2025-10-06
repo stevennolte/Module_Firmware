@@ -449,17 +449,17 @@ void MCPManager::ledUpdateTask(void* parameter) {
         if (mcpManager->initialized) {
             mcpManager->updateLEDs();
         }
-        vTaskDelay(pdMS_TO_TICKS(50)); // Update every 50ms
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Update every 50ms
     }
 }
 
 void MCPManager::updateLEDs() {
-    updateLED(ledPowerOn);
-    updateLED(ledGPSFix);
-    updateLED(ledRTKFix);
-    updateLED(ledEthGood);
-    updateLED(ledSteerStandby);
-    updateLED(ledSteerActive);
+    // updateLED(ledPowerOn);
+    // updateLED(ledGPSFix);
+    // updateLED(ledRTKFix);
+    // updateLED(ledEthGood);
+    // updateLED(ledSteerStandby);
+    // updateLED(ledSteerActive);
 }
 
 void MCPManager::updateLED(LEDIndicator& led) {

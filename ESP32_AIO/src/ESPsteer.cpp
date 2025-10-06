@@ -60,6 +60,8 @@ ESPsteer::ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads)
  */
 void ESPsteer::continuousLoop() {
     while (true) {
+        espData->steer.looptime = millis() - espData->steer.looptimestamp;
+        espData->steer.looptimestamp = millis();
         vTaskDelay(3);
         if (espData->steer.settingsUpdated == 1){
             setPIDgains();
@@ -71,7 +73,7 @@ void ESPsteer::continuousLoop() {
             espData->steer.settingsUpdated = 0;
         }
         was.loop();
-        espData->steer.steerCurrent = getCurrent();
+        // espData->steer.steerCurrent = getCurrent();
         espData->steer.testState = getTestState();
         // Serial.println(espData->steer.testState);
         // vTaskDelay(1000);
@@ -226,7 +228,13 @@ void ESPsteer::begin(ESPudp* espUdp) {
 }
 
 uint32_t ESPsteer::getCurrent() {
-    return ads->readADC_SingleEnded(2);
+    // TODO: Migrate to use adsManager.getRawReading(2)
+    if (ads != nullptr) {
+        return ads->readADC_SingleEnded(2);
+    } else {
+        // Temporary placeholder until ADS Manager migration
+        return 0;
+    }
 }
 
 uint8_t ESPsteer::getTestState(){

@@ -424,7 +424,9 @@ public:
         uint8_t useADS = 0;     
         uint16_t rawADS = 0;        ///< @brief Raw ADS1115 ADC value for analog sensors
         bool wirelessWAS = false;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
-        float wasZeroAngle = 0.0;         ///< @brief Wheel angle sensor zero calibration value
+        float wasZeroAngle = 0.0;     ///< @brief Wheel angle sensor zero calibration value
+        uint32_t looptime = 0;   
+        uint32_t looptimestamp = 0; 
     } steer;
 
     /**

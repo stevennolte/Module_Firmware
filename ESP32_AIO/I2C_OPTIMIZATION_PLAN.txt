@@ -1,0 +1,56 @@
+// I2C Bus Optimization Recommendations for ESP32-AIO
+// =================================================
+
+// CURRENT ISSUE: I2C Bus Overload
+// - WAS reads ADS1115 every 100ms (10 Hz)
+// - MainPower reads ADS1115 every 100ms (10 Hz) 
+// - myLED updates MCP23017 every 50ms (20 Hz)
+// - Total: ~40 I2C transactions/second causing system lag
+
+// SOLUTION OPTIONS:
+
+// Option 1: CENTRALIZED ADS MANAGER (RECOMMENDED)
+// Create ADSManager class that reads all channels once per cycle
+// and shares data with WAS, MainPower, ESPsteer
+// Reduces ADS I2C traffic from 20 Hz to 10 Hz (50% reduction)
+
+// Option 2: REDUCE UPDATE FREQUENCIES
+// Change WAS and MainPower to read every 200ms instead of 100ms
+// Change myLED to update every 100ms instead of 50ms
+// Reduces total I2C traffic by ~60%
+
+// Option 3: STAGGER READ TIMING
+// Offset WAS and MainPower read timings by 50ms
+// Prevents simultaneous I2C access
+// Reduces bus contention without changing frequencies
+
+// Option 4: INCREASE ADS1115 DATA RATE
+// Change from default 128 SPS to 250 SPS or 475 SPS
+// Reduces I2C transaction time from ~8ms to ~4ms
+// Improves bus availability
+
+// IMPLEMENTATION PRIORITY:
+// 1. Option 2 (Quick fix - reduce frequencies)
+// 2. Option 3 (Stagger timing)
+// 3. Option 4 (Increase ADS data rate)
+// 4. Option 1 (Long-term solution - centralized manager)
+
+// IMMEDIATE CHANGES TO IMPLEMENT:
+
+// In WAS.cpp - Change from 100ms to 200ms:
+// vTaskDelay(200/portTICK_PERIOD_MS);
+
+// In MainPower.cpp - Change from 100ms to 200ms:  
+// vTaskDelay(200/portTICK_PERIOD_MS);
+
+// In myLED.cpp - Change from 50ms to 100ms:
+// vTaskDelay(100/portTICK_PERIOD_MS);
+
+// In ADS initialization - Increase data rate:
+// ads.setDataRate(RATE_ADS1115_250SPS);  // or RATE_ADS1115_475SPS
+
+// EXPECTED RESULTS:
+// - 60% reduction in I2C traffic
+// - Improved system responsiveness  
+// - Reduced CPU load from I2C wait states
+// - Better real-time performance

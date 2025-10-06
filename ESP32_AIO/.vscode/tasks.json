@@ -18,6 +18,42 @@
 				"run"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build ESP32-AIO",
+			"type": "shell",
+			"command": "platformio run",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build Check",
+			"type": "shell",
+			"command": "platformio run",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build ESP32-AIO",
+			"type": "shell",
+			"command": "platformio run",
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build ESP32-AIO Fix",
+			"type": "shell",
+			"command": "platformio run",
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
 		}
 	]
 }

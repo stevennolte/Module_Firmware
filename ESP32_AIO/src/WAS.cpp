@@ -22,28 +22,20 @@ void WAS::loop(){
     #ifndef WAS_DEBUG
 
     if(espData->steer.wirelessWAS){
-        vTaskDelay(1000);
+        vTaskDelay(10);
     } else {
-        if (espData->steer.useADS == 1){
+        // TODO: Migrate to use adsManager.getRawReading(0)
+        if (ads != nullptr) {
             espData->steer.rawADS = ads->readADC_SingleEnded(0);
-            espData->steer.actSteerAngle = ads->computeVolts(espData->steer.rawADS);
+            // espData->steer.actSteerAngle = ads->computeVolts(espData->steer.rawADS);
         } else {
-            espData->steer.actSteerAngle = 0.0;
+            // Temporary placeholder until ADS Manager migration
+            espData->steer.rawADS = 0;
         }
-        
     }
-
-    // if (millis()-espData->steer.lastWAStime < 1000){
-    //     espData->steer.wirelessWAS = true;
-    // } else {
-    //     espData->steer.wirelessWAS = false;
-    //     if (espData->program.adsState == 1 && espData->steer.wirelessWAS == false && espData->steer.useADS == 1){ 
-    //         espData->steer.actSteerAngle = ads->computeVolts(ads->readADC_SingleEnded(0));
-    //     } else {
-    //         espData->steer.actSteerAngle = 0.0;
-    //     }
-    // }
-    vTaskDelay(10);
+        
+    
+    vTaskDelay(200);  // Reduced from 100ms to 200ms to reduce I2C bus load
     #else
     updateRampValue();
     vTaskDelay(10);

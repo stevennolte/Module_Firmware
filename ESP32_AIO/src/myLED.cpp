@@ -67,7 +67,7 @@ void MyLED::startTask() {
 // Function to run in parallel
 void MyLED::continuousLoop() {
  while (true) {
-    vTaskDelay(50/portTICK_PERIOD_MS);  // Update every 50ms for smooth error blinking
+    vTaskDelay(100/portTICK_PERIOD_MS);  // Reduced from 50ms to 100ms to reduce I2C bus load
     
     // If no error override is set, automatically detect error states
     if (!errorOverride) {

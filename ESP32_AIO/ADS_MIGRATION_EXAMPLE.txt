@@ -1,0 +1,58 @@
+// Example: How to modify WAS.cpp to use ADSManager
+// ===============================================
+
+// BEFORE (Direct ADS Access):
+/*
+#include <Adafruit_ADS1X15.h>
+extern Adafruit_ADS1115 ads;
+
+void WAS::continuousLoop() {
+    while (true) {
+        // Direct ADS reading - causes I2C contention
+        int16_t rawValue = ads.readADC_SingleEnded(WAS_CHANNEL);
+        float voltage = ads.computeVolts(rawValue);
+        
+        // Process WAS data...
+        updateRampValue();
+        
+        vTaskDelay(200);  // 200ms delay
+    }
+}
+*/
+
+// AFTER (Using ADSManager):
+/*
+#include "ADSManager.h"
+extern ADSManager adsManager;
+
+void WAS::continuousLoop() {
+    while (true) {
+        // Get cached reading from ADSManager - no I2C contention
+        int16_t rawValue = adsManager.getRawReading(WAS_CHANNEL);
+        float voltage = adsManager.getVoltage(WAS_CHANNEL);
+        
+        // Check if reading is valid and recent
+        if (rawValue != INT16_MIN && !isnan(voltage)) {
+            // Process WAS data with valid readings...
+            updateRampValue();
+        } else {
+            Serial.println("WAS: Invalid or stale ADS reading");
+        }
+        
+        vTaskDelay(200);  // 200ms delay
+    }
+}
+*/
+
+// BENEFITS:
+// - No I2C bus contention (single reader)
+// - Thread-safe access to readings
+// - Automatic error handling
+// - Reading age validation
+// - Statistics and health monitoring
+
+// CHANNEL ASSIGNMENTS (example):
+// #define WAS_CHANNEL 0        // Wheel Angle Sensor
+// #define MAIN_POWER_CHANNEL 1 // Main Power monitoring
+// #define SPARE_CHANNEL_2 2    // Available for future use
+// #define SPARE_CHANNEL_3 3    // Available for future use
