@@ -30,7 +30,7 @@
 #include "ESPudp.h"
 // #include "Adafruit_MCP23X17.h"
 #include "MCPManager.h"
-#include "ADSManager.h"
+#include "I2CManager.h"
 #include <Adafruit_ADS1X15.h>
 // #include "Indicators.h"
 #include "MainPower.h"
@@ -336,8 +336,13 @@ void updateDebugVars() {
   debugVars.push_back("Program State: " + String(espData.program.state));
   debugVars.push_back("MCP23017 State: " + String(espData.program.mcpState));
   debugVars.push_back("ADS1115 State: " + String(espData.program.adsState));
-  debugVars.push_back("ADS Manager: " + String(adsManager.isHealthy() ? "Healthy" : "Error"));
-  debugVars.push_back("ADS Reading Age: " + String(adsManager.getReadingAge()) + "ms");
+  debugVars.push_back("I2C Manager: " + String(i2cManager.isHealthy() ? "Healthy" : "Error"));
+  debugVars.push_back("I2C ADS Health: " + String(i2cManager.isDeviceHealthy(I2CDeviceType::ADS1115) ? "OK" : "Error"));
+  debugVars.push_back("I2C MCP Health: " + String(i2cManager.isDeviceHealthy(I2CDeviceType::MCP23017) ? "OK" : "Error"));
+  uint32_t totalCmds, errorCount, queueDepth;
+  float avgTime;
+  i2cManager.getStatistics(totalCmds, errorCount, avgTime, queueDepth);
+  debugVars.push_back("I2C Commands: " + String(totalCmds) + ", Errors: " + String(errorCount) + ", Queue: " + String(queueDepth));
   debugVars.push_back("IMU State: " + String(espData.gps.imuState));
   debugVars.push_back("External GPS: " + String(espData.gps.externalGPS ? "Enabled" : "Disabled"));
   debugVars.push_back("GPS Data: ");
@@ -1330,23 +1335,16 @@ void normalboot(){
     Serial.println("I2C setup failed");
     ESP.restart();
   }
-  if (espData.program.mcpState == 1){
-    if (mcpManager.begin(&espData, 0x20, &twoWire)) {
-      Serial.println("MCPManager initialized successfully");
+  
+  // Initialize I2C Manager for centralized bus management
+  if (espData.program.mcpState == 1 || espData.program.adsState == 1) {
+    if (i2cManager.begin(&twoWire, 0x20, 0x48, 10)) {  // 10ms task interval
+      Serial.println("I2CManager initialized successfully");
+      // Set optimal ADS settings for reduced I2C load
+      i2cManager.adsSetDataRate(250);  // 250 SPS for faster readings
+      i2cManager.adsSetGain(GAIN_TWOTHIRDS);  // +/- 6.144V range
     } else {
-      Serial.println("MCPManager initialization failed");
-      ESP.restart();
-    }
-  }
-  if (espData.program.adsState == 1){
-    // Initialize centralized ADS Manager instead of individual ADS instances
-    if (adsManager.begin(0x48, 100)) {  // 100ms reading interval
-      Serial.println("ADSManager initialized successfully");
-      // Set optimal settings for reduced I2C load
-      adsManager.setDataRate(250);  // 250 SPS for faster readings
-      adsManager.setGain(GAIN_TWOTHIRDS);  // +/- 6.144V range
-    } else {
-      Serial.println("ADSManager initialization failed");
+      Serial.println("I2CManager initialization failed");
       ESP.restart();
     }
   }

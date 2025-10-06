@@ -54,6 +54,15 @@
 				"$gcc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build I2CManager",
+			"type": "shell",
+			"command": "platformio run",
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
 		}
 	]
 }
