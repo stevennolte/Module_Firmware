@@ -1,22 +1,20 @@
 #include "MainPower.h"
 
 
-MainPower::MainPower(ESPdata* config, Adafruit_ADS1115* ads) : _mcpManager(MCPManager::getInstance())
+MainPower::MainPower(ESPdata* config) : _i2cManager(I2CManager::getInstance())
 {
     _data = config;
-    _ads = ads;
     _powerOn = _data->pins.mainPowerInd;
     _mainPowerPin = _data->pins.mainPowerPin;
 }
 
 void MainPower::startTask()
 {
-    if (_mcpManager.isInitialized()) {
-        _mcpManager.setupPowerPin();     // Uses ESPdata pin definitions automatically
-        _mcpManager.setPowerState(true); // Uses ESPdata pin definitions automatically
-        Serial.println("MainPower: Power indicator configured using MCPManager");
+    if (_i2cManager.isInitialized()) {
+        // _i2cManager.setupPowerPin();     // Uses ESPdata pin definitions automatically
+        Serial.println("MainPower: Power indicator configured using I2CManager");
     } else {
-        Serial.println("MainPower: MCPManager not initialized, power indicator not configured");
+        Serial.println("MainPower: I2CManager not initialized, power indicator not configured");
     }
     
     pinMode(_mainPowerPin, OUTPUT);
@@ -52,11 +50,11 @@ void MainPower::continuousLoop()
 void MainPower::getCurrent(){
     // Read main power current using ADS1115 (temporarily disabled until ADS migration)
     // TODO: Migrate to use adsManager.getRawReading(_data->adsConfig.mainPowerISpin)
-    if (_ads != nullptr) {
-        // _data->power.mainCurrent = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin) * 3; // Example conversion factor, adjust as needed
-        _data->power.mainCurrentRaw = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin);
-    } else {
-        // Temporary placeholder until ADS Manager migration
-        _data->power.mainCurrentRaw = 0;
-    }
+    // if (_ads != nullptr) {
+    //     // _data->power.mainCurrent = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin) * 3; // Example conversion factor, adjust as needed
+    //     _data->power.mainCurrentRaw = _ads->readADC_SingleEnded(_data->adsConfig.mainPowerISpin);
+    // } else {
+    //     // Temporary placeholder until ADS Manager migration
+    //     _data->power.mainCurrentRaw = 0;
+    // }
 }

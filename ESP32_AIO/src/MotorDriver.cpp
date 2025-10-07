@@ -35,7 +35,7 @@
  * @details Initializes motor driver with pin assignments from configuration
  *          and establishes connection to MCP23017 I/O expander for control signals.
  */
-MotorDriver::MotorDriver(ESPdata* vars) : mcpManager(MCPManager::getInstance()) {
+MotorDriver::MotorDriver(ESPdata* vars) : i2cManager(I2CManager::getInstance()) {
     espData = vars;
     
     inaPin = espData->pins.MOTOR_A_PIN;
@@ -80,13 +80,7 @@ void MotorDriver::init(){
     pinMode(inaPin, OUTPUT);
     pinMode(inbPin, OUTPUT);
     // pinMode(pwmPin, OUTPUT);
-    Serial.println("Setting up motor pins on MCP");
-    if (espData->program.mcpState == 1 && mcpManager.isInitialized()){
-        mcpManager.setupMotorPins();  // Uses ESPdata pin definitions automatically
-        Serial.println("MotorDriver: Motor pins configured using MCPManager");
-    } else {
-        Serial.println("MotorDriver: MCPManager not available, motor enable pins not configured");
-    }
+    
     
 
     //Set outputs to low
@@ -133,22 +127,14 @@ void MotorDriver::setOutput(float value){
     // Serial.println(cmdValue);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, cmdValue);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-}
+}   
 
 void MotorDriver::enable(){
-    if (mcpManager.isInitialized()) {
-        mcpManager.enableMotor();  // Uses ESPdata pin definitions automatically
-    } else {
-        Serial.println("MotorDriver: Cannot enable motor - MCPManager not initialized");
-    }
+    i2cManager.enableMotor();
 }
 
 void MotorDriver::disable(){
-    if (mcpManager.isInitialized()) {
-        mcpManager.disableMotor();  // Uses ESPdata pin definitions automatically
-    } else {
-        Serial.println("MotorDriver: Cannot disable motor - MCPManager not initialized");
-    }
+    i2cManager.disableMotor();
     digitalWrite(inbPin, LOW);
     digitalWrite(inaPin, LOW);
 }

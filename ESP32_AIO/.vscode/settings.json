@@ -18,7 +18,8 @@
         "istream": "cpp",
         "ostream": "cpp",
         "system_error": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "adafruit_mcp23x17.h": "c"
     },
     "files.exclude": {
         "**/.git": true,

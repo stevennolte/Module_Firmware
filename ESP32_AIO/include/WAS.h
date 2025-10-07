@@ -26,7 +26,7 @@
 #include "Arduino.h"
 #include "ESPdata.h"
 #include <Wire.h>
-#include "Adafruit_ADS1X15.h"
+#include "I2C_Manager.h"
 
 /**
  * @brief Wheel Angle Sensor management class
@@ -41,13 +41,12 @@ class WAS{
          * @brief Constructor for wheel angle sensor management
          * 
          * @param vars Pointer to ESPdata singleton for configuration access
-         * @param ads Pointer to ADS1115 ADC for analog sensor readings
+         * @param i2cManager Pointer to I2C_Manager for ADC readings
          * 
          * @details Initializes WAS system with data management and ADC interfaces
          *          for precise angle measurement and calibration.
          */
-        WAS(ESPdata* vars, Adafruit_ADS1115* ads);
-        
+        WAS(ESPdata* vars);
         /**
          * @brief Initializes wheel angle sensor hardware
          * 
@@ -95,7 +94,7 @@ class WAS{
         void updateRampValue();
         
         ESPdata* espData;           ///< @brief Pointer to central data management system
-        Adafruit_ADS1115* ads;      ///< @brief Pointer to ADS1115 ADC for sensor readings
+        I2CManager& i2cManager;    ///< @brief I2C manager for ADC readings
        
         
 };

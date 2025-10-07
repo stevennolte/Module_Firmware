@@ -29,8 +29,7 @@
 #include <zNMEAParser.h>
 #include <SparkFun_Unicore_GNSS_Arduino_Library.h>
 #include "Adafruit_BNO08x_RVC.h"
-#include "Adafruit_MCP23X17.h"
-#include "MCPManager.h"
+#include "I2C_Manager.h"
 
 class ESPudp; ///< @brief Forward declaration for UDP communication class
 
@@ -114,13 +113,11 @@ class ESPGPS{
         uint8_t _rtkFixIndPin;
         ESPdata* espData;
         ESPudp* espUdp;
-        MCPManager& mcpManager;  // Reference to MCPManager singleton
+        I2CManager& i2cManager;  // Reference to I2CManager singleton
         NMEAParser<2> parser;
         UM980 myGNSS;
         HardwareSerial* gpsSerial;
         HardwareSerial* bnoSerial;
-
-        Adafruit_MCP23X17 mcp;
         Adafruit_BNO08x_RVC rvc;
 };
 

@@ -1,9 +1,8 @@
 #include "WAS.h"
 
 
-WAS::WAS(ESPdata* vars, Adafruit_ADS1115* ads) {
+WAS::WAS(ESPdata* vars) : i2cManager(I2CManager::getInstance()) {
     espData = vars;
-    this->ads = ads;
     #ifdef WAS_DEBUG
     rampValue = -20.0;
     rampIncrement = 40.0 / (10 * 1000 / 10); // 40 units over 10 seconds, with 10ms delay
@@ -24,14 +23,11 @@ void WAS::loop(){
     if(espData->steer.wirelessWAS){
         vTaskDelay(10);
     } else {
-        // TODO: Migrate to use adsManager.getRawReading(0)
-        if (ads != nullptr) {
-            espData->steer.rawADS = ads->readADC_SingleEnded(0);
-            // espData->steer.actSteerAngle = ads->computeVolts(espData->steer.rawADS);
-        } else {
-            // Temporary placeholder until ADS Manager migration
-            espData->steer.rawADS = 0;
-        }
+        espData->steer.rawADS = i2cManager.getRawReading(0);
+        // TODO: Migrate to use i2cManager.getRawReading(0)
+        // espData->steer.rawADS = i2cManager.getRawReading(0);
+        // espData->steer.actSteerAngle = ads->computeVolts(espData->steer.rawADS);
+        
     }
         
     

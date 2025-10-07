@@ -23,8 +23,7 @@
 
 #include "Arduino.h"
 #include "ESPdata.h"
-#include <Adafruit_MCP23X17.h>
-#include "MCPManager.h"
+#include "I2C_Manager.h"
 
 /**
  * @brief Motor driver control class for steering actuator
@@ -113,8 +112,7 @@ class MotorDriver{
         float pidOutput;
 
         ESPdata* espData;
-        MCPManager& mcpManager;  // Reference to MCPManager singleton
-       
+        I2CManager& i2cManager;    ///< @brief I2C manager for ADC readings       
 
 };
 

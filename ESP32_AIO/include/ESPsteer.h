@@ -27,11 +27,9 @@
 #include "MotorDriver.h"
 #include "WAS.h"
 #include <Wire.h>
-#include <Adafruit_MCP23X17.h>
-#include <Adafruit_ADS1X15.h>
 #include "ESPudp.h"
 #include "AutoTunePID.h"
-#include "MCPManager.h"
+#include "I2C_Manager.h"
 
 class ESPudp; ///< @brief Forward declaration for UDP communication class
 
@@ -77,12 +75,11 @@ class ESPsteer{
          * @brief Constructor for steering control system
          * 
          * @param vars Pointer to ESPdata singleton for configuration and data storage
-         * @param ads Pointer to ADS1115 ADC for analog sensor readings
-         * 
+         *
          * @details Initializes steering control system with data management and
          *          analog sensor interfaces
          */
-        ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads);
+        ESPsteer(ESPdata* vars);
         
         WAS was; ///< @brief Wheel angle sensor object for position feedback
         
@@ -135,8 +132,7 @@ class ESPsteer{
         uint8_t getTestState();
         
         ESPdata* espData;           ///< @brief Pointer to central data management system
-        Adafruit_ADS1115* ads;
-        MCPManager& mcpManager;  // Reference to MCPManager singleton
+        I2CManager& i2cManager;  ///< @brief I2C manager for ADC and GPIO expander
         ESPudp* espUdp;
         MotorDriver motorDriver;
         

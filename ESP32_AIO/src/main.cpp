@@ -29,9 +29,7 @@
 #include "Wire.h"
 #include "ESPudp.h"
 // #include "Adafruit_MCP23X17.h"
-#include "MCPManager.h"
-#include "I2CManager.h"
-#include <Adafruit_ADS1X15.h>
+#include "I2C_Manager.h"
 // #include "Indicators.h"
 #include "MainPower.h"
 #include "GPS.h"
@@ -49,28 +47,23 @@
 /// @brief I2C bus 0 for primary peripherals
 TwoWire twoWire = TwoWire(0);
 /// @brief I2C bus 1 for secondary peripherals  
-TwoWire twoWire1 = TwoWire(1);
-/// @brief Hardware serial port 2 for BNO08x IMU communication
+// TwoWire twoWire1 = TwoWire(1);
+// /// @brief Hardware serial port 2 for BNO08x IMU communication
 HardwareSerial bnoSerial(2);
 /// @brief Hardware serial port 1 for GPS communication
 HardwareSerial gpsSerial(1);
 
-// Adafruit_MCP23X17 mcp;
-/// @brief ADS1115 16-bit ADC for analog sensor readings (DEPRECATED - use adsManager instead)
-// Adafruit_ADS1115 ads;  // Replaced by centralized ADSManager to reduce I2C contention
-
 // Using singleton pattern - single access point for configuration
 /// @brief Global configuration and data storage singleton instance
 ESPdata& espData = ESPdata::getInstance();
-/// @brief MCP23017 I/O expander manager singleton instance
-MCPManager& mcpManager = MCPManager::getInstance();
-
+/// @brief I2C Manager singleton instance for centralized bus management
+I2CManager& i2cManager = I2CManager::getInstance();
 /// @brief GPS/IMU manager with UM982 GPS and BNO08x IMU support
 ESPGPS gps(&espData, &gpsSerial, &bnoSerial);  // MCPManager accessed via singleton inside class
 /// @brief LED status indicator controller with error state management
 MyLED myLED(&espData);
 /// @brief Main power control and monitoring system
-MainPower mainPower(&espData, nullptr);  // Will be migrated to use ADSManager
+MainPower mainPower(&espData);  // Will be migrated to use ADSManager
 /// @brief WiFi connection and AP mode manager
 ESPWifi espWifi(&espData);
 /// @brief UDP communication handler for AgOpen GPS protocol
@@ -81,7 +74,9 @@ ESP32OTAPull ota;
 AsyncWebServer server(80);
 
 /// @brief Steering control system with PID feedback and motor control
-ESPsteer espSteer(&espData, nullptr);  // Will be migrated to use ADSManager
+ESPsteer espSteer(&espData);  // Will be migrated to use ADSManager
+/// @brief Simple I2C Manager for centralized bus access
+
 /// @brief Debug variables vector for web interface display
 std::vector<String> debugVars;
 
@@ -336,13 +331,8 @@ void updateDebugVars() {
   debugVars.push_back("Program State: " + String(espData.program.state));
   debugVars.push_back("MCP23017 State: " + String(espData.program.mcpState));
   debugVars.push_back("ADS1115 State: " + String(espData.program.adsState));
-  debugVars.push_back("I2C Manager: " + String(i2cManager.isHealthy() ? "Healthy" : "Error"));
-  debugVars.push_back("I2C ADS Health: " + String(i2cManager.isDeviceHealthy(I2CDeviceType::ADS1115) ? "OK" : "Error"));
-  debugVars.push_back("I2C MCP Health: " + String(i2cManager.isDeviceHealthy(I2CDeviceType::MCP23017) ? "OK" : "Error"));
-  uint32_t totalCmds, errorCount, queueDepth;
-  float avgTime;
-  i2cManager.getStatistics(totalCmds, errorCount, avgTime, queueDepth);
-  debugVars.push_back("I2C Commands: " + String(totalCmds) + ", Errors: " + String(errorCount) + ", Queue: " + String(queueDepth));
+  debugVars.push_back("MCP Ready: " + String(i2cManager.isMcpReady() ? "Yes" : "No"));
+  debugVars.push_back("ADS Ready: " + String(i2cManager.isAdsReady() ? "Yes" : "No"));
   debugVars.push_back("IMU State: " + String(espData.gps.imuState));
   debugVars.push_back("External GPS: " + String(espData.gps.externalGPS ? "Enabled" : "Disabled"));
   debugVars.push_back("GPS Data: ");
@@ -399,6 +389,11 @@ void updateDebugVars() {
   debugVars.push_back("..Steer Switch: " + String(espData.switches.steerSwitch));
   debugVars.push_back("..Work Switch: " + String(espData.switches.workSwitch));
   debugVars.push_back("..Steer loop time [ms]: " + String(espData.steer.looptime));
+  debugVars.push_back("ADS1115 INFO");
+  debugVars.push_back("..voltage 0: " + String(espData.adsConfig.readings[0]));
+  debugVars.push_back("..voltage 1: " + String(espData.adsConfig.readings[1]));
+  debugVars.push_back("..voltage 2: " + String(espData.adsConfig.readings[2]));
+  debugVars.push_back("..voltage 3: " + String(espData.adsConfig.readings[3]));
 
   String sipValue = String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]);
   int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
@@ -1326,28 +1321,17 @@ void normalboot(){
   gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
   gpsSerial.begin(115200);
   
-  // Grab the config
-  
-
-  // Start I2C and check for hardware
-  
-  if(!I2Csetup()){
-    Serial.println("I2C setup failed");
+  // Initialize I2C Manager for centralized bus management
+  I2Csetup();
+  if (i2cManager.begin(&twoWire, espData.i2c.MCP_ADDRESS, espData.i2c.ADS_ADDRESS)) {
+    Serial.println("I2CManager initialized successfully");
+    // Set optimal ADS settings for reduced I2C load
+    // i2cManager.adsSetGain(GAIN_TWOTHIRDS);  // +/- 6.144V range
+  } else {
+    Serial.println("I2CManager initialization failed");
     ESP.restart();
   }
   
-  // Initialize I2C Manager for centralized bus management
-  if (espData.program.mcpState == 1 || espData.program.adsState == 1) {
-    if (i2cManager.begin(&twoWire, 0x20, 0x48, 10)) {  // 10ms task interval
-      Serial.println("I2CManager initialized successfully");
-      // Set optimal ADS settings for reduced I2C load
-      i2cManager.adsSetDataRate(250);  // 250 SPS for faster readings
-      i2cManager.adsSetGain(GAIN_TWOTHIRDS);  // +/- 6.144V range
-    } else {
-      Serial.println("I2CManager initialization failed");
-      ESP.restart();
-    }
-  }
   
   // Start GPS
   // Using MCPManager singleton approach (auto-detected when no MCP pointer provided):

@@ -23,9 +23,7 @@
 #define MAINPOWER_H
 #include "Arduino.h"
 #include "ESPdata.h"
-#include <Adafruit_MCP23X17.h>
-#include "Adafruit_ADS1X15.h"
-#include "MCPManager.h"
+#include "I2C_Manager.h"
 
 /**
  * @brief Main power control and monitoring class
@@ -41,12 +39,10 @@ class MainPower
          * @brief Constructor for main power management system
          * 
          * @param config Pointer to ESPdata singleton for configuration access
-         * @param ads Pointer to ADS1115 ADC for current sensing
          * 
-         * @details Initializes power management with configuration and ADC
-         *          interfaces for comprehensive power control and monitoring.
+         * @details Initializes power management with configuration for comprehensive power control and monitoring.
          */
-        MainPower(ESPdata* config, Adafruit_ADS1115* ads);
+        MainPower(ESPdata* config);
         
         /**
          * @brief Start the power monitoring task
@@ -88,10 +84,8 @@ class MainPower
         
         /// @brief Pointer to ESPdata singleton for configuration access
         ESPdata* _data;
-        /// @brief Reference to MCPManager singleton for I/O control
-        MCPManager& _mcpManager;
-        /// @brief Pointer to ADS1115 ADC for current measurement
-        Adafruit_ADS1115* _ads;
+        /// @brief Reference to I2CManager singleton for I/O control
+        I2CManager& _i2cManager;
 
 };
 

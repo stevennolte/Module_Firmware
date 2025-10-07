@@ -36,10 +36,9 @@
  *          PID controller, and MCP manager integration. Sets up the complete steering
  *          control architecture for precision guidance applications.
  */
-ESPsteer::ESPsteer(ESPdata* vars, Adafruit_ADS1115* ads) 
-    : motorDriver(vars), was(vars, ads), pid(-1.0,1.0, TuningMethod::Manual), mcpManager(MCPManager::getInstance()) {
+ESPsteer::ESPsteer(ESPdata* vars) 
+    : motorDriver(vars), was(vars), pid(-1.0,1.0, TuningMethod::Manual), i2cManager(I2CManager::getInstance()) {
     espData = vars;
-    this->ads = ads;
 }
 
 /**
@@ -228,13 +227,8 @@ void ESPsteer::begin(ESPudp* espUdp) {
 }
 
 uint32_t ESPsteer::getCurrent() {
-    // TODO: Migrate to use adsManager.getRawReading(2)
-    if (ads != nullptr) {
-        return ads->readADC_SingleEnded(2);
-    } else {
-        // Temporary placeholder until ADS Manager migration
-        return 0;
-    }
+    // TODO: Migrate to use i2cManager.getRawReading(2)
+    
 }
 
 uint8_t ESPsteer::getTestState(){

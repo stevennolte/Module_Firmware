@@ -222,6 +222,7 @@ public:
      */
     struct ADSConfig {
         uint8_t mainPowerISpin = 3;     ///< @brief ADS channel for main power current sensing
+        uint16_t readings[4] = {0,0,0,0};
     } adsConfig;
 
     /**
@@ -234,26 +235,46 @@ public:
          * @brief Input pin assignments on MCP23017
          * @details Digital inputs for switch and sensor monitoring
          */
+        bool prevMotorEnableA = false; ///< @brief Previous state of motor enable A
+        bool prevMotorEnableB = false; ///< @brief Previous state of motor enable B
         struct inputs{
             uint8_t work_switch = 0;    ///< @brief Work/implement engage switch input
             uint8_t remote_switch = 1;  ///< @brief Remote control switch input
             uint8_t steer_switch = 2;   ///< @brief Steering engage switch input
+            
+            // Array for iteration
+            uint8_t pins[3] = {work_switch, remote_switch, steer_switch};
         } inputs;
         
         /**
          * @brief Output pin assignments on MCP23017
          * @details Digital outputs for status indication and control signals
          */
-        struct outputs{
+        struct IndOutputs{
             uint8_t power_on = 8;       ///< @brief System power-on indicator LED
             uint8_t eth_good = 9;       ///< @brief Ethernet connection status LED
             uint8_t gps_fix = 10;       ///< @brief GPS fix status indicator LED
             uint8_t rtk_fix = 11;       ///< @brief RTK correction status indicator LED
             uint8_t steer_standby = 12; ///< @brief Steering system standby indicator LED
             uint8_t steer_active = 13;  ///< @brief Steering system active indicator LED
-            uint8_t motor_enb = 14;     ///< @brief Motor driver enable B output
-            uint8_t motor_ena = 15;     ///< @brief Motor driver enable A output
-        } outputs;
+            
+            // Array for iteration
+            uint8_t pins[6] = {power_on, eth_good, gps_fix, rtk_fix, steer_standby, steer_active};
+        } indOutputs;
+
+        struct MotorOutputs{
+            uint8_t motor_enb = 14;  ///< @brief Motor enable b pin
+            uint8_t motor_ena = 15;  ///< @brief Motor enable a pin 
+            uint8_t pins[2] = {motor_enb, motor_ena};
+        } motorOutputs;
+        
+    //     // Combined array of all pins
+        uint8_t getAllPins() const {
+            static uint8_t allPins[11];
+            memcpy(allPins, inputs.pins, 3);
+            memcpy(allPins + 3, indOutputs.pins, 8);
+            return *allPins;
+        }
     } mcpPins;
 
     /**
@@ -261,7 +282,8 @@ public:
      * @details Defines the I2C slave addresses for connected sensors and peripherals
      */
     struct I2CAddresses {
-        uint8_t TLE_ADDRESS = 0x22;     ///< @brief TLx493D magnetic wheel angle sensor address
+        uint8_t ADS_ADDRESS = 0x48;     ///< @brief ADS1115 ADC address
+        // uint8_t TLE_ADDRESS = 0x22;     ///< @brief TLx493D magnetic wheel angle sensor address
         uint8_t MCP_ADDRESS = 0x20;     ///< @brief MCP23017 I/O expander address
     } i2c;
 
