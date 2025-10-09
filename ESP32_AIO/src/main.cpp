@@ -37,6 +37,7 @@
 #include "ESP32OTAPull.h"
 #include "ESPsteer.h"
 #include <ESPAsyncWebServer.h>
+#include <AsyncWebSocket.h>
 #include <LittleFS.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
@@ -72,6 +73,8 @@ ESPudp espUdp(&espData);
 ESP32OTAPull ota;
 /// @brief Async web server for configuration interface (port 80)
 AsyncWebServer server(80);
+/// @brief WebSocket server for real-time serial monitoring
+// AsyncWebSocket ws("/ws");
 
 /// @brief Steering control system with PID feedback and motor control
 ESPsteer espSteer(&espData);  // Will be migrated to use ADSManager
@@ -79,6 +82,89 @@ ESPsteer espSteer(&espData);  // Will be migrated to use ADSManager
 
 /// @brief Debug variables vector for web interface display
 std::vector<String> debugVars;
+
+// WebSocket Serial Monitor Variables
+// String serialBuffer = "";
+// const size_t MAX_SERIAL_BUFFER = 8192;  // 8KB buffer
+
+/**
+ * @brief Custom serial print function that also sends to WebSocket clients
+ * @param message Message to print to both serial and WebSocket
+ */
+void webSerial(const String& message) {
+    // Print to hardware serial
+    // Serial.print(message);
+    
+    // // Add to buffer for WebSocket clients
+    // serialBuffer += message;
+    
+    // // Limit buffer size
+    // if (serialBuffer.length() > MAX_SERIAL_BUFFER) {
+    //     serialBuffer = serialBuffer.substring(serialBuffer.length() - MAX_SERIAL_BUFFER);
+    // }
+    
+    // // Send to all connected WebSocket clients
+    // ws.textAll(message);
+}
+
+// /**
+//  * @brief WebSocket event handler for serial monitor
+//  */
+// void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+//     if (type == WS_EVT_CONNECT) {
+//         webSerial("WebSocket client #" + String(client->id()) + " connected from " + client->remoteIP().toString() + "\n");
+        
+//         // Send welcome message to new WebSocket client
+//         String welcomeMsg = "\n===== ESP32-AIO Serial Monitor =====\n";
+//         welcomeMsg += "System: " + String(ARDUINO_BOARD) + "\n";
+//         welcomeMsg += "MAC: " + WiFi.macAddress() + "\n";
+//         welcomeMsg += "IP: " + WiFi.localIP().toString() + "\n";
+//         welcomeMsg += "Version: " + String(VERSION) + "\n";
+//         welcomeMsg += "Available commands: clear, restart, status\n";
+//         welcomeMsg += "====================================\n\n";
+//         client->text(welcomeMsg);
+        
+//         // Send current buffer to newly connected client
+//         if (serialBuffer.length() > 0) {
+//             client->text("=== ESP32-AIO Serial Monitor Connected ===\n");
+//             client->text("System: " + String(NAME) + " v" + String(VERSION) + "\n");
+//             client->text("Uptime: " + String(millis()/1000) + " seconds\n");
+//             client->text("=========================================\n");
+//             client->text(serialBuffer);
+//         }
+        
+//     } else if (type == WS_EVT_DISCONNECT) {
+//         webSerial("WebSocket client #" + String(client->id()) + " disconnected\n");
+        
+//     } else if (type == WS_EVT_DATA) {
+//         // Handle incoming WebSocket data (commands from web interface)
+//         AwsFrameInfo *info = (AwsFrameInfo*)arg;
+//         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+//             data[len] = 0;  // Null terminate
+//             String command = String((char*)data);
+//             command.trim();
+            
+//             // Process web-based serial commands
+//             webSerial("Web Command: " + command + "\n");
+            
+//             // Process commands
+//             if (command == "clear") {
+//                 serialBuffer = "";
+//                 // ws.textAll(""); // Clear all clients
+//             } else if (command == "restart") {
+//                 webSerial("Restarting ESP32...\n");
+//                 delay(1000);
+//                 ESP.restart();
+//             } else if (command == "status") {
+//                 webSerial("System Status:\n");
+//                 webSerial("  Uptime: " + String(millis()/1000) + " seconds\n");
+//                 webSerial("  Free Heap: " + String(ESP.getFreeHeap()) + " bytes\n");
+//                 webSerial("  WiFi: " + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected") + "\n");
+//                 webSerial("  Program State: " + String(espData.program.state) + "\n");
+//             }
+//         }
+//     }
+// }
 
 // Function declarations
 /**
@@ -119,29 +205,29 @@ void normalboot();
  */
 bool I2Csetup(){
   if(!twoWire.setPins(espData.pins.SDA_PIN, espData.pins.SCL_PIN)){
-    Serial.println("Wire failed to set pins");
+    webSerial("Wire failed to set pins\n");
     return false;
   }
  
   if(!twoWire.begin()){
-    Serial.println("Wire failed to begin");
+    webSerial("Wire failed to begin\n");
     return false;
   }
   byte error, address;
   int nDevices;
 
-  Serial.println("Scanning...");
+  webSerial("Scanning...\n");
 
   twoWire.beginTransmission(0x20);
   error = twoWire.endTransmission();
   if (error == 0)
   {
-    Serial.println("MCP23017 found at address 0x20  !");
+    webSerial("MCP23017 found at address 0x20  !\n");
     espData.program.mcpState = 1;
   }
   else 
   {
-    Serial.println("MCP23017 not found at address 0x20");
+    webSerial("MCP23017 not found at address 0x20\n");
     espData.program.mcpState = 2;
   }
   
@@ -149,12 +235,12 @@ bool I2Csetup(){
   error = twoWire.endTransmission();
   if (error == 0)
   {
-    Serial.println("ADS1115 found at address 0x48  !");
+    webSerial("ADS1115 found at address 0x48  !\n");
     espData.program.adsState = 1;
   }
   else 
   {
-    Serial.println("ADS1115 not found at address 0x48");
+    webSerial("ADS1115 not found at address 0x48\n");
     espData.program.adsState = 2;
   }
   if (espData.program.mcpState == 2 || espData.program.adsState == 2){
@@ -319,87 +405,65 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_
  *          Used for web interface diagnostics and system monitoring
  */
 void updateDebugVars() {
-  debugVars.clear(); // Clear the list to update it dynamically
-  Serial.println("Updating normal mode debug variables...");
+  // Check available heap before proceeding
+  uint32_t freeHeap = ESP.getFreeHeap();
+  if (freeHeap < 30000) {
+    webSerial("Skipping debug update - low memory: " + String(freeHeap) + " bytes\n");
+    debugVars.clear();
+    debugVars.push_back("Low Memory - Debug Disabled");
+    debugVars.push_back("Free Heap: " + String(freeHeap) + " bytes");
+    return;
+  }
+  
+  // Reserve capacity to avoid multiple reallocations
+  debugVars.clear();
+  debugVars.reserve(40); // Reduced from 80 to minimize memory usage
+  
+  webSerial("Updating normal mode debug variables...\n");
+  
+  // Basic system info
   debugVars.push_back("Program: " + String(NAME));
-  debugVars.push_back("Timestamp since boot [s]: " + String((float)(millis())/1000.0));
+  debugVars.push_back("Timestamp since boot [s]: " + String((float)(millis())/1000.0, 2));
   debugVars.push_back("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
   debugVars.push_back("Version: " + String(VERSION));
+  
+  // WiFi info  
   debugVars.push_back("Wifi SSID: " + WiFi.SSID());
   debugVars.push_back("IP Address: " + String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]));
   debugVars.push_back("Wifi State: " + String(espData.wifi.state));
   debugVars.push_back("Program State: " + String(espData.program.state));
+  
+  // I2C device status
   debugVars.push_back("MCP23017 State: " + String(espData.program.mcpState));
   debugVars.push_back("ADS1115 State: " + String(espData.program.adsState));
   debugVars.push_back("MCP Ready: " + String(i2cManager.isMcpReady() ? "Yes" : "No"));
   debugVars.push_back("ADS Ready: " + String(i2cManager.isAdsReady() ? "Yes" : "No"));
-  debugVars.push_back("IMU State: " + String(espData.gps.imuState));
-  debugVars.push_back("External GPS: " + String(espData.gps.externalGPS ? "Enabled" : "Disabled"));
+  
+  // GPS data - simplified to reduce stack usage
   debugVars.push_back("GPS Data: ");
-  debugVars.push_back("..Timestamp: " + String(espData.gps.fixTime));
-  debugVars.push_back("..Position Type: " + String(espData.gps.positionType));
-  debugVars.push_back("..Latitude: " + String(espData.gps.latitude));
-  debugVars.push_back("..Longitude: " + String(espData.gps.longitude));
-  debugVars.push_back("..Altitude: " + String(espData.gps.altitude));
-  debugVars.push_back("..Speed: " + String(espData.gps.speedKnots));
-  debugVars.push_back("..Heading: " + String(espData.gps.imuHeading));
-  debugVars.push_back("..Roll: " + String(espData.gps.imuRoll));
-  debugVars.push_back("..Pitch: " + String(espData.gps.imuPitch));
-  debugVars.push_back("..Yaw Rate: " + String(espData.gps.imuYawRate));
+  debugVars.push_back("..Fix Time: " + String(espData.gps.fixTime));
   debugVars.push_back("..Fix Quality: " + String(espData.gps.fixQuality));
-  debugVars.push_back("..Number of Satellites: " + String(espData.gps.numSats));
-  debugVars.push_back("..HDOP: " + String(espData.gps.HDOP));
-  debugVars.push_back("..Age of DGPS: " + String(espData.gps.ageDGPS));
-  debugVars.push_back("..NMEA: " + String(espData.gps.nmea));
-  debugVars.push_back("..Last Ntrip Data: " + String(espData.gps.lastNtripData));
-  debugVars.push_back("..Last Ntrip Data Length: " + String(espData.gps.lastNtripDataLen));
+  debugVars.push_back("..Satellites: " + String(espData.gps.numSats));
+  debugVars.push_back("..Latitude: " + String(espData.gps.latitude, 6));
+  debugVars.push_back("..Longitude: " + String(espData.gps.longitude, 6));
+  debugVars.push_back("..Altitude: " + String(espData.gps.altitude, 2));
+  debugVars.push_back("..Speed: " + String(espData.gps.speedKnots, 2));
+  debugVars.push_back("..Heading: " + String(espData.gps.imuHeading, 2));
+  debugVars.push_back("..HDOP: " + String(espData.gps.HDOP, 2));
+  
+  // Steering data - essential only
   debugVars.push_back("Steer Data: ");
-  debugVars.push_back("..Target Steer Angle: " + String(espData.steer.targetSteerAngle));
-  debugVars.push_back("..Raw ADS Value: " + String(espData.steer.rawADS));
-  debugVars.push_back("..Steer Angle: " + String(espData.steer.actSteerAngle));
-  debugVars.push_back("..Absolute Angle: " + String(espData.steer.absAngle));
-  debugVars.push_back("..ZeroValue: " + String(espData.steer.wasZeroAngle));
-  debugVars.push_back("..Test State: " + String(espData.steer.testState));
-  debugVars.push_back("..Steer Current: " + String(espData.steer.steerCurrent));
-  debugVars.push_back("..Switch State: " + String(espData.steer.switchState));
+  debugVars.push_back("..Target Angle: " + String(espData.steer.targetSteerAngle, 2));
+  debugVars.push_back("..Actual Angle: " + String(espData.steer.actSteerAngle, 2));
+  debugVars.push_back("..Raw ADS: " + String(espData.steer.rawADS));
   debugVars.push_back("..PWM Command: " + String(espData.steer.pwmCmd));
-  debugVars.push_back("..PID Input: " + String(espData.steer.pidCmd));
-  debugVars.push_back("..Status: " + String(espData.steer.status));
-  debugVars.push_back("..Wireless WAS: " + String(espData.steer.wirelessWAS));
-  // debugVars.push_back("..WAS byte1: " + String(espConfig.steerData.byte1));
-  // debugVars.push_back("..WAS byte2: " + String(espConfig.steerData.byte2));
-  // debugVars.push_back("..WAS byte3: " + String(espConfig.steerData.byte3));
-  // debugVars.push_back("..WAS byte4: " + String(espConfig.steerData.byte4));
-  debugVars.push_back("Steer Config: ");
-  debugVars.push_back("..Settings Updated: " + String(espData.steer.settingsUpdated));
-  debugVars.push_back("..Gain P: " + String(espData.steer.gainP));
-  debugVars.push_back("..High PWM: " + String(espData.steer.highPWM));
-  debugVars.push_back("..Low PWM: " + String(espData.steer.lowPWM));
-  debugVars.push_back("..Min PWM: " + String(espData.steer.minPWM));
-  debugVars.push_back("..Counts per Degree: " + String(espData.steer.countsPerDeg));
-  debugVars.push_back("..Steer Offset: " + String(espData.steer.steerOffset));
-  debugVars.push_back("..Ackerman Fix: " + String(espData.steer.ackermanFix));
-  debugVars.push_back("..Set0: " + String(espData.steer.set0));
-  debugVars.push_back("..Pulse Count: " + String(espData.steer.pulseCount));
-  debugVars.push_back("..Min Speed: " + String(espData.steer.minSpeed));
-  debugVars.push_back("..Set1: " + String(espData.steer.set1));
-  debugVars.push_back("..Steer Msg Rate: " + String(espData.steer.steerMsgRate));
-  debugVars.push_back("..PID Input Filter: " + String(espData.steer.pidInputFilt));
-  debugVars.push_back("Switches: ");
-  debugVars.push_back("..Steer Switch: " + String(espData.switches.steerSwitch));
-  debugVars.push_back("..Work Switch: " + String(espData.switches.workSwitch));
-  debugVars.push_back("..Steer loop time [ms]: " + String(espData.steer.looptime));
+  debugVars.push_back("..Switch State: " + String(espData.steer.switchState));
+  
+  // ADS readings - simplified
   debugVars.push_back("ADS1115 INFO");
-  debugVars.push_back("..voltage 0: " + String(espData.adsConfig.readings[0]));
-  debugVars.push_back("..voltage 1: " + String(espData.adsConfig.readings[1]));
-  debugVars.push_back("..voltage 2: " + String(espData.adsConfig.readings[2]));
-  debugVars.push_back("..voltage 3: " + String(espData.adsConfig.readings[3]));
-
-  String sipValue = String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]);
-  int   ArrayLength  =sipValue.length()+1;    //The +1 is for the 0x00h Terminator
-  char  CharArray[ArrayLength];
-  sipValue.toCharArray(CharArray,ArrayLength);
-  // std::string ipValue = sipValue.toCharArray();
+  for(int i = 0; i < 4; i++) {
+    debugVars.push_back("..Ch" + String(i) + ": " + String(i2cManager.getVoltage(i), 3) + "V");
+  }
   
 }
 
@@ -466,7 +530,7 @@ void updateRecoveryDebugVars() {
 
 // Function to serve the debug variables as JSON
 void handleDebugVars(AsyncWebServerRequest *request) {
-  Serial.println("Normal mode debug handler called");
+  webSerial("Normal mode debug handler called\n");
   updateDebugVars();  // Update the debug variables just before sending
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
@@ -477,7 +541,7 @@ void handleDebugVars(AsyncWebServerRequest *request) {
   
   String jsonResponse;
   serializeJson(doc, jsonResponse);
-  Serial.println("Sending " + String(debugVars.size()) + " debug variables");
+  webSerial("Sending " + String(debugVars.size()) + " debug variables\n");
   request->send(200, "application/json", jsonResponse);
 }
 
@@ -1076,27 +1140,19 @@ void handleSerialCommands() {
  * @see handleSerialCommands()
  */
 void debugPrint(){
-  Serial.print("Timestamp: ");
-  Serial.println(millis());
-  Serial.print("\tprogName: ");
-  Serial.print(String(NAME));
-  Serial.print("\tprogState: ");
-  Serial.print(espData.program.state);
-  Serial.print("\tconfRes: ");
-  Serial.print(espData.program.confRes);
-  Serial.print("\twifiRes: ");
-  Serial.print(espData.wifi.state);
-  Serial.print("\tgpsFix: ");
-  Serial.print(espData.gps.fixQualityInt);
-  Serial.print("\tip: ");
-  Serial.print(espData.wifi.ips[0]);
-  Serial.print(".");
-  Serial.print(espData.wifi.ips[1]);
-  Serial.print(".");
-  Serial.print(espData.wifi.ips[2]);
-  Serial.print(".");
-  Serial.print(espData.wifi.ips[3]);
-  Serial.println();
+  webSerial("Timestamp: " + String(millis()) + "\n");
+  webSerial("\tprogName: " + String(NAME));
+  webSerial("\tprogState: " + String(espData.program.state));
+  webSerial("\tconfRes: " + String(espData.program.confRes));
+  webSerial("\twifiRes: " + String(espData.wifi.state));
+  webSerial("\tgpsFix: " + String(espData.gps.fixQualityInt));
+  webSerial("\tip: " + String(espData.wifi.ips[0]) + "." + 
+                     String(espData.wifi.ips[1]) + "." + 
+                     String(espData.wifi.ips[2]) + "." + 
+                     String(espData.wifi.ips[3]) + "\n");
+  // webSerial("\timu roll: " + String(espData.gps.imuRoll) + 
+  //           "\timu pitch: " + String(espData.gps.imuPitch) + 
+  //           "\timu yaw: " + String(espData.gps.imuHeading) + "\n");
 }
 
 #pragma region Setup and Loop
@@ -1120,7 +1176,7 @@ void recoveryBoot() {
   Serial.println("=== ENTERING RECOVERY MODE ===");
   
   // Set all LEDs to error flash pattern to indicate recovery mode
-  // mcpManager.setAllLEDs(MCPLEDState::ERROR_FLASH);
+  // I2CManager::getInstance().setAllLEDs(LEDPattern::ERROR_FLASH);
   
   // Initialize LittleFS for file operations
   Serial.println("Initializing LittleFS...");
@@ -1350,6 +1406,7 @@ void normalboot(){
       break;
     }
   }
+  i2cManager.setEthLED(LEDPattern::ON);
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espData.wifi.state));
   
@@ -1438,6 +1495,218 @@ void normalboot(){
         handleFirmwareUpload);
 
         server.on("/reboot", HTTP_GET, handleReboot);
+        
+        // WebSocket handler for serial monitor
+        // ws.onEvent(onWsEvent);
+        // server.addHandler(&ws);
+        
+        // Serial monitor web page
+        server.on("/serialmonitor", HTTP_GET, [](AsyncWebServerRequest *request){
+            String html = R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32-AIO Serial Monitor</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #1e1e1e; 
+            color: #ffffff; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .header { 
+            background: #333; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 10px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .status { 
+            color: #00ff00; 
+            font-weight: bold; 
+        }
+        .status.disconnected { 
+            color: #ff0000; 
+        }
+        .terminal { 
+            background: #000; 
+            color: #00ff00; 
+            padding: 15px; 
+            border-radius: 5px; 
+            height: 70vh; 
+            overflow-y: auto; 
+            font-size: 14px; 
+            white-space: pre-wrap; 
+            border: 2px solid #333; 
+        }
+        .controls { 
+            margin: 10px 0; 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            flex-wrap: wrap;
+        }
+        .button { 
+            background: #0066cc; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        .button:hover { 
+            background: #0052a3; 
+        }
+        .button.clear { 
+            background: #cc6600; 
+        }
+        .button.clear:hover { 
+            background: #b85500; 
+        }
+        .button.danger { 
+            background: #cc0000; 
+        }
+        .button.danger:hover { 
+            background: #990000; 
+        }
+        input[type="text"] { 
+            flex: 1; 
+            padding: 8px; 
+            border: 1px solid #555; 
+            border-radius: 4px; 
+            background: #333; 
+            color: white; 
+            min-width: 200px;
+        }
+        .timestamp { 
+            color: #888; 
+            font-size: 12px; 
+        }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; align-items: stretch; }
+            .controls { flex-direction: column; }
+            input[type="text"] { min-width: auto; margin-bottom: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h2>📡 ESP32-AIO Serial Monitor</h2>
+            <div class='status' id='status'>Connecting...</div>
+        </div>
+        
+        <div class='controls'>
+            <input type='text' id='commandInput' placeholder='Enter command (clear, restart, status)...' onkeypress='handleKeyPress(event)'>
+            <button class='button' onclick='sendCommand()'>Send</button>
+            <button class='button clear' onclick='clearTerminal()'>Clear</button>
+            <button class='button' onclick='reconnect()'>Reconnect</button>
+            <button class='button' onclick='sendPredefinedCommand("status")'>Status</button>
+            <button class='button danger' onclick='sendPredefinedCommand("restart")'>Restart ESP32</button>
+        </div>
+        
+        <div class='terminal' id='terminal'></div>
+    </div>
+
+    <script>
+        let ws;
+        let terminal = document.getElementById('terminal');
+        let status = document.getElementById('status');
+        let commandInput = document.getElementById('commandInput');
+        
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host + '/ws';
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                status.textContent = 'Connected';
+                status.className = 'status';
+                addToTerminal('[' + new Date().toLocaleTimeString() + '] WebSocket Connected\n');
+            };
+            
+            ws.onmessage = function(event) {
+                addToTerminal(event.data);
+            };
+            
+            ws.onclose = function() {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                addToTerminal('[' + new Date().toLocaleTimeString() + '] WebSocket Disconnected\n');
+                
+                // Auto-reconnect after 3 seconds
+                setTimeout(connect, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                status.textContent = 'Error';
+                status.className = 'status disconnected';
+                addToTerminal('[' + new Date().toLocaleTimeString() + '] WebSocket Error\n');
+            };
+        }
+        
+        function addToTerminal(message) {
+            terminal.textContent += message;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        function sendCommand() {
+            const command = commandInput.value.trim();
+            if (command && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(command);
+                commandInput.value = '';
+            }
+        }
+        
+        function sendPredefinedCommand(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(cmd);
+            }
+        }
+        
+        function clearTerminal() {
+            terminal.textContent = '';
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('clear');
+            }
+        }
+        
+        function reconnect() {
+            if (ws) {
+                ws.close();
+            }
+            connect();
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendCommand();
+            }
+        }
+        
+        // Connect on page load
+        connect();
+        
+        // Auto-scroll to bottom
+        setInterval(() => {
+            terminal.scrollTop = terminal.scrollHeight;
+        }, 1000);
+    </script>
+</body>
+</html>
+            )";
+            
+            request->send(200, "text/html", html);
+        });
         
         server.on("/toggleAPMode", HTTP_POST, handleToggleAPMode); // Add this line
         // Handle toggle state update
@@ -1549,10 +1818,22 @@ void setup(){
 void loop(){
   
   // Handle serial commands
-  handleSerialCommands();
+  // handleSerialCommands();
   
-  debugPrint();
+  // Only debug print occasionally and check free heap
+  // static unsigned long lastDebugPrint = 0;
+  // unsigned long currentMillis = millis();
   
-  delay(5000);
+  // if (currentMillis - lastDebugPrint >= 10000) { // Every 10 seconds instead of 5
+  //   if (ESP.getFreeHeap() > 50000) { // Only if we have sufficient free heap
+  //     debugPrint();
+  //     lastDebugPrint = currentMillis;
+  //   } else {
+  //     webSerial("Low memory warning: " + String(ESP.getFreeHeap()) + " bytes free\n");
+  //     lastDebugPrint = currentMillis;
+  //   }
+  // }
+  
+  delay(1000); // Reduce to 1 second delay for better responsiveness
 }
 #pragma endregion

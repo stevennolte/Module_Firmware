@@ -223,7 +223,7 @@ void ESPsteer::begin(ESPudp* espUdp) {
     // ********End PID Setup**********
 
     Serial.println("\tWAS Initialized");
-    xTaskCreatePinnedToCore(taskHandler, "taskHandler", 10000, this, 1, NULL, 0);
+    xTaskCreatePinnedToCore(taskHandler, "Steer_Task", 10000, this, 3, NULL, 0);
 }
 
 uint32_t ESPsteer::getCurrent() {

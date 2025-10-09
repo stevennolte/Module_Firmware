@@ -12,9 +12,9 @@
 #include "ESPdata.h"
 
 /**
- * @brief LED state enumeration for indicator control
+ * @brief LED animation pattern enumeration for indicator control
  */
-enum class LEDState {
+enum class LEDPattern {
     OFF,                   // LED is off
     ON,                    // LED is solid on
     SLOW_PULSE,           // Slow pulse (0.5 Hz)
@@ -29,12 +29,12 @@ enum class LEDState {
  */
 struct LEDIndicator {
     uint8_t pin;
-    LEDState state;
+    LEDPattern state;
     unsigned long lastToggle;
     bool currentState;
     uint8_t flashCount;    // For error flash pattern
     
-    LEDIndicator() : pin(0), state(LEDState::OFF), lastToggle(0), currentState(false), flashCount(0) {}
+    LEDIndicator() : pin(0), state(LEDPattern::OFF), lastToggle(0), currentState(false), flashCount(0) {}
 };
 
 class I2CManager {
@@ -68,13 +68,13 @@ public:
     bool isAdsReady() const;
 
     // --- LED State Management ---
-    void setPowerLED(LEDState state);
-    void setGPSLED(LEDState state);
-    void setRTKLED(LEDState state);
-    void setEthLED(LEDState state);
-    void setSteerStandbyLED(LEDState state);
-    void setSteerActiveLED(LEDState state);
-    void setAllLEDs(LEDState state);
+    void setPowerLED(LEDPattern state);
+    void setGPSLED(LEDPattern state);
+    void setRTKLED(LEDPattern state);
+    void setEthLED(LEDPattern state);
+    void setSteerStandbyLED(LEDPattern state);
+    void setSteerActiveLED(LEDPattern state);
+    void setAllLEDs(LEDPattern state);
 
     // --- Motor Control ---
     void setMotorEnableA(bool enabled);

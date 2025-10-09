@@ -223,6 +223,7 @@ public:
     struct ADSConfig {
         uint8_t mainPowerISpin = 3;     ///< @brief ADS channel for main power current sensing
         uint16_t readings[4] = {0,0,0,0};
+        float voltages[4] = {0.0,0.0,0.0,0.0};
     } adsConfig;
 
     /**
@@ -349,7 +350,7 @@ public:
         
         String lastNtripData;       ///< @brief Last received NTRIP correction data
         uint8_t lastNtripDataLen;   ///< @brief Length of last NTRIP data packet
-        char nmea[100];             ///< @brief Raw NMEA sentence buffer
+        char nmea[150];             ///< @brief Raw NMEA sentence buffer - increased for PANDA sentence
         const char* asciiHex = "0123456789ABCDEF"; ///< @brief Hex encoding lookup table
         bool externalGPS = false;   ///< @brief GPS source flag (false=onboard, true=wireless)
         uint16_t gpsBaud;           ///< @brief GPS communication baud rate
@@ -448,7 +449,9 @@ public:
         bool wirelessWAS = false;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
         float wasZeroAngle = 0.0;     ///< @brief Wheel angle sensor zero calibration value
         uint32_t looptime = 0;   
-        uint32_t looptimestamp = 0; 
+        uint32_t looptimestamp = 0;
+        float sensorVoltage = 0.0;      ///< @brief Voltage reading from analog wheel angle sensor
+         
     } steer;
 
     /**

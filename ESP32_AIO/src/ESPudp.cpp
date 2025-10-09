@@ -183,7 +183,18 @@ void ESPudp::begin(ESPGPS* gps){
               udp.writeTo(aioReply, sizeof(aioReply), IPAddress(espData->wifi.ips[0],espData->wifi.ips[1], espData->wifi.ips[2],255) , espData->wifi.aioPort);
               // sendUDP(aioReply);
               // udp.writeTo(aioReply, sizeof(aioReply), espData->wifiCfg.moduleIP, espData->wifiCfg.aioPort);
-              
+              // aioReply[2] = 126;
+              delay(10);
+              aioReply[2] = 79;
+              aioReply[3] = 121;
+              aioReply[4] = 5;
+              aioReply[5] = 0;
+              aioReply[6] = 0;
+              aioReply[7] = 0;
+              aioReply[8] = 0;  
+              aioReply[9] = 0;
+              aioReply[10] = calcChecksum(aioReply, sizeof(aioReply));
+              udp.writeTo(aioReply, sizeof(aioReply), IPAddress(espData->wifi.ips[0],espData->wifi.ips[1], espData->wifi.ips[2],255) , espData->wifi.aioPort);
               // TODO: Send back a hello packet
               break;
             case 201:
@@ -211,7 +222,9 @@ void ESPudp::begin(ESPGPS* gps){
               this->espData->steer.lowPWM = packet.data()[7];
               this->espData->steer.minPWM = packet.data()[8];
               this->espData->steer.countsPerDeg = packet.data()[9];
-              this->espData->steer.steerOffset = packet.data()[10] << 8 | packet.data()[11];
+              // Serial.print("counts per deg: ");
+              // Serial.println(this->espData->steer.countsPerDeg);
+              this->espData->steer.steerOffset = packet.data()[11] << 8 | packet.data()[10];
               this->espData->steer.ackermanFix = packet.data()[12];
               this->espData->steer.settingsUpdated = 1;
               Serial.print("Got Steer Settings ");

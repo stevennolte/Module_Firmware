@@ -24,6 +24,10 @@ void WAS::loop(){
         vTaskDelay(10);
     } else {
         espData->steer.rawADS = i2cManager.getRawReading(0);
+
+        espData->steer.sensorVoltage = i2cManager.getVoltage(0);
+        uint16_t zeroPoint = 6800;
+        espData->steer.actSteerAngle = (float)((int)espData->steer.rawADS/2 - (int)zeroPoint+espData->steer.steerOffset/2) / (float)(espData->steer.countsPerDeg);
         // TODO: Migrate to use i2cManager.getRawReading(0)
         // espData->steer.rawADS = i2cManager.getRawReading(0);
         // espData->steer.actSteerAngle = ads->computeVolts(espData->steer.rawADS);

@@ -96,7 +96,7 @@ bool I2CManager::begin(TwoWire* bus, uint8_t mcp_addr, uint8_t ads_addr) {
             "I2CManagerTask",
             4096, // Stack size
             this,
-            1, // Priority
+            4, // Lower priority to avoid conflicts
             &_taskHandle
         );
         if (_taskHandle != nullptr) {
@@ -219,33 +219,33 @@ void I2CManager::updateLED(LEDIndicator& led) {
     bool newState = led.currentState;
     
     switch (led.state) {
-        case LEDState::OFF:
+        case LEDPattern::OFF:
             newState = false;
             break;
             
-        case LEDState::ON:
+        case LEDPattern::ON:
             newState = true;
             break;
             
-        case LEDState::SLOW_PULSE:
+        case LEDPattern::SLOW_PULSE:
             if (currentTime - led.lastToggle >= 1000) { // 1 second
                 shouldToggle = true;
             }
             break;
             
-        case LEDState::FAST_PULSE:
+        case LEDPattern::FAST_PULSE:
             if (currentTime - led.lastToggle >= 250) { // 250ms
                 shouldToggle = true;
             }
             break;
             
-        case LEDState::RAPID_PULSE:
+        case LEDPattern::RAPID_PULSE:
             if (currentTime - led.lastToggle >= 100) { // 100ms
                 shouldToggle = true;
             }
             break;
             
-        case LEDState::ERROR_FLASH:
+        case LEDPattern::ERROR_FLASH:
             if (led.flashCount < 6) { // 3 flashes = 6 state changes
                 if (currentTime - led.lastToggle >= 100) { // 100ms on/off
                     shouldToggle = true;
@@ -259,7 +259,7 @@ void I2CManager::updateLED(LEDIndicator& led) {
             }
             break;
             
-        case LEDState::HEARTBEAT:
+        case LEDPattern::HEARTBEAT:
             // Double pulse pattern: on-off-on-off-pause
             if (led.flashCount < 4) {
                 if (currentTime - led.lastToggle >= 150) { // 150ms for heartbeat pulses
@@ -287,37 +287,37 @@ void I2CManager::updateLED(LEDIndicator& led) {
 }
 
 // LED State Control Methods
-void I2CManager::setPowerLED(LEDState state) {
+void I2CManager::setPowerLED(LEDPattern state) {
     ledPowerOn.state = state;
     ledPowerOn.flashCount = 0;
 }
 
-void I2CManager::setGPSLED(LEDState state) {
+void I2CManager::setGPSLED(LEDPattern state) {
     ledGPSFix.state = state;
     ledGPSFix.flashCount = 0;
 }
 
-void I2CManager::setRTKLED(LEDState state) {
+void I2CManager::setRTKLED(LEDPattern state) {
     ledRTKFix.state = state;
     ledRTKFix.flashCount = 0;
 }
 
-void I2CManager::setEthLED(LEDState state) {
+void I2CManager::setEthLED(LEDPattern state) {
     ledEthGood.state = state;
     ledEthGood.flashCount = 0;
 }
 
-void I2CManager::setSteerStandbyLED(LEDState state) {
+void I2CManager::setSteerStandbyLED(LEDPattern state) {
     ledSteerStandby.state = state;
     ledSteerStandby.flashCount = 0;
 }
 
-void I2CManager::setSteerActiveLED(LEDState state) {
+void I2CManager::setSteerActiveLED(LEDPattern state) {
     ledSteerActive.state = state;
     ledSteerActive.flashCount = 0;
 }
 
-void I2CManager::setAllLEDs(LEDState state) {
+void I2CManager::setAllLEDs(LEDPattern state) {
     setPowerLED(state);
     setGPSLED(state);
     setRTKLED(state);

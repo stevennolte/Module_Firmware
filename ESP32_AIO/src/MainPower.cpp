@@ -22,6 +22,8 @@ void MainPower::startTask()
     digitalWrite(_data->pins.mainPowerDen, LOW);
 
     digitalWrite(_mainPowerPin, HIGH);
+    // LEDPattern pattern = LEDPattern::ON;
+    _i2cManager.setPowerLED(LEDPattern::ON);
     xTaskCreatePinnedToCore(
         taskHandler,   /* Task function. */
         "MainPower",     /* name of task. */
@@ -48,6 +50,7 @@ void MainPower::continuousLoop()
 }
 
 void MainPower::getCurrent(){
+    _data->power.mainCurrentRaw = _i2cManager.getRawReading(_data->adsConfig.mainPowerISpin);
     // Read main power current using ADS1115 (temporarily disabled until ADS migration)
     // TODO: Migrate to use adsManager.getRawReading(_data->adsConfig.mainPowerISpin)
     // if (_ads != nullptr) {

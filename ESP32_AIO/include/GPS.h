@@ -106,6 +106,8 @@ class ESPGPS{
     private:
         static ESPGPS* instance;
         static void staticGGA_Handler();
+        static void staticVTG_Handler();
+        void VTG_Handler();
         char fixTime[12];
         uint32_t imuWatchdog;
         uint32_t gpsWatchdog;
@@ -119,6 +121,13 @@ class ESPGPS{
         HardwareSerial* gpsSerial;
         HardwareSerial* bnoSerial;
         Adafruit_BNO08x_RVC rvc;
+        
+        // NMEA sentence buffering - not needed for NMEAParser approach
+        // static const size_t NMEA_BUFFER_SIZE = 200; // Increased to handle longer sentences
+        // char* nmeaBuffer; // Use heap allocation instead of stack
+        // size_t bufferIndex;
+        // void processCompleteSentence(const char* sentence);
+        // void parseNMEAManually(const char* sentence);
 };
 
 #endif
