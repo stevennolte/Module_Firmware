@@ -83,6 +83,9 @@ ESPsteer espSteer(&espData);  // Will be migrated to use ADSManager
 /// @brief Debug variables vector for web interface display
 std::vector<String> debugVars;
 
+/// @brief Debug mode flag - true for full debug, false for minimal
+bool fullDebugMode = false;
+
 // WebSocket Serial Monitor Variables
 // String serialBuffer = "";
 // const size_t MAX_SERIAL_BUFFER = 8192;  // 8KB buffer
@@ -417,6 +420,19 @@ void updateDebugVars() {
   
   // Reserve capacity to avoid multiple reallocations
   debugVars.clear();
+  
+  // Check if minimal debug mode is enabled
+  if (!fullDebugMode) {
+    // Minimal debug mode - only show basic info
+    Serial.println("DEBUG: Using minimal debug mode");
+    debugVars.reserve(3);
+    debugVars.push_back("Program: " + String(NAME));
+    debugVars.push_back("Timestamp since boot [s]: " + String((float)(millis())/1000.0, 2));
+    return;
+  }
+  
+  // Full debug mode - show all variables
+  Serial.println("DEBUG: Using full debug mode");
   debugVars.reserve(40); // Reduced from 80 to minimize memory usage
   
   webSerial("Updating normal mode debug variables...\n");
@@ -450,7 +466,12 @@ void updateDebugVars() {
   debugVars.push_back("..Speed: " + String(espData.gps.speedKnots, 2));
   debugVars.push_back("..Heading: " + String(espData.gps.imuHeading, 2));
   debugVars.push_back("..HDOP: " + String(espData.gps.HDOP, 2));
-  
+  debugVars.push_back("..Message Counts");
+  debugVars.push_back("....GGA: " + String(espData.gps.ggaMessageCount));
+  debugVars.push_back("....RMC: " + String(espData.gps.rmcMessageCount));
+  debugVars.push_back("....GSA: " + String(espData.gps.gsaMessageCount));
+  debugVars.push_back("....VTG: " + String(espData.gps.vtgMessageCount));
+  debugVars.push_back("....Other:" + String(espData.gps.otherMessageCount));  
   // Steering data - essential only
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Angle: " + String(espData.steer.targetSteerAngle, 2));
@@ -1478,6 +1499,49 @@ void normalboot(){
         });
         // Route to get debug variables as JSON
         server.on("/getDebugVars", HTTP_GET, handleDebugVars);
+        
+        // Route to set debug mode (minimal vs full)
+        server.on("/setDebugMode", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+          // This is the body handler for POST requests
+          static String body = "";
+          
+          // Accumulate the body data
+          if (index == 0) {
+            body = "";  // Reset for new request
+          }
+          
+          for (size_t i = 0; i < len; i++) {
+            body += (char)data[i];
+          }
+          
+          // Process only when we have received all the data
+          if (index + len == total) {
+            Serial.println("setDebugMode endpoint called");
+            Serial.println("Request body: " + body);
+            
+            // Parse JSON body
+            StaticJsonDocument<200> doc;
+            DeserializationError error = deserializeJson(doc, body);
+            
+            if (error) {
+              Serial.println("JSON parsing error: " + String(error.c_str()));
+              request->send(400, "text/plain", "Invalid JSON");
+              return;
+            }
+            
+            if (doc.containsKey("fullDebug")) {
+              bool newMode = doc["fullDebug"].as<bool>();
+              fullDebugMode = newMode;
+              String response = fullDebugMode ? "Full debug mode enabled" : "Minimal debug mode enabled";
+              Serial.println("Debug mode changed to: " + String(fullDebugMode ? "FULL" : "MINIMAL"));
+              request->send(200, "text/plain", response);
+            } else {
+              Serial.println("Missing fullDebug parameter in JSON");
+              request->send(400, "text/plain", "Missing fullDebug parameter");
+            }
+          }
+        });
+        
         // Route to list files as JSON
         Serial.println("Registering settings endpoints for normal mode...");
         server.on("/settings", HTTP_GET, handleSettingsPage);
@@ -1772,6 +1836,7 @@ void normalboot(){
 void setup(){
   Serial.begin(115200);
   myLED.startTask();
+  myLED.setLEDState(LEDState::SPECIAL_MODE);
   // myLED.setLEDState(LEDState::NO_ERROR);
   delay(1000); // Give time for serial to initialize
   Serial.println("\n\nStarting up...");

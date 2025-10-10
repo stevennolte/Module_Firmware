@@ -48,6 +48,13 @@ ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSeri
     _gpsFixIndPin = espData->pins.gpsFix;
     _rtkFixIndPin = espData->pins.rtkFix;
     
+    // Initialize NMEA message counters in ESPdata struct
+    espData->gps.ggaMessageCount = 0;
+    espData->gps.vtgMessageCount = 0;
+    espData->gps.gsaMessageCount = 0;
+    espData->gps.rmcMessageCount = 0;
+    espData->gps.otherMessageCount = 0;
+    
     // No need for manual NMEA buffer when using NMEAParser library
     Serial.println("GPS constructor: Using NMEAParser library");
     
@@ -72,63 +79,204 @@ ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSeri
  * @note Called automatically by NMEA parser when GGA sentence is received
  * @see VTG_Handler(), parser.h
  */
-void ESPGPS::GGA_Handler() //Rec'd GGA
+/**
+ * @brief Helper function to clean unwanted characters from GPS data fields
+ * @param str String to clean
+ */
+void ESPGPS::cleanDataField(char* str) {
+    if (!str) return;
+    
+    // Remove any \r, \n, or other control characters
+    int len = strlen(str);
+    for (int i = 0; i < len; i++) {
+        if (str[i] == '\r' || str[i] == '\n' || str[i] < 32) {
+            str[i] = '\0';  // Terminate string at first bad character
+            break;
+        }
+    }
+}
+
+/**
+ * @brief NMEA GGA sentence handler for GPS position data
+ * 
+ * @details Custom parser for GGA sentences to extract:
+ *          - Fix time (UTC)
+ *          - Latitude and longitude coordinates
+ *          - Fix quality indicator
+ *          - Number of satellites in use
+ *          - Horizontal dilution of precision (HDOP)
+ *          - Altitude above mean sea level
+ * 
+ * @note Called when a complete GGA sentence is received
+ */
+void ESPGPS::parseGGA(const char* sentence) 
 {
-    // Safety check
-    if (!espData) {
-        Serial.println("ERROR: espData is null in GGA_Handler");
-        return;
+    // GGA format: $GPGGA,time,lat,latNS,lon,lonEW,quality,numSats,hdop,alt,altUnit,geoidHeight,geoidUnit,dgpsAge,dgpsID*checksum
+    
+    char* fields[15];
+    int fieldCount = 0;
+    char tempSentence[150];
+    strcpy(tempSentence, sentence);
+    
+    // Split sentence by commas
+    char* token = strtok(tempSentence, ",*");
+    while (token != NULL && fieldCount < 15) {
+        fields[fieldCount++] = token;
+        token = strtok(NULL, ",*");
     }
     
-    Serial.println("got gga");
+    if (fieldCount >= 10) {
+        // Initialize all GPS fields to empty strings first to avoid garbage characters
+        espData->gps.fixTime[0] = '\0';
+        espData->gps.latitude[0] = '\0';
+        espData->gps.latNS[0] = '\0';
+        espData->gps.longitude[0] = '\0';
+        espData->gps.lonEW[0] = '\0';
+        espData->gps.fixQuality[0] = '\0';
+        espData->gps.numSats[0] = '\0';
+        espData->gps.HDOP[0] = '\0';
+        espData->gps.altitude[0] = '\0';
+        espData->gps.ageDGPS[0] = '\0';
+        
+        // Extract time (field 1) and clean it
+        if (strlen(fields[1]) > 0) {
+            strncpy(espData->gps.fixTime, fields[1], sizeof(espData->gps.fixTime) - 1);
+            espData->gps.fixTime[sizeof(espData->gps.fixTime) - 1] = '\0';
+            cleanDataField(espData->gps.fixTime);
+        }
+        
+        // Extract latitude (fields 2,3) and clean them
+        if (strlen(fields[2]) > 0) {
+            strncpy(espData->gps.latitude, fields[2], sizeof(espData->gps.latitude) - 1);
+            espData->gps.latitude[sizeof(espData->gps.latitude) - 1] = '\0';
+            cleanDataField(espData->gps.latitude);
+        }
+        if (strlen(fields[3]) > 0) {
+            strncpy(espData->gps.latNS, fields[3], sizeof(espData->gps.latNS) - 1);
+            espData->gps.latNS[sizeof(espData->gps.latNS) - 1] = '\0';
+            cleanDataField(espData->gps.latNS);
+        }
+        
+        // Extract longitude (fields 4,5) and clean them
+        if (strlen(fields[4]) > 0) {
+            strncpy(espData->gps.longitude, fields[4], sizeof(espData->gps.longitude) - 1);
+            espData->gps.longitude[sizeof(espData->gps.longitude) - 1] = '\0';
+            cleanDataField(espData->gps.longitude);
+        }
+        if (strlen(fields[5]) > 0) {
+            strncpy(espData->gps.lonEW, fields[5], sizeof(espData->gps.lonEW) - 1);
+            espData->gps.lonEW[sizeof(espData->gps.lonEW) - 1] = '\0';
+            cleanDataField(espData->gps.lonEW);
+        }
+        
+        // Extract fix quality (field 6) and clean it
+        if (strlen(fields[6]) > 0) {
+            strncpy(espData->gps.fixQuality, fields[6], sizeof(espData->gps.fixQuality) - 1);
+            espData->gps.fixQuality[sizeof(espData->gps.fixQuality) - 1] = '\0';
+            cleanDataField(espData->gps.fixQuality);
+        }
+        
+        // Extract number of satellites (field 7) and clean it
+        if (strlen(fields[7]) > 0) {
+            strncpy(espData->gps.numSats, fields[7], sizeof(espData->gps.numSats) - 1);
+            espData->gps.numSats[sizeof(espData->gps.numSats) - 1] = '\0';
+            cleanDataField(espData->gps.numSats);
+        }
+        
+        // Extract HDOP (field 8) and clean it
+        if (strlen(fields[8]) > 0) {
+            strncpy(espData->gps.HDOP, fields[8], sizeof(espData->gps.HDOP) - 1);
+            espData->gps.HDOP[sizeof(espData->gps.HDOP) - 1] = '\0';
+            cleanDataField(espData->gps.HDOP);
+        }
+        
+        // Extract altitude (field 9) and clean it
+        if (strlen(fields[9]) > 0) {
+            strncpy(espData->gps.altitude, fields[9], sizeof(espData->gps.altitude) - 1);
+            espData->gps.altitude[sizeof(espData->gps.altitude) - 1] = '\0';
+            cleanDataField(espData->gps.altitude);
+        }
+        
+        // Extract DGPS age (field 13) if available and clean it
+        if (fieldCount > 13 && strlen(fields[13]) > 0) {
+            strncpy(espData->gps.ageDGPS, fields[13], sizeof(espData->gps.ageDGPS) - 1);
+            espData->gps.ageDGPS[sizeof(espData->gps.ageDGPS) - 1] = '\0';
+            cleanDataField(espData->gps.ageDGPS);
+        }
+        
+        // Increment GGA message counter in ESPdata
+        espData->gps.ggaMessageCount++;
+        
+        // Serial.println("GGA parsed successfully");
+        buildPandaSentence();
+    }
+}
+
+/**
+ * @brief Parse VTG sentence for speed data
+ */
+void ESPGPS::parseVTG(const char* sentence) 
+{
+    // VTG format: $GPVTG,courseTrue,T,courseMag,M,speedKnots,N,speedKmh,K,mode*checksum
     
-    // Clear GPS data fields first to ensure clean data
-    memset(espData->gps.fixTime, 0, sizeof(espData->gps.fixTime));
-    memset(espData->gps.latitude, 0, sizeof(espData->gps.latitude));
-    memset(espData->gps.latNS, 0, sizeof(espData->gps.latNS));
-    memset(espData->gps.longitude, 0, sizeof(espData->gps.longitude));
-    memset(espData->gps.lonEW, 0, sizeof(espData->gps.lonEW));
-    memset(espData->gps.fixQuality, 0, sizeof(espData->gps.fixQuality));
-    memset(espData->gps.numSats, 0, sizeof(espData->gps.numSats));
-    memset(espData->gps.HDOP, 0, sizeof(espData->gps.HDOP));
-    memset(espData->gps.altitude, 0, sizeof(espData->gps.altitude));
-    memset(espData->gps.ageDGPS, 0, sizeof(espData->gps.ageDGPS));
+    char* fields[10];
+    int fieldCount = 0;
+    char tempSentence[150];
+    strcpy(tempSentence, sentence);
     
-    // Parse GPS data with error checking
-    try {
-        // fix time
-        parser.getArg(0, espData->gps.fixTime);
-
-        // latitude
-        parser.getArg(1, espData->gps.latitude);
-        parser.getArg(2, espData->gps.latNS);
-
-        // longitude
-        parser.getArg(3, espData->gps.longitude);
-        parser.getArg(4, espData->gps.lonEW);
-
-        // fix quality
-        parser.getArg(5, espData->gps.fixQuality);
-
-        // satellite #
-        parser.getArg(6, espData->gps.numSats);
-
-        // HDOP
-        parser.getArg(7, espData->gps.HDOP);
-
-        // altitude
-        parser.getArg(8, espData->gps.altitude);
-
-        // time of last DGPS update
-        parser.getArg(12, espData->gps.ageDGPS);
+    // Split sentence by commas
+    char* token = strtok(tempSentence, ",*");
+    while (token != NULL && fieldCount < 10) {
+        fields[fieldCount++] = token;
+        token = strtok(NULL, ",*");
+    }
+    
+    if (fieldCount >= 6) {
+        // Initialize speed field to empty string first
+        espData->gps.speedKnots[0] = '\0';
         
-        Serial.println("GGA parsing completed successfully");
+        // Extract speed in knots (field 5) and clean it
+        if (strlen(fields[5]) > 0) {
+            strncpy(espData->gps.speedKnots, fields[5], sizeof(espData->gps.speedKnots) - 1);
+            espData->gps.speedKnots[sizeof(espData->gps.speedKnots) - 1] = '\0';
+            cleanDataField(espData->gps.speedKnots);
+        }
         
-        // Only build NMEA sentence if parsing was successful
-        buildNmea();
+        // Increment VTG message counter in ESPdata
+        espData->gps.vtgMessageCount++;
         
-    } catch (...) {
-        Serial.println("ERROR: Exception in GGA parsing");
+        // Serial.println("VTG parsed successfully");
+    }
+}
+
+/**
+ * @brief Custom NMEA parser - replaces NMEAParser library
+ */
+void ESPGPS::parseNMEASentence(const char* sentence) 
+{
+    if (!sentence || strlen(sentence) < 7) return;
+    
+    // Check sentence type
+    if (strstr(sentence, "GGA") != NULL) {
+        parseGGA(sentence);
+    }
+    else if (strstr(sentence, "VTG") != NULL) {
+        parseVTG(sentence);
+    }
+    // Add GSA and RMC parsers here if needed
+    else if (strstr(sentence, "GSA") != NULL) {
+        // GSA parsing for satellite info if needed
+        // Serial.println("GSA sentence received (not parsed yet)");
+        espData->gps.gsaMessageCount++;
+    }
+    else if (strstr(sentence, "RMC") != NULL) {
+        // RMC parsing for additional data if needed
+        // Serial.println("RMC sentence received (not parsed yet)");
+        espData->gps.rmcMessageCount++;
+    }
+    else {
+        // Count other message types
+        espData->gps.otherMessageCount++;
     }
 }
 
@@ -143,7 +291,7 @@ void ESPGPS::GGA_Handler() //Rec'd GGA
  */
 void ESPGPS::VTG_Handler() 
 {
-    Serial.println("got vtg");
+    // Serial.println("got vtg");
     
     // Course over ground (true) - field 0
     // parser.getArg(0, espData->gps.courseTrue);
@@ -174,6 +322,26 @@ void ESPGPS::staticGGA_Handler(){
 void ESPGPS::init(ESPudp* espUdp){
     this->espUdp = espUdp;
     
+    // Initialize all GPS data fields to empty strings to prevent garbage characters
+    espData->gps.fixTime[0] = '\0';
+    espData->gps.latitude[0] = '\0';
+    espData->gps.latNS[0] = '\0';
+    espData->gps.longitude[0] = '\0';
+    espData->gps.lonEW[0] = '\0';
+    espData->gps.fixQuality[0] = '\0';
+    espData->gps.numSats[0] = '\0';
+    espData->gps.HDOP[0] = '\0';
+    espData->gps.altitude[0] = '\0';
+    espData->gps.ageDGPS[0] = '\0';
+    espData->gps.speedKnots[0] = '\0';
+    espData->gps.imuHeading[0] = '\0';
+    espData->gps.imuRoll[0] = '\0';
+    espData->gps.imuPitch[0] = '\0';
+    espData->gps.imuYawRate[0] = '\0';
+    espData->gps.nmea[0] = '\0';
+    
+    Serial.println("GPS: All data fields initialized to empty strings");
+    
     // Setup GPS indicators using MCPManager member
     // if (mcpManager.isInitialized()) {
     //     mcpManager.setupGPSIndicators();  // Uses ESPdata pin definitions
@@ -183,8 +351,9 @@ void ESPGPS::init(ESPudp* espUdp){
     //     Serial.println("GPS: MCPManager not initialized, skipping indicator setup");
     // }
    
-    parser.addHandler("GNGGA", staticGGA_Handler);
-    parser.addHandler("GNVTG", staticVTG_Handler);  // Add VTG handler for speed data
+    // Using custom NMEA parser - no need for NMEAParser library handlers
+    // parser.addHandler("GNGGA", staticGGA_Handler);
+    // parser.addHandler("GNVTG", staticVTG_Handler);
     // parser.setErrorHandler(errorHandler);
     // parser.addHandler("G-GGA", GPS::GGA_Handler);
     // parser.addHandler("G-VTG", VTG_Handler);
@@ -267,6 +436,7 @@ void ESPGPS::init(ESPudp* espUdp){
             Serial.print(gpsEnd - gpsStart);
             Serial.println(" ms");
         } else {
+            i2cManager.setGPSLED(LEDPattern::ON);
             espData->gps.state = 1;
             Serial.println("UM980 detected!");
             myGNSS.disableOutput();
@@ -275,9 +445,9 @@ void ESPGPS::init(ESPudp* espUdp){
             myGNSS.setNMEAMessage("GPGGA", rate); 
             // myGNSS.setNMEAMessage("GPGSA", rate); 
             // myGNSS.setNMEAMessage("GPGST", rate); 
-            // myGNSS.setNMEAMessage("GPRMC", rate); 
+            myGNSS.setNMEAMessage("GPRMC", rate); 
             // myGNSS.setNMEAMessage("GPGSV", rate);
-            // myGNSS.setNMEAMessage("GNGGA", rate);
+            myGNSS.setNMEAMessage("GNGGA", rate);
             myGNSS.setNMEAMessage("GPVTG", rate);
 
             // myGNSS.
@@ -330,161 +500,192 @@ void ESPGPS::calculateChecksum(void)
   char checksumStr[3];
   sprintf(checksumStr, "%02X", (unsigned char)sum);
   
-  // Append the checksum after the * character
+  // Properly append the checksum after the * character
+  // The * should already be there, so we just add the checksum
   strcat(espData->gps.nmea, checksumStr);
   
-  Serial.print("Calculated checksum: ");
-  Serial.println(checksumStr);
+  // Serial.print("Calculated checksum: ");
+  // Serial.println(checksumStr);
+  // Serial.print("Final sentence after checksum: ");
+  // Serial.println(espData->gps.nmea);
 }
 
 
 
-void ESPGPS::buildNmea()
+/**
+ * @brief Build PANDA sentence according to AgOpenGPS specification
+ */
+void ESPGPS::buildPandaSentence()
 {
     // Safety check - ensure we have valid data before building NMEA
     if (!espData || !espUdp) {
-        Serial.println("ERROR: espData or espUdp is null in buildNmea");
+        Serial.println("ERROR: espData or espUdp is null in buildPandaSentence");
         return;
     }
+    
+    // Debug: Show what data we have before building sentence
+    // Serial.println("=== GPS Data Before Building PANDA ===");
+    // Serial.printf("Time: '%s'\n", espData->gps.fixTime);
+    // Serial.printf("Lat: '%s' %s\n", espData->gps.latitude, espData->gps.latNS);
+    // Serial.printf("Lon: '%s' %s\n", espData->gps.longitude, espData->gps.lonEW);
+    // Serial.printf("Quality: '%s'\n", espData->gps.fixQuality);
+    // Serial.printf("Sats: '%s'\n", espData->gps.numSats);
+    // Serial.printf("HDOP: '%s'\n", espData->gps.HDOP);
+    // Serial.printf("Alt: '%s'\n", espData->gps.altitude);
+    // Serial.printf("DGPS Age: '%s'\n", espData->gps.ageDGPS);
+    // Serial.printf("Speed: '%s'\n", espData->gps.speedKnots);
+    // Serial.printf("IMU Heading: '%s'\n", espData->gps.imuHeading);
+    // Serial.printf("IMU Roll: '%s'\n", espData->gps.imuRoll);
+    // Serial.printf("IMU Pitch: '%s'\n", espData->gps.imuPitch);
+    // Serial.printf("IMU Yaw Rate: '%s'\n", espData->gps.imuYawRate);
+    // Serial.println("=====================================");
     
     // Clear the NMEA buffer
     strcpy(espData->gps.nmea, "");
     
-    // Build PANDA sentence in AgOpenGPS format
-    // $PANDA,time,lat,latNS,lon,lonEW,quality,numSats,hdop,alt,geoidHeight,speedKnots,heading*checksum
+    // Build PANDA sentence: $PANDA,time,lat,latNS,lon,lonEW,quality,numSats,hdop,alt,dgpsAge,speed,heading,roll,pitch,yawRate*checksum
     strcat(espData->gps.nmea, "$PANDA,");
     
-    // Add fix time (or empty if not available)
-    if (strlen(espData->gps.fixTime) > 0) {
+    // (1) Time of fix - only add if we have valid data
+    if (strlen(espData->gps.fixTime) > 0 && espData->gps.fixTime[0] != '\0') {
         strcat(espData->gps.nmea, espData->gps.fixTime);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add latitude (limit decimal places for AgOpenGPS compatibility)
-    if (strlen(espData->gps.latitude) > 0) {
-        // Truncate latitude to 10 characters max (reduces precision but fits in buffer)
-        char truncLat[12];
-        strncpy(truncLat, espData->gps.latitude, 10);
-        truncLat[10] = '\0';
-        strcat(espData->gps.nmea, truncLat);
+    // (2) Latitude - only add if we have valid data
+    if (strlen(espData->gps.latitude) > 0 && espData->gps.latitude[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.latitude);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add latitude N/S
-    if (strlen(espData->gps.latNS) > 0) {
+    // (3) Latitude N/S - only add if we have valid data
+    if (strlen(espData->gps.latNS) > 0 && espData->gps.latNS[0] != '\0') {
         strcat(espData->gps.nmea, espData->gps.latNS);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add longitude (limit decimal places for AgOpenGPS compatibility)
-    if (strlen(espData->gps.longitude) > 0) {
-        // Truncate longitude to 11 characters max (reduces precision but fits in buffer)
-        char truncLon[13];
-        strncpy(truncLon, espData->gps.longitude, 11);
-        truncLon[11] = '\0';
-        strcat(espData->gps.nmea, truncLon);
+    // (4) Longitude - only add if we have valid data
+    if (strlen(espData->gps.longitude) > 0 && espData->gps.longitude[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.longitude);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add longitude E/W
-    if (strlen(espData->gps.lonEW) > 0) {
+    // (5) Longitude E/W - only add if we have valid data
+    if (strlen(espData->gps.lonEW) > 0 && espData->gps.lonEW[0] != '\0') {
         strcat(espData->gps.nmea, espData->gps.lonEW);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add fix quality
-    if (strlen(espData->gps.fixQuality) > 0) {
+    // (6) Fix quality (0-8 as per specification) - only add if we have valid data
+    if (strlen(espData->gps.fixQuality) > 0 && espData->gps.fixQuality[0] != '\0') {
         strcat(espData->gps.nmea, espData->gps.fixQuality);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add number of satellites
-    if (strlen(espData->gps.numSats) > 0) {
+    // (7) Number of satellites being tracked - only add if we have valid data
+    if (strlen(espData->gps.numSats) > 0 && espData->gps.numSats[0] != '\0') {
         strcat(espData->gps.nmea, espData->gps.numSats);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add HDOP (or empty)
-    if (strlen(espData->gps.HDOP) > 0) {
-        // Truncate HDOP to 4 characters max
-        char truncHDOP[6];
-        strncpy(truncHDOP, espData->gps.HDOP, 4);
-        truncHDOP[4] = '\0';
-        strcat(espData->gps.nmea, truncHDOP);
+    // (8) Horizontal dilution of position - only add if we have valid data
+    if (strlen(espData->gps.HDOP) > 0 && espData->gps.HDOP[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.HDOP);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add altitude (or empty)
-    if (strlen(espData->gps.altitude) > 0) {
-        // Truncate altitude to 6 characters max
-        char truncAlt[8];
-        strncpy(truncAlt, espData->gps.altitude, 6);
-        truncAlt[6] = '\0';
-        strcat(espData->gps.nmea, truncAlt);
+    // (9) Altitude (ALWAYS in Meters, above mean sea level) - only add if we have valid data
+    if (strlen(espData->gps.altitude) > 0 && espData->gps.altitude[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.altitude);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Skip geoid height field to save space - leave empty
-    strcat(espData->gps.nmea, ",");
-    
-    // Add speed in knots (truncate to save space)
-    if (strlen(espData->gps.speedKnots) > 0) {
-        char truncSpeed[6];
-        strncpy(truncSpeed, espData->gps.speedKnots, 4);
-        truncSpeed[4] = '\0';
-        strcat(espData->gps.nmea, truncSpeed);
+    // (10) Time in seconds since last DGPS update - only add if we have valid data
+    if (strlen(espData->gps.ageDGPS) > 0 && espData->gps.ageDGPS[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.ageDGPS);
     }
     strcat(espData->gps.nmea, ",");
     
-    // Add heading from IMU (truncate to save space)
-    if (strlen(espData->gps.imuHeading) > 0) {
-        char truncHeading[6];
-        strncpy(truncHeading, espData->gps.imuHeading, 4);
-        truncHeading[4] = '\0';
-        strcat(espData->gps.nmea, truncHeading);
+    // (11) Speed in knots - only add if we have valid data
+    if (strlen(espData->gps.speedKnots) > 0 && espData->gps.speedKnots[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.speedKnots);
+    }
+    strcat(espData->gps.nmea, ",");
+    
+    // FROM IMU:
+    // (12) Heading in degrees - only add if we have valid data
+    if (strlen(espData->gps.imuHeading) > 0 && espData->gps.imuHeading[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.imuHeading);
+    }
+    strcat(espData->gps.nmea, ",");
+    
+    // (13) Roll angle in degrees (positive roll = right leaning) - only add if we have valid data
+    if (strlen(espData->gps.imuRoll) > 0 && espData->gps.imuRoll[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.imuRoll);
+    }
+    strcat(espData->gps.nmea, ",");
+    
+    // (14) Pitch angle in degrees (positive pitch = nose up) - only add if we have valid data
+    if (strlen(espData->gps.imuPitch) > 0 && espData->gps.imuPitch[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.imuPitch);
+    }
+    strcat(espData->gps.nmea, ",");
+    
+    // (15) Yaw Rate in Degrees/second - only add if we have valid data
+    if (strlen(espData->gps.imuYawRate) > 0 && espData->gps.imuYawRate[0] != '\0') {
+        strcat(espData->gps.nmea, espData->gps.imuYawRate);
     }
     
-    strcat(espData->gps.nmea, "*");
+    // Add comma after the last field, then asterisk for checksum
+    strcat(espData->gps.nmea, ",*");
     
     // Check length before checksum to prevent overflow
     if (strlen(espData->gps.nmea) > 145) {
-        Serial.println("WARNING: NMEA sentence too long, truncating");
+        Serial.println("WARNING: PANDA sentence too long, truncating");
         espData->gps.nmea[145] = '*';
         espData->gps.nmea[146] = '\0';
     }
     
     // Debug: Show sentence before checksum
-    Serial.print("Before checksum: ");
-    Serial.println(espData->gps.nmea);
+    // Serial.print("Before checksum: ");
+    // Serial.println(espData->gps.nmea);
+    // Serial.print("Length before checksum: ");
+    // Serial.println(strlen(espData->gps.nmea));
     
-    // Calculate and append checksum (this function is now safe with buffer bounds checking)
+    // Calculate and append checksum
     calculateChecksum();
+    
+    // Debug: Show sentence after checksum but before line ending
+    // Serial.print("After checksum, before \\r\\n: ");
+    // Serial.println(espData->gps.nmea);
+    // Serial.print("Length after checksum: ");
+    // Serial.println(strlen(espData->gps.nmea));
     
     // Add proper NMEA line ending
     strcat(espData->gps.nmea, "\r\n");
     
     // Debug: Show complete sentence
-    Serial.print("Complete NMEA: ");
-    Serial.println(espData->gps.nmea);
+    // Serial.print("Complete PANDA: ");
+    // Serial.println(espData->gps.nmea);
     
     // Send via UDP if WiFi is connected
     if (espData->wifi.state == 1)
     {
-        Serial.println("Sending GPS via UDP");
+        // Serial.println("Sending PANDA via UDP");
         int len = strlen(espData->gps.nmea);
-        Serial.print("NMEA Length: ");
-        Serial.println(len);
+        // Serial.print("PANDA Length: ");
+        // Serial.println(len);
         espUdp->sendUDPgps(espData->gps.nmea);
     }
 }void ESPGPS::continuousLoop(){
     uint32_t lastImuCall = 0;
     uint32_t loopCount = 0;
     
-    Serial.println("GPS task started - using NMEAParser library");
+    // Serial.println("GPS task started - using NMEAParser library");
     
     // No buffer allocation needed for NMEAParser approach
     
-    Serial.println("GPS entering main loop...");
+    // Serial.println("GPS entering main loop...");
     
     while (true){
         loopCount++;
@@ -499,16 +700,39 @@ void ESPGPS::buildNmea()
             }
         }
         
-        // Process GPS data using original NMEAParser with fixed checksum function
+        // Process GPS data using custom NMEA parser
         int bytesProcessed = 0;
-        const int maxBytes = 64; // Conservative but reasonable limit for NMEAParser
+        const int maxBytes = 64; // Conservative limit
+        static char nmeaBuffer[200]; // Buffer for building complete sentences
+        static int bufferIndex = 0;
         
         while(gpsSerial->available() && bytesProcessed < maxBytes){
-            parser << gpsSerial->read();
+            char c = gpsSerial->read();
             bytesProcessed++;
             
-            // Use original NMEAParser - this should work now that calculateChecksum is fixed
-            // parser << c;
+            // Build complete NMEA sentences character by character
+            if (bufferIndex < sizeof(nmeaBuffer) - 1) {
+                nmeaBuffer[bufferIndex++] = c;
+                
+                // Check for end of NMEA sentence
+                if (c == '\n') {
+                    nmeaBuffer[bufferIndex] = '\0';
+                    
+                    // Process complete sentence with our custom parser
+                    if (bufferIndex > 6) { // Minimum NMEA sentence length
+                        parseNMEASentence(nmeaBuffer);
+                    }
+                    
+                    // Reset buffer for next sentence
+                    bufferIndex = 0;
+                    memset(nmeaBuffer, 0, sizeof(nmeaBuffer));
+                }
+            } else {
+                // Buffer overflow protection - reset
+                // Serial.println("NMEA buffer overflow, resetting");
+                bufferIndex = 0;
+                memset(nmeaBuffer, 0, sizeof(nmeaBuffer));
+            }
         }
         // Original NMEAParser approach is now active - no longer need manual parsing
         //             if (bufferIndex > 6) { // Minimum NMEA sentence length
@@ -540,7 +764,7 @@ void ESPGPS::buildNmea()
         }
         
         // Generous delay to prevent overwhelming the system
-        vTaskDelay(pdMS_TO_TICKS(100)); // Increased to 100ms
+        vTaskDelay(pdMS_TO_TICKS(5)); // Increased to 100ms
     }
 }
 
@@ -707,6 +931,11 @@ void ESPGPS::imuHandler(){
         BNO08x_RVC_Data heading;
         if (!rvc.read(&heading)) {
             // Serial.println("failed to read");
+            // Initialize IMU fields to "0" if read fails
+            strcpy(espData->gps.imuHeading, "0");
+            strcpy(espData->gps.imuPitch, "0");
+            strcpy(espData->gps.imuRoll, "0");
+            strcpy(espData->gps.imuYawRate, "0");
             return;
         }
         int16_t temp = 0;
@@ -719,14 +948,48 @@ void ESPGPS::imuHandler(){
         itoa(temp, espData->gps.imuPitch, 10);
         temp = heading.roll * 100;
         itoa(temp, espData->gps.imuRoll, 10);
-       
+        
+        // Set yaw rate to 0 for now (could be calculated from previous heading if needed)
+        strcpy(espData->gps.imuYawRate, "0");
 
     } else {
-        // IMU not active, do nothing
-        // itoa(0, espData->gps.imuHeading, 10);
-        // itoa(0, espData->gps.imuPitch, 10);
-        // itoa(0, espData->gps.imuRoll, 10);
+        // IMU not active, set all values to "0"
+        strcpy(espData->gps.imuHeading, "0");
+        strcpy(espData->gps.imuPitch, "0");
+        strcpy(espData->gps.imuRoll, "0");
+        strcpy(espData->gps.imuYawRate, "0");
         return;
     }
+}
+
+/**
+ * @brief Display current NMEA message counts
+ */
+void ESPGPS::logMessageCounts() 
+{
+    Serial.println("=== NMEA Message Counts ===");
+    Serial.printf("GGA messages: %lu\n", espData->gps.ggaMessageCount);
+    Serial.printf("VTG messages: %lu\n", espData->gps.vtgMessageCount);
+    Serial.printf("GSA messages: %lu\n", espData->gps.gsaMessageCount);
+    Serial.printf("RMC messages: %lu\n", espData->gps.rmcMessageCount);
+    Serial.printf("Other messages: %lu\n", espData->gps.otherMessageCount);
+    uint32_t total = espData->gps.ggaMessageCount + espData->gps.vtgMessageCount + 
+                     espData->gps.gsaMessageCount + espData->gps.rmcMessageCount + 
+                     espData->gps.otherMessageCount;
+    Serial.printf("Total messages: %lu\n", total);
+    Serial.println("===========================");
+}
+
+/**
+ * @brief Reset all NMEA message counters to zero
+ */
+void ESPGPS::resetMessageCounts() 
+{
+    espData->gps.ggaMessageCount = 0;
+    espData->gps.vtgMessageCount = 0;
+    espData->gps.gsaMessageCount = 0;
+    espData->gps.rmcMessageCount = 0;
+    espData->gps.otherMessageCount = 0;
+    Serial.println("NMEA message counters reset to zero");
 }
 

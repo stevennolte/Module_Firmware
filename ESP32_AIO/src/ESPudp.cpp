@@ -92,16 +92,19 @@ void ESPudp::begin(ESPGPS* gps){
     udpNtrip.listen(2233);
     udpNtrip.onPacket([this](AsyncUDPPacket packet) {
       char packetBuffer[255];
+      size_t packetLength = packet.length();
+      uint8_t *_data = packet.data();
       Serial.println("Sent Ntrip");
-      _gps->sendNTRIP(packet.data(), packet.length());
+      _gps->sendNTRIP(_data, packetLength);
+      
       // Serial2.write(packet.data(), packet.length());
        String ntripStr;
-       espData->gps.lastNtripDataLen = packet.length();
-      for (size_t i = 0; i < packet.length() && i < 64; i++) {
-        char buf[4];
-        sprintf(buf, "%02X ", packet.data()[i]);
-        ntripStr += buf;
+       espData->gps.lastNtripDataLen = packetLength;
+      for (size_t i = 0; i < packetLength && i < 64; i++) {
+        Serial.print(_data[i], HEX);
+        Serial.print(" ");
       }
+      Serial.println();
       espData->gps.lastNtripData = ntripStr;
     });
     Serial.println("NTRIP UDP listener setup complete");

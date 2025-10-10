@@ -91,8 +91,19 @@ class ESPGPS{
          */
         void continuousLoop();
         static void taskHandler(void *param);
-        void buildNmea();
+        
+        // Custom NMEA parsing functions
+        void parseNMEASentence(const char* sentence);
+        void parseGGA(const char* sentence);
+        void parseVTG(const char* sentence);
+        void buildPandaSentence();
         void calculateChecksum();
+        void cleanDataField(char* str);  // Helper to clean unwanted characters from GPS data
+        
+        // Message counter functions
+        void logMessageCounts();         // Display current message counts
+        void resetMessageCounts();      // Reset all counters to zero
+        
         void test();
         void sendNTRIP(uint8_t* data, uint8_t len);
         // static void errorHandler();
@@ -113,6 +124,7 @@ class ESPGPS{
         uint32_t gpsWatchdog;
         uint8_t _gpsFixIndPin;
         uint8_t _rtkFixIndPin;
+        
         ESPdata* espData;
         ESPudp* espUdp;
         I2CManager& i2cManager;  // Reference to I2CManager singleton

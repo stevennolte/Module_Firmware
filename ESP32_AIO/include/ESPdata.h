@@ -359,6 +359,13 @@ public:
         uint8_t bnoPin;             ///< @brief BNO055 IMU communication pin
         uint16_t bnoBaud;           ///< @brief BNO055 IMU communication baud rate
         const bool invertRoll = true; ///< @brief IMU roll inversion flag for dual antenna setup
+        
+        // NMEA message counters for monitoring parsing activity
+        uint32_t ggaMessageCount;   ///< @brief Count of parsed GGA (position) messages
+        uint32_t vtgMessageCount;   ///< @brief Count of parsed VTG (velocity) messages  
+        uint32_t gsaMessageCount;   ///< @brief Count of parsed GSA (satellite info) messages
+        uint32_t rmcMessageCount;   ///< @brief Count of parsed RMC (recommended minimum) messages
+        uint32_t otherMessageCount; ///< @brief Count of other NMEA message types received
     } gps;
 
     /**

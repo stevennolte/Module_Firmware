@@ -68,6 +68,12 @@
     input:checked + .slider:before {
       transform: translateX(26px);
     }
+    .slider.round {
+      border-radius: 34px;
+    }
+    .slider.round:before {
+      border-radius: 50%;
+    }
   </style>
   <script>
   const fetchWithTimeout = (url, options = {}, timeout = 5000) => {
@@ -234,6 +240,22 @@
       alert(`Debug fetch interval updated to ${debugInterval}ms.`);
     }
 
+    function toggleDebugMode() {
+      const isFullDebug = document.getElementById('fullDebugToggle').checked;
+      fetchWithTimeout('/setDebugMode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullDebug: isFullDebug })
+      })
+        .then(response => response.text())
+        .then(data => {
+          console.log('Debug mode changed:', data);
+          // Immediately refresh debug variables with new mode
+          fetchDebugVarsForUI();
+        })
+        .catch(error => console.error('Error setting debug mode:', error));
+    }
+
     window.onload = function() {
       fetchControlValue();
       // fetchDebugVarsForUI();
@@ -269,6 +291,13 @@
   </div>
 
   <h1>Debug Variables</h1>
+  <div style="margin-bottom: 15px;">
+    <label class="switch">
+      <input type="checkbox" id="fullDebugToggle" onchange="toggleDebugMode()">
+      <span class="slider round"></span>
+    </label>
+    <span style="margin-left: 10px;">Full Debug Variables</span>
+  </div>
   <ul id="debugList"></ul>
 
   <h2>Set Debug Variables Fetch Interval</h2>
