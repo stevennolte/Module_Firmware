@@ -197,18 +197,13 @@ void ESPGPS::parseGGA(const char* sentence)
             cleanDataField(espData->gps.altitude);
         }
         
-        // Extract DGPS age (field 13) if available and clean it
-        if (fieldCount > 13 && strlen(fields[13]) > 0) {
-            strncpy(espData->gps.ageDGPS, fields[13], sizeof(espData->gps.ageDGPS) - 1);
-            espData->gps.ageDGPS[sizeof(espData->gps.ageDGPS) - 1] = '\0';
-            cleanDataField(espData->gps.ageDGPS);
-        }
+        // Set DGPS age to 0 for now (instead of parsing from NMEA)
+        strcpy(espData->gps.ageDGPS, "0");
         
         // Increment GGA message counter in ESPdata
         espData->gps.ggaMessageCount++;
         
         // Serial.println("GGA parsed successfully");
-        buildPandaSentence();
     }
 }
 
@@ -256,22 +251,36 @@ void ESPGPS::parseNMEASentence(const char* sentence)
 {
     if (!sentence || strlen(sentence) < 7) return;
     
-    // Check sentence type
+    // Check sentence type and forward GGA and VTG messages over UDP
     if (strstr(sentence, "GGA") != NULL) {
-        parseGGA(sentence);
+        // parseGGA(sentence);
+        // Forward raw GGA sentence over UDP
+        if (espUdp) {
+            espUdp->sendUDPgps(sentence);
+        }
     }
     else if (strstr(sentence, "VTG") != NULL) {
-        parseVTG(sentence);
+        // parseVTG(sentence);
+        // Forward raw VTG sentence over UDP
+        if (espUdp) {
+            espUdp->sendUDPgps(sentence);
+        }
     }
     // Add GSA and RMC parsers here if needed
     else if (strstr(sentence, "GSA") != NULL) {
         // GSA parsing for satellite info if needed
         // Serial.println("GSA sentence received (not parsed yet)");
+        if (espUdp){
+            espUdp->sendUDPgps(sentence);
+        }
         espData->gps.gsaMessageCount++;
     }
     else if (strstr(sentence, "RMC") != NULL) {
         // RMC parsing for additional data if needed
         // Serial.println("RMC sentence received (not parsed yet)");
+        if (espUdp){
+            espUdp->sendUDPgps(sentence);
+        }
         espData->gps.rmcMessageCount++;
     }
     else {
@@ -439,20 +448,20 @@ void ESPGPS::init(ESPudp* espUdp){
             i2cManager.setGPSLED(LEDPattern::ON);
             espData->gps.state = 1;
             Serial.println("UM980 detected!");
-            myGNSS.disableOutput();
-            // myGNSS.setModeRoverAutomotive();
-            float rate = 0.1;
-            myGNSS.setNMEAMessage("GPGGA", rate); 
-            // myGNSS.setNMEAMessage("GPGSA", rate); 
-            // myGNSS.setNMEAMessage("GPGST", rate); 
-            myGNSS.setNMEAMessage("GPRMC", rate); 
-            // myGNSS.setNMEAMessage("GPGSV", rate);
-            myGNSS.setNMEAMessage("GNGGA", rate);
-            myGNSS.setNMEAMessage("GPVTG", rate);
-
-            // myGNSS.
-            myGNSS.saveConfiguration();
         }
+        myGNSS.sendCommand("CONFIG RTK RELIABILITY 3 1");
+        delay(500);
+        myGNSS.sendCommand("CONFIG SMOOTH RTKHEIGHT 0");
+        delay(500);
+        myGNSS.sendCommand("CONFIG HEADING RELIABILITY 3");
+        delay(500);
+        myGNSS.sendCommand("CONFIG HEADING VARIABLELENGTH");
+        delay(500);
+        myGNSS.sendCommand("CONFIG SMOOTH HEADING 0");
+        delay(500);
+        myGNSS.sendCommand("GNGGA, .1");
+        delay(500);
+        myGNSS.sendCommand("GPVTG, .1");
         Serial.print("Time to start gps: ");
         Serial.print(millis() - gpsStart);
         Serial.println(" ms");
@@ -600,10 +609,8 @@ void ESPGPS::buildPandaSentence()
     }
     strcat(espData->gps.nmea, ",");
     
-    // (10) Time in seconds since last DGPS update - only add if we have valid data
-    if (strlen(espData->gps.ageDGPS) > 0 && espData->gps.ageDGPS[0] != '\0') {
-        strcat(espData->gps.nmea, espData->gps.ageDGPS);
-    }
+    // (10) Time in seconds since last DGPS update - set to 0 for now
+    strcat(espData->gps.nmea, espData->gps.ageDGPS);
     strcat(espData->gps.nmea, ",");
     
     // (11) Speed in knots - only add if we have valid data
@@ -718,8 +725,10 @@ void ESPGPS::buildPandaSentence()
                 if (c == '\n') {
                     nmeaBuffer[bufferIndex] = '\0';
                     
-                    // Process complete sentence with our custom parser
+                    // Print raw NMEA string to serial terminal
                     if (bufferIndex > 6) { // Minimum NMEA sentence length
+                        // Serial.print("RAW NMEA: ");
+                        // Serial.print(nmeaBuffer);
                         parseNMEASentence(nmeaBuffer);
                     }
                     
@@ -879,8 +888,17 @@ void ESPGPS::taskHandler(void *param){
     instance->continuousLoop();
 }
 
-void ESPGPS::sendNTRIP(uint8_t* data, uint8_t len){
+void ESPGPS::sendNTRIP(uint8_t* data, size_t len){
 
+    // Serial.print("Raw UDP packet sent to GPS: ");
+    // Serial.print(len);
+    // Serial.print(" bytes - ");
+    // for(size_t i = 0; i < min(len, (size_t)32); i++){
+    //     Serial.printf("%02X ", data[i]);
+    // }
+    // if (len > 32) Serial.print("...");
+    // Serial.println();
+    
     gpsSerial->write(data, len);
 }
 
@@ -936,8 +954,14 @@ void ESPGPS::imuHandler(){
             strcpy(espData->gps.imuPitch, "0");
             strcpy(espData->gps.imuRoll, "0");
             strcpy(espData->gps.imuYawRate, "0");
+            if (millis() - espData->gps.imuMessageTime > 1000){
+                espData->gps.imuState = 2; // Set to error state after 1 second of failures
+            // Serial.println("IMU data received");
+            } 
             return;
         }
+        espData->gps.imuState = 1; // Ensure state is active
+        espData->gps.imuMessageTime = millis();
         int16_t temp = 0;
         temp = heading.yaw * 100;
         // Serial.println("Yaw: " + String(temp));

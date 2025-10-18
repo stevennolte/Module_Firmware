@@ -105,7 +105,7 @@ class ESPGPS{
         void resetMessageCounts();      // Reset all counters to zero
         
         void test();
-        void sendNTRIP(uint8_t* data, uint8_t len);
+        void sendNTRIP(uint8_t* data, size_t len);
         // static void errorHandler();
         void GGA_Handler();
         void displayInfo();

@@ -22,6 +22,7 @@ void WAS::loop(){
 
     if(espData->steer.wirelessWAS){
         vTaskDelay(10);
+        espData->steer.actSteerAngle = 0;
     } else {
         espData->steer.rawADS = i2cManager.getRawReading(0);
 

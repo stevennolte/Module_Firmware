@@ -26,6 +26,25 @@
  */
 ESPudp::ESPudp(ESPdata* vars) : udp(), udpNtrip(), udpGPS(), udpWAS(){
     espData = vars;
+    
+    // NTRIP task and buffering disabled for direct forwarding mode
+    // Initialize NTRIP circular buffer
+    // ntripBufferHead = 0;
+    // ntripBufferTail = 0;
+    
+    // Create NTRIP queue for notifications (small queue, just for wake-up signals)
+    // ntripQueue = xQueueCreate(5, sizeof(uint8_t));
+    
+    // Create NTRIP processing task
+    // xTaskCreatePinnedToCore(
+    //     ntripTask,           // Task function
+    //     "NTRIP_Task",        // Task name
+    //     4096,                // Stack size
+    //     this,                // Parameter passed to task
+    //     2,                   // Task priority (lower than GPS task)
+    //     &ntripTaskHandle,    // Task handle
+    //     0                    // Core to run on (core 0)
+    // );
 }
 
 /**
@@ -91,21 +110,23 @@ void ESPudp::begin(ESPGPS* gps){
     Serial.println("Setting up NTRIP UDP on port 2233");
     udpNtrip.listen(2233);
     udpNtrip.onPacket([this](AsyncUDPPacket packet) {
-      char packetBuffer[255];
       size_t packetLength = packet.length();
       uint8_t *_data = packet.data();
-      Serial.println("Sent Ntrip");
-      _gps->sendNTRIP(_data, packetLength);
       
-      // Serial2.write(packet.data(), packet.length());
-       String ntripStr;
-       espData->gps.lastNtripDataLen = packetLength;
-      for (size_t i = 0; i < packetLength && i < 64; i++) {
-        Serial.print(_data[i], HEX);
-        Serial.print(" ");
+      // Simple direct forward to GPS serial port - no buffering or parsing
+      // Serial.print("NTRIP packet received: ");
+      // Serial.print(packetLength);
+      // Serial.print(" bytes - ");
+      // for (size_t i = 0; i < min(packetLength, (size_t)16); i++) {
+      //   Serial.printf("%02X ", _data[i]);
+      // }
+      // if (packetLength > 16) Serial.print("...");
+      // Serial.println();
+      
+      // Send directly to GPS
+      if (_gps) {
+        _gps->sendNTRIP(_data, packetLength);
       }
-      Serial.println();
-      espData->gps.lastNtripData = ntripStr;
     });
     Serial.println("NTRIP UDP listener setup complete");
     
@@ -188,6 +209,7 @@ void ESPudp::begin(ESPGPS* gps){
               // udp.writeTo(aioReply, sizeof(aioReply), espData->wifiCfg.moduleIP, espData->wifiCfg.aioPort);
               // aioReply[2] = 126;
               delay(10);
+              if (espData->gps.imuState == 1){
               aioReply[2] = 79;
               aioReply[3] = 121;
               aioReply[4] = 5;
@@ -198,7 +220,7 @@ void ESPudp::begin(ESPGPS* gps){
               aioReply[9] = 0;
               aioReply[10] = calcChecksum(aioReply, sizeof(aioReply));
               udp.writeTo(aioReply, sizeof(aioReply), IPAddress(espData->wifi.ips[0],espData->wifi.ips[1], espData->wifi.ips[2],255) , espData->wifi.aioPort);
-              // TODO: Send back a hello packet
+              }// TODO: Send back a hello packet
               break;
             case 201:
               
@@ -282,13 +304,139 @@ void ESPudp::begin(ESPGPS* gps){
 
 
 void ESPudp::sendUDP(uint8_t* _data, size_t size) {
-    Serial.println("Sent data:");
-    Serial.print("\tLen: ");
-    Serial.println(sizeof(_data));
+    // Serial.println("Sent data:");
+    // Serial.print("\tLen: ");
+    // Serial.println(sizeof(_data));
     udp.writeTo(_data, sizeof(_data), IPAddress(espData->wifi.ips[0],espData->wifi.ips[1], espData->wifi.ips[2],255) , espData->wifi.aioPort);
 }
 
 void ESPudp::sendUDPgps(const char * data){
     udpGPS.broadcastTo(data,9999);
 }
+
+/**
+ * @brief Buffer NTRIP data for processing by the dedicated task
+ * 
+ * @param data Pointer to NTRIP correction data
+ * @param length Length of data in bytes
+ * 
+ * @details Thread-safe method to buffer incoming NTRIP correction data
+ *          using a circular buffer. Preserves exact byte order for proper
+ *          RTCM message parsing.
+ * 
+ * DISABLED FOR DIRECT FORWARDING MODE
+ */
+/*
+void ESPudp::bufferNTRIPData(const uint8_t* data, size_t length) {
+    if (!data || length == 0) {
+        return;
+    }
+    
+    // Add data to circular buffer
+    for (size_t i = 0; i < length; i++) {
+        size_t nextHead = (ntripBufferHead + 1) % NTRIP_BUFFER_SIZE;
+        
+        // Check for buffer overflow
+        if (nextHead == ntripBufferTail) {
+            Serial.println("NTRIP buffer overflow - dropping data");
+            break;
+        }
+        
+        ntripBuffer[ntripBufferHead] = data[i];
+        ntripBufferHead = nextHead;
+    }
+    
+    // Signal the task that data is available
+    uint8_t signal = 1;
+    xQueueSend(ntripQueue, &signal, 0);
+}
+*/
+
+/**
+ * @brief FreeRTOS task for processing NTRIP correction data
+ * 
+ * @param pvParameters Pointer to ESPudp instance
+ * 
+ * @details Dedicated task that processes buffered NTRIP data and parses complete
+ *          RTCM messages before sending them to the GPS receiver. Ensures proper
+ *          message boundaries and validates RTCM format (D3 00 preamble).
+ * 
+ * DISABLED FOR DIRECT FORWARDING MODE
+ */
+/*
+void ESPudp::ntripTask(void* pvParameters) {
+    ESPudp* udpInstance = (ESPudp*)pvParameters;
+    uint8_t signal;
+    static uint8_t rtcmBuffer[1024];  // Increased buffer for larger RTCM messages (was 512)
+    static size_t rtcmIndex = 0;
+    static bool inMessage = false;
+    static uint16_t expectedLength = 0;
+    
+    Serial.println("NTRIP processing task started");
+    
+    while (true) {
+        // Wait for signal that data is available
+        if (xQueueReceive(udpInstance->ntripQueue, &signal, portMAX_DELAY) == pdTRUE) {
+            
+            // Process all available data in circular buffer
+            while (udpInstance->ntripBufferTail != udpInstance->ntripBufferHead) {
+                uint8_t byte = udpInstance->ntripBuffer[udpInstance->ntripBufferTail];
+                udpInstance->ntripBufferTail = (udpInstance->ntripBufferTail + 1) % udpInstance->NTRIP_BUFFER_SIZE;
+                
+                if (!inMessage) {
+                    // Look for RTCM preamble D3 00
+                    if (rtcmIndex == 0 && byte == 0xD3) {
+                        rtcmBuffer[rtcmIndex++] = byte;
+                    } else if (rtcmIndex == 1 && byte == 0x00) {
+                        rtcmBuffer[rtcmIndex++] = byte;
+                    } else if (rtcmIndex == 2) {
+                        // Third byte: high byte of length
+                        rtcmBuffer[rtcmIndex++] = byte;
+                        expectedLength = (byte & 0x03) << 8;  // Only lower 2 bits
+                    } else if (rtcmIndex == 3) {
+                        // Fourth byte: low byte of length
+                        rtcmBuffer[rtcmIndex++] = byte;
+                        expectedLength |= byte;
+                        expectedLength += 6;  // Add header (3) + CRC (3) bytes
+                        inMessage = true;
+                        
+                        Serial.printf("RTCM message started, expected length: %d\n", expectedLength);
+                    } else {
+                        // Reset if we don't find proper preamble
+                        rtcmIndex = 0;
+                        if (byte == 0xD3) {
+                            rtcmBuffer[rtcmIndex++] = byte;
+                        }
+                    }
+                } else {
+                    // We're in a message, collect bytes until complete
+                    if (rtcmIndex < sizeof(rtcmBuffer)) {
+                        rtcmBuffer[rtcmIndex++] = byte;
+                        
+                        // Check if message is complete
+                        if (rtcmIndex >= expectedLength) {
+                            // Send complete RTCM message to GPS
+                            if (udpInstance->_gps) {
+                                udpInstance->_gps->sendNTRIP(rtcmBuffer, rtcmIndex);
+                                Serial.printf("Complete RTCM message sent: %d bytes\n", rtcmIndex);
+                            }
+                            
+                            // Reset for next message
+                            rtcmIndex = 0;
+                            inMessage = false;
+                            expectedLength = 0;
+                        }
+                    } else {
+                        // Buffer overflow - reset
+                        Serial.println("RTCM buffer overflow, resetting");
+                        rtcmIndex = 0;
+                        inMessage = false;
+                        expectedLength = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+*/
 

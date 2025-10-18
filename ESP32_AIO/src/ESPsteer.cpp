@@ -59,9 +59,10 @@ ESPsteer::ESPsteer(ESPdata* vars)
  */
 void ESPsteer::continuousLoop() {
     while (true) {
+        vTaskDelay(500);
         espData->steer.looptime = millis() - espData->steer.looptimestamp;
         espData->steer.looptimestamp = millis();
-        vTaskDelay(3);
+        // vTaskDelay(3);
         if (espData->steer.settingsUpdated == 1){
             setPIDgains();
             if (espData->steer.set0 == 1){
@@ -108,7 +109,7 @@ void ESPsteer::continuousLoop() {
             testdata[13] = espUdp->calcChecksum(testdata, sizeof(testdata));
             espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);
             // espUdp->sendUDP(testdata, sizeof(testdata));
-            delay(3);
+            vTaskDelay(10);
             // Current Message
             uint8_t currentData[14];
             currentData[0] = 0x80;

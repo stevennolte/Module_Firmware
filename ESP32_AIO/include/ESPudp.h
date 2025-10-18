@@ -114,6 +114,23 @@ class ESPudp{
         /// @brief Joystick control UDP service (port 8887)
         AsyncUDP udpJoystick;
         
+        /// NTRIP buffer and task components disabled for direct forwarding mode
+        /*
+        /// @brief NTRIP stream buffer for incoming correction data
+        static const size_t NTRIP_BUFFER_SIZE = 2048;
+        uint8_t ntripBuffer[NTRIP_BUFFER_SIZE];
+        volatile size_t ntripBufferHead = 0;
+        volatile size_t ntripBufferTail = 0;
+        QueueHandle_t ntripQueue = NULL;
+        TaskHandle_t ntripTaskHandle = NULL;
+        
+        /// @brief Static task function for NTRIP processing
+        static void ntripTask(void* pvParameters);
+        
+        /// @brief Add data to NTRIP buffer (thread-safe)
+        void bufferNTRIPData(const uint8_t* data, size_t length);
+        */
+        
         ESPdata* espData;
         ESPGPS* _gps;
     

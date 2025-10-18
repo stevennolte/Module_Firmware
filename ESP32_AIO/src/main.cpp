@@ -1396,7 +1396,7 @@ void normalboot(){
   bnoSerial.setPins(espData.pins.BNO_PIN, 10);
   bnoSerial.begin(115200);
   gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
-  gpsSerial.begin(115200);
+  gpsSerial.begin(460800);
   
   // Initialize I2C Manager for centralized bus management
   I2Csetup();

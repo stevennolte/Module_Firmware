@@ -320,11 +320,23 @@ public:
      *          GPS receiver and inertial measurement unit
      */
     struct GPS {
+        bool reset = false;
+        bool rtkReliability = false; ///< @brief RTK reliability flag
+        bool rtkTimeout = false;     ///< @brief RTK timeout flag
+        bool modeRover = false;    ///< @brief GPS mode flag (false=base, true=rover)
+        bool gpggaSet = false;
+        bool gpvtgSet = false;
+        bool gphprSet = false;
+        bool saveCfg1 = false;
+        bool signalGroup = false;
+        bool saveCfg2 = false;
+
+
         uint8_t state;              ///< @brief GPS receiver state (0=off, 1=searching, 2=fixed)
         uint8_t imuState;           ///< @brief IMU state (0=off, 1=calibrating, 2=ready)
         uint8_t positionType;       ///< @brief Position solution type (1=GPS, 2=DGPS, 4=RTK_FIXED, 5=RTK_FLOAT)
         uint32_t posAge;            ///< @brief Age of position solution in milliseconds
-    
+        uint32_t imuMessageTime;
         // GGA message data
         char fixTime[12];           ///< @brief UTC time of GPS fix (HHMMSS.SSS format)
         char latitude[15];          ///< @brief Latitude in degrees and decimal minutes
