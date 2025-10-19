@@ -446,7 +446,7 @@ void updateDebugVars() {
   // WiFi info  
   debugVars.push_back("Wifi SSID: " + WiFi.SSID());
   debugVars.push_back("IP Address: " + String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]));
-  debugVars.push_back("Wifi State: " + String(espData.wifi.state));
+  debugVars.push_back("Wifi State: " + String(espData.wifi.state) + " (" + (espData.wifi.state == 1 ? "Connected" : "Disconnected") + ")");
   debugVars.push_back("Program State: " + String(espData.program.state));
   
   // I2C device status
@@ -457,21 +457,29 @@ void updateDebugVars() {
   
   // GPS data - simplified to reduce stack usage
   debugVars.push_back("GPS Data: ");
+  debugVars.push_back("..GPS Mode: " + String(espData.gps.ntripPandaMode ? "PANDA Generation" : "Raw NMEA"));
   debugVars.push_back("..Fix Time: " + String(espData.gps.fixTime));
   debugVars.push_back("..Fix Quality: " + String(espData.gps.fixQuality));
   debugVars.push_back("..Satellites: " + String(espData.gps.numSats));
-  debugVars.push_back("..Latitude: " + String(espData.gps.latitude, 6));
-  debugVars.push_back("..Longitude: " + String(espData.gps.longitude, 6));
-  debugVars.push_back("..Altitude: " + String(espData.gps.altitude, 2));
-  debugVars.push_back("..Speed: " + String(espData.gps.speedKnots, 2));
-  debugVars.push_back("..Heading: " + String(espData.gps.imuHeading, 2));
-  debugVars.push_back("..HDOP: " + String(espData.gps.HDOP, 2));
+  debugVars.push_back("..Latitude: " + String(espData.gps.latitude));
+  debugVars.push_back("..Longitude: " + String(espData.gps.longitude));
+  debugVars.push_back("..Altitude: " + String(espData.gps.altitude));
+  debugVars.push_back("..Speed: " + String(espData.gps.speedKnots));
+  debugVars.push_back("..Heading: " + String(espData.gps.vtgHeading));
+  debugVars.push_back("..HDOP: " + String(espData.gps.HDOP));
+  debugVars.push_back("..Last PANDA: " + String(espData.gps.nmea));
   debugVars.push_back("..Message Counts");
   debugVars.push_back("....GGA: " + String(espData.gps.ggaMessageCount));
   debugVars.push_back("....RMC: " + String(espData.gps.rmcMessageCount));
   debugVars.push_back("....GSA: " + String(espData.gps.gsaMessageCount));
   debugVars.push_back("....VTG: " + String(espData.gps.vtgMessageCount));
-  debugVars.push_back("....Other:" + String(espData.gps.otherMessageCount));  
+  debugVars.push_back("....Other:" + String(espData.gps.otherMessageCount)); 
+  debugVars.push_back("....PANDA Sent: " + String(espData.gps.pandaMessageCount));
+  debugVars.push_back("..Last PANDA Time: " + String((float)(espData.gps.lastPandaTime)/1000.0, 2) + "s"); 
+  debugVars.push_back("..IMU State: " + String(espData.gps.imuState));
+  debugVars.push_back("....IMU Heading: " + String(espData.gps.imuHeading));
+  debugVars.push_back("....IMU Pitch: " + String(espData.gps.imuPitch));
+  debugVars.push_back("....IMU Roll: " + String(espData.gps.imuRoll));
   // Steering data - essential only
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Angle: " + String(espData.steer.targetSteerAngle, 2));
@@ -656,6 +664,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='section'>";
   html += "<div class='section-title'>System Configuration</div>";
   html += "<div class='form-group'><label>GPS Source:</label><select id='gpsSource'><option value='0'>On-board GPS</option><option value='1'>Wireless GPS</option></select></div>";
+  html += "<div class='form-group'><label>GPS Output Mode:</label><select id='pandaMode'><option value='0'>Raw NMEA Forward</option><option value='1'>PANDA Generation</option></select></div>";
   html += "<div class='form-group'><label>WAS Source:</label><select id='wasSource'><option value='0'>Wired WAS</option><option value='1'>Wireless WAS</option></select></div>";
   html += "<div class='form-group'><label>LED Brightness (0-255):</label><input type='number' id='ledBrightness' min='0' max='255'></div>";
   html += "<div class='form-group'><label>ADS Address:</label><select id='adsAddress'><option value='0x48'>0x48</option><option value='0x49'>0x49</option><option value='0x4A'>0x4A</option><option value='0x4B'>0x4B</option></select></div>";
@@ -703,6 +712,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
   html += "      document.getElementById('useADS').value = data.useADS;";
   html += "      document.getElementById('gpsSource').value = data.gpsSource;";
+  html += "      document.getElementById('pandaMode').value = data.pandaMode;";
   html += "      document.getElementById('wasSource').value = data.wasSource;";
   html += "      document.getElementById('ledBrightness').value = data.ledBrightness;";
   html += "      document.getElementById('adsAddress').value = data.adsAddress;";
@@ -729,6 +739,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('pidOutputFilt', parseFloat(document.getElementById('pidOutputFilt').value) || 0.1);";
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
   html += "  formData.append('gpsSource', document.getElementById('gpsSource').value);";
+  html += "  formData.append('pandaMode', document.getElementById('pandaMode').value);";
   html += "  formData.append('wasSource', document.getElementById('wasSource').value);";
   html += "  formData.append('ledBrightness', parseInt(document.getElementById('ledBrightness').value) || 100);";
   html += "  fetch('/saveSettings', {";
@@ -753,6 +764,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "    document.getElementById('pidOutputFilt').value = '0.1';";
   html += "    document.getElementById('useADS').value = '1';";
   html += "    document.getElementById('gpsSource').value = '0';";
+  html += "    document.getElementById('pandaMode').value = '1';";
   html += "    document.getElementById('wasSource').value = '0';";
   html += "    document.getElementById('ledBrightness').value = '100';";
   html += "    document.getElementById('adsAddress').value = '0x48';";
@@ -799,6 +811,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["wasSource"] = espData.steer.wirelessWAS ? 1 : 0;
   doc["ledBrightness"] = espData.program.ledBrht;
   doc["adsAddress"] = "0x48"; // Default, could be made configurable
+  doc["pandaMode"] = espData.gps.ntripPandaMode ? 1 : 0;
   
   String response;
   serializeJson(doc, response);
@@ -810,6 +823,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   Serial.println("  Low PWM: " + String(espData.steer.lowPWM));
   Serial.println("  Min PWM: " + String(espData.steer.minPWM));
   Serial.println("  Use ADS: " + String(espData.steer.useADS ? "true" : "false"));
+  Serial.println("  PANDA Mode: " + String(espData.gps.ntripPandaMode ? "Enabled" : "Disabled"));
   Serial.println("JSON Response size: " + String(response.length()) + " bytes");
   
   request->send(200, "application/json", response);
@@ -924,6 +938,11 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
     // Apply the new brightness immediately
     myLED.updateBrightness();
     Serial.println("  LED brightness updated immediately");
+  }
+  if (request->hasParam("pandaMode", true)) {
+    bool oldValue = espData.gps.ntripPandaMode;
+    espData.gps.ntripPandaMode = request->getParam("pandaMode", true)->value().toInt();
+    Serial.println("  PANDA Mode: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.ntripPandaMode ? "Enabled" : "Disabled"));
   }
   
   Serial.println("Attempting to save configuration to NVS...");
@@ -1085,6 +1104,8 @@ void handleSerialCommands() {
           Serial.println("normal            - Reboot into normal mode");
           Serial.println("status            - Show system status");
           Serial.println("config            - Show configuration");
+          Serial.println("gps raw           - Set GPS to raw NMEA forwarding mode");
+          Serial.println("gps panda         - Set GPS to PANDA generation mode");
           Serial.println("====================================");
           
         } else if (inputBuffer == "reboot") {
@@ -1124,11 +1145,26 @@ void handleSerialCommands() {
           Serial.println("=== Configuration ===");
           Serial.println("IP: " + String(espData.wifi.ips[0]) + "." + String(espData.wifi.ips[1]) + "." + String(espData.wifi.ips[2]) + "." + String(espData.wifi.ips[3]));
           Serial.println("GPS Source: " + String(espData.gps.externalGPS ? "Wireless" : "On-board"));
+          Serial.println("GPS Output: " + String(espData.gps.ntripPandaMode ? "PANDA Generation" : "Raw NMEA Forwarding"));
           Serial.println("WAS Source: " + String(espData.steer.wirelessWAS ? "Wireless" : "Wired"));
           Serial.println("Use ADS: " + String(espData.steer.useADS ? "Yes" : "No"));
           Serial.println("LED Brightness: " + String(espData.program.ledBrht));
           Serial.println("PID Kp: " + String(espData.steer.gainP));
           Serial.println("====================");
+          
+        } else if (inputBuffer == "gps raw") {
+          Serial.println("SERIAL COMMAND: Setting GPS to raw NMEA forwarding mode");
+          espData.gps.ntripPandaMode = false;
+          espData.saveConfig();
+          Serial.println("GPS output set to: Raw NMEA Forwarding");
+          Serial.println("GPS GGA/VTG sentences will be forwarded as-is via UDP");
+          
+        } else if (inputBuffer == "gps panda") {
+          Serial.println("SERIAL COMMAND: Setting GPS to PANDA generation mode");
+          espData.gps.ntripPandaMode = true;
+          espData.saveConfig();
+          Serial.println("GPS output set to: PANDA Generation");
+          Serial.println("GPS GGA/VTG sentences will be parsed to generate PANDA messages");
           
         } else if (inputBuffer.length() > 0) {
           Serial.println("Unknown command: " + inputBuffer);

@@ -200,6 +200,7 @@ uint8_t ESPdata::loadConfig(){
 
     // Load GPS configuration
     gps.externalGPS = preferences.getBool("externalGPS", false);
+    gps.ntripPandaMode = preferences.getBool("ntripPandaMode", true);
 
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
@@ -284,6 +285,7 @@ uint8_t ESPdata::saveConfig(){
 
     // Save GPS configuration
     preferences.putBool("externalGPS", gps.externalGPS);
+    preferences.putBool("ntripPandaMode", gps.ntripPandaMode);
 
     // Save server configuration
     preferences.putUChar("serverAdr", ota.ipAddr);

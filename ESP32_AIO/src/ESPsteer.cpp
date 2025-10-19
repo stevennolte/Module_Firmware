@@ -229,7 +229,7 @@ void ESPsteer::begin(ESPudp* espUdp) {
 
 uint32_t ESPsteer::getCurrent() {
     // TODO: Migrate to use i2cManager.getRawReading(2)
-    
+    return 0; // Temporary return value until implementation is complete
 }
 
 uint8_t ESPsteer::getTestState(){

@@ -113,17 +113,16 @@ void ESPudp::begin(ESPGPS* gps){
       size_t packetLength = packet.length();
       uint8_t *_data = packet.data();
       
-      // Simple direct forward to GPS serial port - no buffering or parsing
-      // Serial.print("NTRIP packet received: ");
-      // Serial.print(packetLength);
-      // Serial.print(" bytes - ");
-      // for (size_t i = 0; i < min(packetLength, (size_t)16); i++) {
-      //   Serial.printf("%02X ", _data[i]);
-      // }
-      // if (packetLength > 16) Serial.print("...");
-      // Serial.println();
+      // Direct forwarding mode: send raw data to GPS
+      Serial.print("NTRIP direct mode - forwarding: ");
+      Serial.print(packetLength);
+      Serial.print(" bytes - ");
+      for (size_t i = 0; i < min(packetLength, (size_t)16); i++) {
+        Serial.printf("%02X ", _data[i]);
+      }
+      if (packetLength > 16) Serial.print("...");
+      Serial.println();
       
-      // Send directly to GPS
       if (_gps) {
         _gps->sendNTRIP(_data, packetLength);
       }
@@ -439,4 +438,6 @@ void ESPudp::ntripTask(void* pvParameters) {
     }
 }
 */
+
+
 

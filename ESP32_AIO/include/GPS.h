@@ -99,6 +99,7 @@ class ESPGPS{
         void buildPandaSentence();
         void calculateChecksum();
         void cleanDataField(char* str);  // Helper to clean unwanted characters from GPS data
+        void validateIMUString(char* str, size_t maxLen);  // Helper to validate IMU data strings
         
         // Message counter functions
         void logMessageCounts();         // Display current message counts

@@ -337,6 +337,7 @@ public:
         uint8_t positionType;       ///< @brief Position solution type (1=GPS, 2=DGPS, 4=RTK_FIXED, 5=RTK_FLOAT)
         uint32_t posAge;            ///< @brief Age of position solution in milliseconds
         uint32_t imuMessageTime;
+        uint32_t lastPandaTime;     ///< @brief Timestamp of last PANDA message sent (millis())
         // GGA message data
         char fixTime[12];           ///< @brief UTC time of GPS fix (HHMMSS.SSS format)
         char latitude[15];          ///< @brief Latitude in degrees and decimal minutes
@@ -365,6 +366,7 @@ public:
         char nmea[150];             ///< @brief Raw NMEA sentence buffer - increased for PANDA sentence
         const char* asciiHex = "0123456789ABCDEF"; ///< @brief Hex encoding lookup table
         bool externalGPS = false;   ///< @brief GPS source flag (false=onboard, true=wireless)
+        bool ntripPandaMode = false; ///< @brief GPS output mode (false=raw NMEA forward, true=parse GGA/VTG to PANDA)
         uint16_t gpsBaud;           ///< @brief GPS communication baud rate
         uint8_t gpsTxPin;           ///< @brief GPS module transmit pin assignment
         uint8_t gpsRxPin;           ///< @brief GPS module receive pin assignment
@@ -378,6 +380,7 @@ public:
         uint32_t gsaMessageCount;   ///< @brief Count of parsed GSA (satellite info) messages
         uint32_t rmcMessageCount;   ///< @brief Count of parsed RMC (recommended minimum) messages
         uint32_t otherMessageCount; ///< @brief Count of other NMEA message types received
+        uint32_t pandaMessageCount; ///< @brief Count of PANDA messages generated and sent
     } gps;
 
     /**

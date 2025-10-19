@@ -25,6 +25,8 @@
 
 #include "GPS.h"
 
+// #define DEBUG_NTRIP_PRINT
+
 /// @brief Static singleton instance pointer for GPS management
 ESPGPS* ESPGPS::instance = nullptr;
 
@@ -54,6 +56,8 @@ ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSeri
     espData->gps.gsaMessageCount = 0;
     espData->gps.rmcMessageCount = 0;
     espData->gps.otherMessageCount = 0;
+    espData->gps.pandaMessageCount = 0;
+    espData->gps.lastPandaTime = 0;
     
     // No need for manual NMEA buffer when using NMEAParser library
     Serial.println("GPS constructor: Using NMEAParser library");
@@ -89,9 +93,19 @@ void ESPGPS::cleanDataField(char* str) {
     // Remove any \r, \n, or other control characters
     int len = strlen(str);
     for (int i = 0; i < len; i++) {
-        if (str[i] == '\r' || str[i] == '\n' || str[i] < 32) {
+        if (str[i] == '\r' || str[i] == '\n' || str[i] < 32 || str[i] > 126) {
             str[i] = '\0';  // Terminate string at first bad character
             break;
+        }
+    }
+    
+    // Ensure string is properly null-terminated and remove trailing spaces
+    if (len > 0) {
+        // Remove trailing whitespace
+        int end = strlen(str) - 1;
+        while (end >= 0 && (str[end] == ' ' || str[end] == '\t')) {
+            str[end] = '\0';
+            end--;
         }
     }
 }
@@ -214,6 +228,14 @@ void ESPGPS::parseVTG(const char* sentence)
 {
     // VTG format: $GPVTG,courseTrue,T,courseMag,M,speedKnots,N,speedKmh,K,mode*checksum
     
+    // Debug occasionally to avoid spam
+    static int vtgDebugCounter = 0;
+    if (++vtgDebugCounter >= 50) {
+        vtgDebugCounter = 0;
+        Serial.print("DEBUG VTG: ");
+        Serial.println(sentence);
+    }
+    
     char* fields[10];
     int fieldCount = 0;
     char tempSentence[150];
@@ -226,21 +248,53 @@ void ESPGPS::parseVTG(const char* sentence)
         token = strtok(NULL, ",*");
     }
     
+    if (vtgDebugCounter == 1) {  // Only show field breakdown occasionally
+        Serial.print("DEBUG VTG fields: ");
+        for (int i = 0; i < fieldCount; i++) {
+            Serial.print("[");
+            Serial.print(i);
+            Serial.print("]=");
+            Serial.print(fields[i]);
+            Serial.print(" ");
+        }
+        Serial.println();
+    }
+    
     if (fieldCount >= 6) {
-        // Initialize speed field to empty string first
+        // Initialize fields to empty strings first
         espData->gps.speedKnots[0] = '\0';
+        espData->gps.vtgHeading[0] = '\0';
+        
+        // Extract course/heading in degrees true (field 1) and clean it
+        if (fieldCount > 1 && strlen(fields[1]) > 0) {
+            strncpy(espData->gps.vtgHeading, fields[1], sizeof(espData->gps.vtgHeading) - 1);
+            espData->gps.vtgHeading[sizeof(espData->gps.vtgHeading) - 1] = '\0';
+            cleanDataField(espData->gps.vtgHeading);
+            if (vtgDebugCounter == 1) {
+                Serial.print("DEBUG vtgHeading set to: '");
+                Serial.print(espData->gps.vtgHeading);
+                Serial.println("'");
+            }
+        }
         
         // Extract speed in knots (field 5) and clean it
-        if (strlen(fields[5]) > 0) {
+        if (fieldCount > 5 && strlen(fields[5]) > 0) {
             strncpy(espData->gps.speedKnots, fields[5], sizeof(espData->gps.speedKnots) - 1);
             espData->gps.speedKnots[sizeof(espData->gps.speedKnots) - 1] = '\0';
             cleanDataField(espData->gps.speedKnots);
+            if (vtgDebugCounter == 1) {
+                Serial.print("DEBUG speedKnots set to: '");
+                Serial.print(espData->gps.speedKnots);
+                Serial.println("'");
+            }
         }
         
         // Increment VTG message counter in ESPdata
         espData->gps.vtgMessageCount++;
         
         // Serial.println("VTG parsed successfully");
+    } else {
+        Serial.println("DEBUG VTG: Not enough fields");
     }
 }
 
@@ -251,20 +305,38 @@ void ESPGPS::parseNMEASentence(const char* sentence)
 {
     if (!sentence || strlen(sentence) < 7) return;
     
-    // Check sentence type and forward GGA and VTG messages over UDP
+    // Check sentence type and handle based on PANDA mode setting
     if (strstr(sentence, "GGA") != NULL) {
-        // parseGGA(sentence);
-        // Forward raw GGA sentence over UDP
-        if (espUdp) {
-            espUdp->sendUDPgps(sentence);
+        // Parse GGA sentence to extract GPS data
+        parseGGA(sentence);
+        espData->gps.ggaMessageCount++;
+        
+        // Check mode: PANDA generation or raw forwarding
+        if (espData->gps.ntripPandaMode) {
+            // PANDA mode: build and send PANDA sentence (only for GGA)
+            Serial.println("GGA received - generating PANDA sentence");
+            buildPandaSentence();
+        } else {
+            // Raw forwarding mode: send original NMEA sentence
+            if (espUdp) {
+                espUdp->sendUDPgps(sentence);
+            }
         }
     }
     else if (strstr(sentence, "VTG") != NULL) {
-        // parseVTG(sentence);
-        // Forward raw VTG sentence over UDP
-        if (espUdp) {
-            espUdp->sendUDPgps(sentence);
+        // Parse VTG sentence to extract velocity data
+        parseVTG(sentence);
+        espData->gps.vtgMessageCount++;
+        
+        // In PANDA mode, VTG data is used in GGA-triggered PANDA messages
+        // In raw mode, forward the VTG sentence
+        if (!espData->gps.ntripPandaMode) {
+            // Raw forwarding mode: send original NMEA sentence
+            if (espUdp) {
+                espUdp->sendUDPgps(sentence);
+            }
         }
+        // Note: VTG data is parsed and stored for use in next GGA-triggered PANDA message
     }
     // Add GSA and RMC parsers here if needed
     else if (strstr(sentence, "GSA") != NULL) {
@@ -343,6 +415,7 @@ void ESPGPS::init(ESPudp* espUdp){
     espData->gps.altitude[0] = '\0';
     espData->gps.ageDGPS[0] = '\0';
     espData->gps.speedKnots[0] = '\0';
+    espData->gps.vtgHeading[0] = '\0';
     espData->gps.imuHeading[0] = '\0';
     espData->gps.imuRoll[0] = '\0';
     espData->gps.imuPitch[0] = '\0';
@@ -532,22 +605,26 @@ void ESPGPS::buildPandaSentence()
         return;
     }
     
-    // Debug: Show what data we have before building sentence
-    // Serial.println("=== GPS Data Before Building PANDA ===");
-    // Serial.printf("Time: '%s'\n", espData->gps.fixTime);
-    // Serial.printf("Lat: '%s' %s\n", espData->gps.latitude, espData->gps.latNS);
-    // Serial.printf("Lon: '%s' %s\n", espData->gps.longitude, espData->gps.lonEW);
-    // Serial.printf("Quality: '%s'\n", espData->gps.fixQuality);
-    // Serial.printf("Sats: '%s'\n", espData->gps.numSats);
-    // Serial.printf("HDOP: '%s'\n", espData->gps.HDOP);
-    // Serial.printf("Alt: '%s'\n", espData->gps.altitude);
-    // Serial.printf("DGPS Age: '%s'\n", espData->gps.ageDGPS);
-    // Serial.printf("Speed: '%s'\n", espData->gps.speedKnots);
-    // Serial.printf("IMU Heading: '%s'\n", espData->gps.imuHeading);
-    // Serial.printf("IMU Roll: '%s'\n", espData->gps.imuRoll);
-    // Serial.printf("IMU Pitch: '%s'\n", espData->gps.imuPitch);
-    // Serial.printf("IMU Yaw Rate: '%s'\n", espData->gps.imuYawRate);
-    // Serial.println("=====================================");
+    // Debug: Show what data we have before building sentence (reduce frequency)
+    static int pandaDebugCounter = 0;
+    if (++pandaDebugCounter >= 10) {
+        pandaDebugCounter = 0;
+        Serial.println("=== GPS Data Before Building PANDA ===");
+        Serial.printf("Time: '%s'\n", espData->gps.fixTime);
+        Serial.printf("Lat: '%s' %s\n", espData->gps.latitude, espData->gps.latNS);
+        Serial.printf("Lon: '%s' %s\n", espData->gps.longitude, espData->gps.lonEW);
+        Serial.printf("Quality: '%s'\n", espData->gps.fixQuality);
+        Serial.printf("Sats: '%s'\n", espData->gps.numSats);
+        Serial.printf("HDOP: '%s'\n", espData->gps.HDOP);
+        Serial.printf("Alt: '%s'\n", espData->gps.altitude);
+        Serial.printf("DGPS Age: '%s'\n", espData->gps.ageDGPS);
+        Serial.printf("Speed: '%s'\n", espData->gps.speedKnots);
+        Serial.printf("IMU Heading: '%s'\n", espData->gps.imuHeading);
+        Serial.printf("IMU Roll: '%s'\n", espData->gps.imuRoll);
+        Serial.printf("IMU Pitch: '%s'\n", espData->gps.imuPitch);
+        Serial.printf("IMU Yaw Rate: '%s'\n", espData->gps.imuYawRate);
+        Serial.println("=====================================");
+    }
     
     // Clear the NMEA buffer
     strcpy(espData->gps.nmea, "");
@@ -671,18 +748,28 @@ void ESPGPS::buildPandaSentence()
     // Add proper NMEA line ending
     strcat(espData->gps.nmea, "\r\n");
     
-    // Debug: Show complete sentence
-    // Serial.print("Complete PANDA: ");
-    // Serial.println(espData->gps.nmea);
+    // Debug: Show complete sentence (reduce frequency)
+    static int pandaOutputCounter = 0;
+    if (++pandaOutputCounter >= 10) {
+        pandaOutputCounter = 0;
+        Serial.print("Complete PANDA: ");
+        Serial.println(espData->gps.nmea);
+    }
     
     // Send via UDP if WiFi is connected
     if (espData->wifi.state == 1)
     {
-        // Serial.println("Sending PANDA via UDP");
-        int len = strlen(espData->gps.nmea);
-        // Serial.print("PANDA Length: ");
-        // Serial.println(len);
+        if (pandaOutputCounter == 1) { // Only show sending message when we show the sentence
+            Serial.println("Sending PANDA via UDP");
+            int len = strlen(espData->gps.nmea);
+            Serial.print("PANDA Length: ");
+            Serial.println(len);
+        }
         espUdp->sendUDPgps(espData->gps.nmea);
+        espData->gps.pandaMessageCount++; // Increment PANDA message counter
+        espData->gps.lastPandaTime = millis(); // Record timestamp
+    } else {
+        Serial.println("WiFi not connected - PANDA not sent");
     }
 }void ESPGPS::continuousLoop(){
     uint32_t lastImuCall = 0;
@@ -768,119 +855,14 @@ void ESPGPS::buildPandaSentence()
         // IMU handler every 500ms
         uint32_t currentTime = millis();
         if (currentTime - lastImuCall >= 500) {
-            imuHandler(); // Enable IMU for heading data in PANDA sentence
+            // imuHandler(); // Enable IMU for heading data in PANDA sentence
             lastImuCall = currentTime;
         }
-        
+        imuHandler();
         // Generous delay to prevent overwhelming the system
         vTaskDelay(pdMS_TO_TICKS(5)); // Increased to 100ms
     }
 }
-
-// Manual parsing functions - commented out since we're back to using NMEAParser
-// void ESPGPS::processCompleteSentence(const char* sentence) {
-//     // Safety checks
-//     if (!sentence || !nmeaBuffer) return;
-    
-//     // Count sentences
-//     static uint32_t totalSentences = 0;
-//     totalSentences++;
-    
-//     // Only occasionally report that we're receiving data
-//     if (totalSentences % 50 == 0) {
-//         Serial.printf("Received %d NMEA sentences\n", totalSentences);
-//     }
-    
-//     // SAFE ALTERNATIVE: Parse GPS data manually instead of using problematic parser
-//     // This bypasses the NMEAParser library that was causing crashes
-    
-//     if (sentence[0] == '$' && strlen(sentence) > 10) {
-//         // Simple manual parsing for essential GPS data
-//         parseNMEAManually(sentence);
-//     }
-// }
-
-// Manual NMEA parsing function - commented out since we're back to using NMEAParser
-// void ESPGPS::parseNMEAManually(const char* sentence) {
-//     // Extract sentence type (first 6 characters after $)
-//     char sentenceType[7] = {0};
-//     strncpy(sentenceType, sentence, 6);
-//     sentenceType[6] = '\0';
-    
-//     // Process GGA sentences for basic position data
-//     if (strstr(sentenceType, "GGA") != nullptr) {
-//         // Simple comma-separated parsing for GGA sentence
-//         // Format: $GPGGA,time,lat,latNS,lon,lonEW,quality,numSats,hdop,alt,altUnit,geoidHeight,geoidUnit,dgpsAge,dgpsID*checksum
-        
-//         // Count commas to find fields
-//         const char* ptr = sentence;
-//         int fieldCount = 0;
-//         char fieldBuffer[20] = {0};
-//         int bufferIndex = 0;
-        
-//         while (*ptr && fieldCount < 15) {
-//             if (*ptr == ',' || *ptr == '*') {
-//                 // Process field based on count
-//                 fieldBuffer[bufferIndex] = '\0';
-                
-//                 switch(fieldCount) {
-//                     case 1: // Time
-//                         strncpy(espData->gps.fixTime, fieldBuffer, sizeof(espData->gps.fixTime) - 1);
-//                         break;
-//                     case 2: // Latitude
-//                         strncpy(espData->gps.latitude, fieldBuffer, sizeof(espData->gps.latitude) - 1);
-//                         break;
-//                     case 3: // Latitude N/S
-//                         strncpy(espData->gps.latNS, fieldBuffer, sizeof(espData->gps.latNS) - 1);
-//                         break;
-//                     case 4: // Longitude  
-//                         strncpy(espData->gps.longitude, fieldBuffer, sizeof(espData->gps.longitude) - 1);
-//                         break;
-//                     case 5: // Longitude E/W
-//                         strncpy(espData->gps.lonEW, fieldBuffer, sizeof(espData->gps.lonEW) - 1);
-//                         break;
-//                     case 6: // Fix quality
-//                         strncpy(espData->gps.fixQuality, fieldBuffer, sizeof(espData->gps.fixQuality) - 1);
-//                         espData->gps.fixQualityInt = atoi(fieldBuffer);
-//                         break;
-//                     case 7: // Number of satellites
-//                         strncpy(espData->gps.numSats, fieldBuffer, sizeof(espData->gps.numSats) - 1);
-//                         break;
-//                     case 8: // HDOP
-//                         strncpy(espData->gps.HDOP, fieldBuffer, sizeof(espData->gps.HDOP) - 1);
-//                         break;
-//                     case 9: // Altitude
-//                         strncpy(espData->gps.altitude, fieldBuffer, sizeof(espData->gps.altitude) - 1);
-//                         break;
-//                 }
-                
-//                 fieldCount++;
-//                 bufferIndex = 0;
-//                 memset(fieldBuffer, 0, sizeof(fieldBuffer));
-//             } else {
-//                 if (bufferIndex < sizeof(fieldBuffer) - 1) {
-//                     fieldBuffer[bufferIndex++] = *ptr;
-//                 }
-//             }
-//             ptr++;
-//         }
-        
-//         // Update GPS indicators using I2CManager
-//         if (espData->gps.fixQualityInt > 0) {
-//             i2cManager.setGPSLED(LEDPattern::ON);
-            
-//             // RTK fix indication (quality 4 or 5)
-//             if (espData->gps.fixQualityInt >= 4) {
-//                 i2cManager.setRTKLED(LEDPattern::ON);
-//             } else {
-//                 i2cManager.setRTKLED(LEDPattern::SLOW_PULSE);
-//             }
-//         } else {
-//             i2cManager.setGPSLED(LEDPattern::FAST_PULSE);
-//             i2cManager.setRTKLED(LEDPattern::OFF);
-//         }
-//     }
-// }
 
 
 void ESPGPS::taskHandler(void *param){
@@ -940,50 +922,136 @@ void ESPGPS::setGPSIndicators(bool hasGPSFix, bool hasRTKFix) {
  * @note If the RVC sensor read operation fails, the function returns early without
  *       updating any IMU data fields.
  */
+
+/**
+ * @brief Validate and clean IMU data string
+ * @param str String to validate and clean
+ * @param maxLen Maximum length of the string
+ */
+void ESPGPS::validateIMUString(char* str, size_t maxLen) {
+    if (!str) return;
+    
+    // Check for null characters or invalid data in the middle of the string
+    for (size_t i = 0; i < maxLen - 1 && str[i] != '\0'; i++) {
+        if (str[i] < 32 || str[i] > 126) {
+            // Found invalid character, truncate string here
+            str[i] = '\0';
+            break;
+        }
+    }
+    
+    // If string is empty or invalid, set to "0"
+    if (strlen(str) == 0) {
+        strcpy(str, "0");
+    }
+    
+    // Ensure null termination
+    str[maxLen - 1] = '\0';
+}
+
 void ESPGPS::imuHandler(){
     // webSerial("gps called\n");
     // Serial.print("gps called  ");
     // Serial.println(espData->gps.imuState);
-    if (espData->gps.imuState == 1){
+    
+    if (true){
 
         BNO08x_RVC_Data heading;
         if (!rvc.read(&heading)) {
-            // Serial.println("failed to read");
-            // Initialize IMU fields to "0" if read fails
-            strcpy(espData->gps.imuHeading, "0");
-            strcpy(espData->gps.imuPitch, "0");
-            strcpy(espData->gps.imuRoll, "0");
-            strcpy(espData->gps.imuYawRate, "0");
+            // No new data available - this is normal for RVC mode
+            // Keep existing IMU values, don't reset to 0
+            espData->gps.imuState = 1; // IMU is still active
+            
             if (millis() - espData->gps.imuMessageTime > 1000){
-                espData->gps.imuState = 2; // Set to error state after 1 second of failures
-            // Serial.println("IMU data received");
+                espData->gps.imuState = 2; // Set to error state after 1 second of no data
             } 
             return;
         }
         espData->gps.imuState = 1; // Ensure state is active
         espData->gps.imuMessageTime = millis();
-        int16_t temp = 0;
-        temp = heading.yaw * 100;
-        // Serial.println("Yaw: " + String(temp));
-        // Serial.println("Pitch: " + String(heading.pitch * 100));
-        // Serial.println("Roll: " + String(heading.roll * 100));
-        itoa(temp, espData->gps.imuHeading, 10);
-        temp = heading.pitch * 100;
-        itoa(temp, espData->gps.imuPitch, 10);
-        temp = heading.roll * 100;
-        itoa(temp, espData->gps.imuRoll, 10);
         
-        // Set yaw rate to 0 for now (could be calculated from previous heading if needed)
+        // Create temporary variables to avoid partial updates
+        char tempHeading[6], tempPitch[6], tempRoll[6];
+        memset(tempHeading, 0, sizeof(tempHeading));
+        memset(tempPitch, 0, sizeof(tempPitch));
+        memset(tempRoll, 0, sizeof(tempRoll));
+        
+        // Convert values to strings in temporary buffers first
+        int16_t temp = heading.yaw * 100;
+        snprintf(tempHeading, sizeof(tempHeading), "%d", temp);
+        
+        temp = heading.pitch * 100;
+        snprintf(tempPitch, sizeof(tempPitch), "%d", temp);
+        
+        temp = heading.roll * 100;
+        snprintf(tempRoll, sizeof(tempRoll), "%d", temp);
+        
+        // Validate the strings don't contain invalid characters
+        for (int i = 0; i < strlen(tempHeading); i++) {
+            if (tempHeading[i] < 32 || tempHeading[i] > 126) tempHeading[i] = '0';
+        }
+        for (int i = 0; i < strlen(tempPitch); i++) {
+            if (tempPitch[i] < 32 || tempPitch[i] > 126) tempPitch[i] = '0';
+        }
+        for (int i = 0; i < strlen(tempRoll); i++) {
+            if (tempRoll[i] < 32 || tempRoll[i] > 126) tempRoll[i] = '0';
+        }
+        
+        // Now atomically copy to the actual fields
+        memset(espData->gps.imuHeading, 0, sizeof(espData->gps.imuHeading));
+        memset(espData->gps.imuPitch, 0, sizeof(espData->gps.imuPitch));
+        memset(espData->gps.imuRoll, 0, sizeof(espData->gps.imuRoll));
+        memset(espData->gps.imuYawRate, 0, sizeof(espData->gps.imuYawRate));
+        
+        strcpy(espData->gps.imuHeading, tempHeading);
+        strcpy(espData->gps.imuPitch, tempPitch);
+        strcpy(espData->gps.imuRoll, tempRoll);
         strcpy(espData->gps.imuYawRate, "0");
+        
+        // Validate all IMU strings to ensure they're clean
+        validateIMUString(espData->gps.imuHeading, sizeof(espData->gps.imuHeading));
+        validateIMUString(espData->gps.imuPitch, sizeof(espData->gps.imuPitch));
+        validateIMUString(espData->gps.imuRoll, sizeof(espData->gps.imuRoll));
+        validateIMUString(espData->gps.imuYawRate, sizeof(espData->gps.imuYawRate));
+        
+        // Debug output occasionally to avoid spam (every 100 readings)
+        static int debugCounter = 0;
+        if (++debugCounter >= 100) {
+            debugCounter = 0;
+            Serial.print("DEBUG IMU: H='");
+            Serial.print(espData->gps.imuHeading);
+            Serial.print("' P='");
+            Serial.print(espData->gps.imuPitch);
+            Serial.print("' R='");
+            Serial.print(espData->gps.imuRoll);
+            Serial.println("'");
+        }
 
-    } else {
-        // IMU not active, set all values to "0"
+    } 
+    // Note: IMU is currently always enabled (if condition above is 'true')
+    // The following else block would only execute if IMU was conditionally disabled
+    /*
+    else {
+        // IMU not active, set all values to "0" and clear any garbage
+        memset(espData->gps.imuHeading, 0, sizeof(espData->gps.imuHeading));
+        memset(espData->gps.imuPitch, 0, sizeof(espData->gps.imuPitch));
+        memset(espData->gps.imuRoll, 0, sizeof(espData->gps.imuRoll));
+        memset(espData->gps.imuYawRate, 0, sizeof(espData->gps.imuYawRate));
+        
         strcpy(espData->gps.imuHeading, "0");
         strcpy(espData->gps.imuPitch, "0");
         strcpy(espData->gps.imuRoll, "0");
         strcpy(espData->gps.imuYawRate, "0");
+        
+        // Validate all IMU strings even when inactive
+        validateIMUString(espData->gps.imuHeading, sizeof(espData->gps.imuHeading));
+        validateIMUString(espData->gps.imuPitch, sizeof(espData->gps.imuPitch));
+        validateIMUString(espData->gps.imuRoll, sizeof(espData->gps.imuRoll));
+        validateIMUString(espData->gps.imuYawRate, sizeof(espData->gps.imuYawRate));
+        
         return;
     }
+    */
 }
 
 /**
