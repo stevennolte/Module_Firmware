@@ -964,6 +964,8 @@ void ESPGPS::imuHandler(){
             
             if (millis() - espData->gps.imuMessageTime > 1000){
                 espData->gps.imuState = 2; // Set to error state after 1 second of no data
+                //TODO: SET IMU HEADING TO 99999 AND ROLL TO 88888.
+                //  MAYBE JUST CLEAR OUT ALL VALUES SO IT'S EMPTY?
             } 
             return;
         }
