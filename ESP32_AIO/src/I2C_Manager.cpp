@@ -81,7 +81,7 @@ bool I2CManager::begin(TwoWire* bus, uint8_t mcp_addr, uint8_t ads_addr) {
             _ads_initialized = false;
         } else {
             Serial.println("ADS1115 found.");
-            ads.setGain(GAIN_ONE);
+            ads.setGain(GAIN_TWOTHIRDS);
             _ads_initialized = true;
         }
 

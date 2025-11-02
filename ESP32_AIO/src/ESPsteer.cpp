@@ -59,7 +59,7 @@ ESPsteer::ESPsteer(ESPdata* vars)
  */
 void ESPsteer::continuousLoop() {
     while (true) {
-        vTaskDelay(500);
+        vTaskDelay(3);
         espData->steer.looptime = millis() - espData->steer.looptimestamp;
         espData->steer.looptimestamp = millis();
         // vTaskDelay(3);

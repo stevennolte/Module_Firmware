@@ -979,13 +979,13 @@ void ESPGPS::imuHandler(){
         memset(tempRoll, 0, sizeof(tempRoll));
         
         // Convert values to strings in temporary buffers first
-        int16_t temp = heading.yaw * 100;
+        int16_t temp = heading.yaw * 10;
         snprintf(tempHeading, sizeof(tempHeading), "%d", temp);
         
-        temp = heading.pitch * 100;
+        temp = heading.pitch * 10;
         snprintf(tempPitch, sizeof(tempPitch), "%d", temp);
         
-        temp = heading.roll * 100;
+        temp = heading.roll * 10;
         snprintf(tempRoll, sizeof(tempRoll), "%d", temp);
         
         // Validate the strings don't contain invalid characters

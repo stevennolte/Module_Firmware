@@ -787,7 +787,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   Serial.println("Client IP: " + request->client()->remoteIP().toString());
   Serial.println("Preparing settings JSON response...");
   
-  StaticJsonDocument<1024> doc;
+  JsonDocument doc;
   
   // Network settings
   doc["ip0"] = espData.wifi.ips[0];
@@ -1212,6 +1212,50 @@ void debugPrint(){
   //           "\timu yaw: " + String(espData.gps.imuHeading) + "\n");
 }
 
+/**
+ * @brief Write startup log entry to file system
+ * @param logEntry The log entry to write
+ * @param isNewBoot True if this is a new boot session, false for additional entries
+ */
+void writeStartupLog(String logEntry, bool isNewBoot = false) {
+  File logFile = LittleFS.open("/startup.log", isNewBoot ? "w" : "a");
+  if (logFile) {
+    if (isNewBoot) {
+      // Add header for new boot session
+      logFile.println("=== ESP32-AIO Startup Log ===");
+      logFile.println("Firmware: " + String(NAME) + " v" + String(VERSION));
+      logFile.println("Boot Time: " + String(millis()) + "ms since power-on");
+      logFile.println("Reset Reason: " + String(esp_reset_reason()));
+      logFile.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+      logFile.println("Chip Model: " + String(ESP.getChipModel()));
+      logFile.println("CPU Freq: " + String(ESP.getCpuFreqMHz()) + " MHz");
+      logFile.println("Flash Size: " + String(ESP.getFlashChipSize()) + " bytes");
+      logFile.println("MAC Address: " + WiFi.macAddress());
+      logFile.println("Boot Count: " + String(espData.program.bootcount));
+      logFile.println("================================");
+    }
+    logFile.println(String(millis()) + "ms: " + logEntry);
+    logFile.close();
+    Serial.println("Startup Log: " + logEntry);
+  } else {
+    Serial.println("ERROR: Could not write to startup log: " + logEntry);
+  }
+}
+
+/**
+ * @brief Log startup state information
+ * @param stage The boot stage name
+ * @param status The status or result
+ * @param details Additional details (optional)
+ */
+void logStartupState(const char* stage, const char* status, const char* details = "") {
+  String logEntry = String(stage) + " -> " + String(status);
+  if (strlen(details) > 0) {
+    logEntry += " (" + String(details) + ")";
+  }
+  writeStartupLog(logEntry);
+}
+
 #pragma region Setup and Loop
 /**
  * @brief Initializes the system in recovery mode with AP WiFi and basic web interface
@@ -1231,14 +1275,17 @@ void debugPrint(){
  */
 void recoveryBoot() {
   Serial.println("=== ENTERING RECOVERY MODE ===");
+  logStartupState("Boot Mode", "Recovery Mode", "Normal boot failed");
   
   // Set all LEDs to error flash pattern to indicate recovery mode
   // I2CManager::getInstance().setAllLEDs(LEDPattern::ERROR_FLASH);
   
   // Initialize LittleFS for file operations
   Serial.println("Initializing LittleFS...");
+  logStartupState("LittleFS", "Initializing", "Recovery mode");
   if (!LittleFS.begin(true)) {
     Serial.println("LittleFS Mount Failed - Attempting to format...");
+    logStartupState("LittleFS", "Mount Failed", "Recovery mode format attempt");
     // if (LittleFS.format()) {
     //   Serial.println("LittleFS Format successful");
     //   if (LittleFS.begin(true)) {
@@ -1395,7 +1442,9 @@ void recoveryBoot() {
   server.on("/reboot", HTTP_GET, handleReboot);
   
   // Start the recovery server
+  logStartupState("Web Server", "Starting", "Recovery mode");
   server.begin();
+  logStartupState("Recovery Mode", "Complete", "Web server started");
   Serial.println("Recovery Web Server started!");
   Serial.println("Connect to WiFi: " + recoverySSID);
   Serial.println("Password: " + String(recoveryPassword));
@@ -1425,23 +1474,34 @@ void normalboot(){
   // Normal boot sequence
   /** @brief Normal boot sequence */
   Serial.println("Normal Boot Sequence Initiated");
+  logStartupState("Normal Boot", "Started", "");
+  
   LittleFS.begin(); // Ensure LittleFS is mounted
   espData.setState(2);
+  logStartupState("Program State", "Set to 2", "");
   
   // Start other Serial Ports
   bnoSerial.setPins(espData.pins.BNO_PIN, 10);
   bnoSerial.begin(115200);
+  String bnoDetails = "Pin: " + String(espData.pins.BNO_PIN) + ", 115200 baud";
+  logStartupState("BNO Serial", "Initialized", bnoDetails.c_str());
+  
   gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
   gpsSerial.begin(460800);
+  String gpsDetails = "RX: " + String(espData.pins.GPS_RX) + ", TX: " + String(espData.pins.GPS_TX) + ", 460800 baud";
+  logStartupState("GPS Serial", "Initialized", gpsDetails.c_str());
   
   // Initialize I2C Manager for centralized bus management
   I2Csetup();
   if (i2cManager.begin(&twoWire, espData.i2c.MCP_ADDRESS, espData.i2c.ADS_ADDRESS)) {
     Serial.println("I2CManager initialized successfully");
+    String i2cDetails = "MCP: 0x" + String(espData.i2c.MCP_ADDRESS, HEX) + ", ADS: 0x" + String(espData.i2c.ADS_ADDRESS, HEX);
+    logStartupState("I2C Manager", "Initialized Successfully", i2cDetails.c_str());
     // Set optimal ADS settings for reduced I2C load
     // i2cManager.adsSetGain(GAIN_TWOTHIRDS);  // +/- 6.144V range
   } else {
     Serial.println("I2CManager initialization failed");
+    logStartupState("I2C Manager", "Failed - Restarting", "");
     ESP.restart();
   }
   
@@ -1451,6 +1511,7 @@ void normalboot(){
  
     // If everything is good, turn on power to autosteer
   Serial.println("starting wifi");
+  logStartupState("WiFi", "Starting Connection", "");
     
   uint32_t wifiStart = millis();
   while (WiFi.status() != WL_CONNECTED){
@@ -1459,6 +1520,7 @@ void normalboot(){
     if (millis()-wifiStart > 120000){
       Serial.println("Wifi connection timed out");
       Serial.println("Switching to AP mode");
+      logStartupState("WiFi", "Connection Timeout", "Switching to AP mode after 120s");
       espData.wifi.state = espWifi.makeAP();
       break;
     }
@@ -1466,6 +1528,8 @@ void normalboot(){
   i2cManager.setEthLED(LEDPattern::ON);
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espData.wifi.state));
+  String wifiDetails = "State: " + String(espData.wifi.state);
+  logStartupState("WiFi", espData.wifi.state == 1 ? "Connected" : "AP Mode", wifiDetails.c_str());
   
   // ADD NETWORK READINESS CHECK
   Serial.println("=== NETWORK INITIALIZATION DEBUG ===");
@@ -1498,24 +1562,33 @@ void normalboot(){
   delay(3000); // Increased delay for stability
   
   // Final verification before starting UDP
+  String networkDetails = "WiFi Status: " + String(WiFi.status()) + ", IP: " + WiFi.localIP().toString();
+  logStartupState("Network", "Verifying", networkDetails.c_str());
   Serial.println("Final network check before UDP:");
   Serial.println("WiFi Status: " + String(WiFi.status()));
   Serial.println("IP Address: " + WiFi.localIP().toString());
   
   // START UDP SERVICES FIRST - before other components try to use them
   Serial.println("=== STARTING UDP SERVICES ===");
+  logStartupState("UDP Services", "Starting", "Network ready");
   espUdp.begin(&gps);  // Initialize UDP services first
+  logStartupState("UDP Services", "Complete", "Initialization successful");
   Serial.println("=== UDP SERVICES COMPLETE ===");
   
   // Now start other components that depend on UDP
   Serial.println("Starting hardware tasks...");
+  logStartupState("MainPower", "Starting", "Task initialization");
   mainPower.startTask();
 
   Serial.println("Initializing GPS...");
+  logStartupState("GPS", "Starting", "Initialization with UDP");
   gps.init(&espUdp);  // Now UDP is ready
+  logStartupState("GPS", "Complete", "Initialization successful");
   
   Serial.println("Initializing steering...");
+  logStartupState("Steering", "Starting", "System initialization");
   espSteer.begin(&espUdp);  // Now UDP is ready
+  logStartupState("Steering", "Complete", "System ready");
   
   
   // UDP setup
@@ -1556,7 +1629,7 @@ void normalboot(){
             Serial.println("Request body: " + body);
             
             // Parse JSON body
-            StaticJsonDocument<200> doc;
+            JsonDocument doc;
             DeserializationError error = deserializeJson(doc, body);
             
             if (error) {
@@ -1565,7 +1638,7 @@ void normalboot(){
               return;
             }
             
-            if (doc.containsKey("fullDebug")) {
+            if (doc["fullDebug"].is<bool>()) {
               bool newMode = doc["fullDebug"].as<bool>();
               fullDebugMode = newMode;
               String response = fullDebugMode ? "Full debug mode enabled" : "Minimal debug mode enabled";
@@ -1844,9 +1917,12 @@ void normalboot(){
         // server.on("/isConnected", HTTP_GET, [](AsyncWebServerRequest *request){
         //   request->send(LittleFS, "/Modu.svg", "image/svg+xml");
         // });
+        logStartupState("Web Server", "Starting", "Normal mode");
         server.begin();
+        logStartupState("Web Server", "Complete", "Started successfully");
       #pragma endregion
   
+  logStartupState("System Boot", "Complete", "Entering normal operation");
   espData.setState(1);
   espData.setBootCount(0);
   // Add your normal boot logic here
@@ -1877,16 +1953,35 @@ void setup(){
   delay(1000); // Give time for serial to initialize
   Serial.println("\n\nStarting up...");
   
+  // Initialize LittleFS first for startup logging
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed");
+  }
+  
+  // Start new startup log session
+  writeStartupLog("System startup initiated", true);
+  logStartupState("Serial", "Initialized", "115200 baud");
+  logStartupState("LED Controller", "Started", "Special mode");
+  
   espData.program.confRes = espData.loadConfig();
+  String confDetails = "Result: " + String(espData.program.confRes);
+  logStartupState("Configuration", espData.program.confRes == 0 ? "Loaded Successfully" : "Load Failed", confDetails.c_str());
+  
   // Update LED brightness from loaded configuration
   myLED.updateBrightness();
   Serial.println("LED brightness set to: " + String(espData.program.ledBrht));
+  String ledDetails = "Set to " + String(espData.program.ledBrht);
+  logStartupState("LED Brightness", "Updated", ledDetails.c_str());
   
   if (espData.program.state != 1 && espData.program.bootcount > 2){
     Serial.println(" Booting into Recovery Mode");
+    String recoveryDetails = "State: " + String(espData.program.state) + ", Boot count: " + String(espData.program.bootcount);
+    logStartupState("Boot Mode", "Recovery", recoveryDetails.c_str());
     myLED.setLEDState(LEDState::RECOVERY_MODE);
     recoveryBoot();
   } else {
+    String normalDetails = "State: " + String(espData.program.state) + ", Boot count: " + String(espData.program.bootcount);
+    logStartupState("Boot Mode", "Normal", normalDetails.c_str());
     normalboot();
   }
   

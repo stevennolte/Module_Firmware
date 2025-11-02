@@ -92,6 +92,10 @@
         .catch(error => console.error('Error:', error));
     }
 
+    function downloadStartupLog() {
+      window.location.href = '/download?filename=startup.log';
+    }
+
     function isConnected() {
       const statusImage = document.getElementById("connectionStatusImage");
       const timeout = setTimeout(() => {
@@ -288,6 +292,7 @@
     <button onclick="reboot()">Reboot ESP32</button>
     <button onclick="startLogging()">Start Logging</button>
     <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+    <button onclick="downloadStartupLog()">📋 Download Startup Log</button>
   </div>
 
   <h1>Debug Variables</h1>
