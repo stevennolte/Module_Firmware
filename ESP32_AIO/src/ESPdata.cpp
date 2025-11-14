@@ -201,6 +201,9 @@ uint8_t ESPdata::loadConfig(){
     // Load GPS configuration
     gps.externalGPS = preferences.getBool("externalGPS", false);
     gps.ntripPandaMode = preferences.getBool("ntripPandaMode", true);
+    gps.flipPitchRoll = preferences.getBool("flipPitchRoll", true);
+    gps.invertRoll = preferences.getBool("invertRoll", true);
+    gps.disableHeading = preferences.getBool("disableHeading", false);
 
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
@@ -286,6 +289,9 @@ uint8_t ESPdata::saveConfig(){
     // Save GPS configuration
     preferences.putBool("externalGPS", gps.externalGPS);
     preferences.putBool("ntripPandaMode", gps.ntripPandaMode);
+    preferences.putBool("flipPitchRoll", gps.flipPitchRoll);
+    preferences.putBool("invertRoll", gps.invertRoll);
+    preferences.putBool("disableHeading", gps.disableHeading);
 
     // Save server configuration
     preferences.putUChar("serverAdr", ota.ipAddr);

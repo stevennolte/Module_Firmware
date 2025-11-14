@@ -35,6 +35,14 @@ except ImportError:
     print("Error: scapy module not found. Install with: pip install scapy")
     sys.exit(1)
 
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    print("Warning: matplotlib not found. Plotting will be disabled. Install with: pip install matplotlib")
+    MATPLOTLIB_AVAILABLE = False
+
 
 class GPSUDPParser:
     """Parser for GPS UDP data from pcapng files"""
@@ -61,6 +69,12 @@ class GPSUDPParser:
             'nmea_sentences': 0,
             'panda_messages': 0,
             'parse_errors': 0
+        }
+        self.imu_data = {
+            'timestamps': [],
+            'pitch': [],
+            'roll': [],
+            'yaw': []
         }
     
     def is_nmea_sentence(self, data: str) -> bool:
@@ -143,7 +157,7 @@ class GPSUDPParser:
         try:
             parts = message.strip().split(',')
             if len(parts) >= 6:
-                return {
+                parsed = {
                     'type': 'PANDA',
                     'latitude': float(parts[0]),
                     'longitude': float(parts[1]),
@@ -155,6 +169,14 @@ class GPSUDPParser:
                     'timestamp': datetime.now().isoformat(),
                     'valid': True
                 }
+                
+                # Store IMU data for plotting
+                self.imu_data['timestamps'].append(datetime.now())
+                self.imu_data['pitch'].append(float(parts[4]))
+                self.imu_data['roll'].append(float(parts[3]))
+                self.imu_data['yaw'].append(float(parts[5]))
+                
+                return parsed
             else:
                 return {'error': 'Invalid PANDA format', 'raw': message, 'valid': False}
                 
@@ -201,8 +223,10 @@ class GPSUDPParser:
                             print(f"Error extracting payload: {e}")
                             continue
                         
+                        timestamp = packet.sniff_time if hasattr(packet, 'sniff_time') else datetime.now()
                         packet_info = {
-                            'timestamp': packet.sniff_time.isoformat() if hasattr(packet, 'sniff_time') else datetime.now().isoformat(),
+                            'timestamp': timestamp.isoformat(),
+                            'timestamp_obj': timestamp,
                             'src_ip': src_ip,
                             'dst_ip': dst_ip,
                             'src_port': src_port,
@@ -296,6 +320,12 @@ class GPSUDPParser:
             
             # Check for PANDA messages
             elif self.is_panda_message(line):
+                # Update timestamp for IMU data from packet
+                if 'timestamp_obj' in packet_info:
+                    self.imu_data['timestamps'].append(packet_info['timestamp_obj'])
+                else:
+                    self.imu_data['timestamps'].append(datetime.now())
+                
                 parsed_panda = self.parse_panda_message(line)
                 if parsed_panda:
                     parsed_panda['packet_info'] = packet_info
@@ -412,6 +442,99 @@ class GPSUDPParser:
             json.dump(data, f, indent=2)
         
         print(f"Data saved to {output_file}")
+    
+    def plot_imu_data(self, output_file: str = None) -> None:
+        """Plot pitch, roll, and yaw values over time"""
+        if not MATPLOTLIB_AVAILABLE:
+            print("Matplotlib is not available. Cannot create plots.")
+            print("Install with: pip install matplotlib")
+            return
+        
+        if not self.imu_data['timestamps'] or len(self.imu_data['timestamps']) == 0:
+            print("No IMU data available to plot.")
+            return
+        
+        # Remove duplicate timestamps for cleaner plotting
+        unique_indices = []
+        seen_times = set()
+        for i, ts in enumerate(self.imu_data['timestamps']):
+            if ts not in seen_times:
+                unique_indices.append(i)
+                seen_times.add(ts)
+        
+        timestamps = [self.imu_data['timestamps'][i] for i in unique_indices]
+        pitch = [self.imu_data['pitch'][i] for i in unique_indices]
+        roll = [self.imu_data['roll'][i] for i in unique_indices]
+        yaw = [self.imu_data['yaw'][i] for i in unique_indices]
+        
+        print(f"Plotting {len(timestamps)} IMU data points...")
+        
+        # Create figure with 3 subplots
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+        fig.suptitle('IMU Data Analysis (Pitch, Roll, Yaw)', fontsize=16, fontweight='bold')
+        
+        # Plot Pitch
+        ax1.plot(timestamps, pitch, 'b-', linewidth=1, label='Pitch')
+        ax1.set_ylabel('Pitch (degrees)', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(loc='upper right')
+        ax1.set_title(f'Pitch: min={min(pitch):.2f}°, max={max(pitch):.2f}°, avg={sum(pitch)/len(pitch):.2f}°')
+        
+        # Plot Roll
+        ax2.plot(timestamps, roll, 'r-', linewidth=1, label='Roll')
+        ax2.set_ylabel('Roll (degrees)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(loc='upper right')
+        ax2.set_title(f'Roll: min={min(roll):.2f}°, max={max(roll):.2f}°, avg={sum(roll)/len(roll):.2f}°')
+        
+        # Plot Yaw
+        ax3.plot(timestamps, yaw, 'g-', linewidth=1, label='Yaw')
+        ax3.set_ylabel('Yaw (degrees)', fontsize=12)
+        ax3.set_xlabel('Time', fontsize=12)
+        ax3.grid(True, alpha=0.3)
+        ax3.legend(loc='upper right')
+        ax3.set_title(f'Yaw: min={min(yaw):.2f}°, max={max(yaw):.2f}°, avg={sum(yaw)/len(yaw):.2f}°')
+        
+        # Format x-axis for all subplots
+        for ax in [ax1, ax2, ax3]:
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        
+        plt.tight_layout()
+        
+        # Save or show the plot
+        if output_file:
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            print(f"Plot saved to {output_file}")
+        else:
+            plt.show()
+        
+        plt.close()
+        
+        # Create a combined plot
+        fig2, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(timestamps, pitch, 'b-', linewidth=1, label='Pitch', alpha=0.7)
+        ax.plot(timestamps, roll, 'r-', linewidth=1, label='Roll', alpha=0.7)
+        ax.plot(timestamps, yaw, 'g-', linewidth=1, label='Yaw', alpha=0.7)
+        
+        ax.set_xlabel('Time', fontsize=12)
+        ax.set_ylabel('Angle (degrees)', fontsize=12)
+        ax.set_title('IMU Data - Combined View (Pitch, Roll, Yaw)', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper right', fontsize=10)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        
+        plt.tight_layout()
+        
+        if output_file:
+            combined_file = output_file.replace('.png', '_combined.png')
+            plt.savefig(combined_file, dpi=300, bbox_inches='tight')
+            print(f"Combined plot saved to {combined_file}")
+        else:
+            plt.show()
+        
+        plt.close()
 
 
 def main():
@@ -422,6 +545,8 @@ def main():
     parser.add_argument('--ip', help='Filter by specific IP address')
     parser.add_argument('--output', help='Output file for detailed data (JSON format)')
     parser.add_argument('--report', help='Output file for analysis report (text format)')
+    parser.add_argument('--plot', help='Output file for IMU plots (PNG format, e.g., imu_plot.png)')
+    parser.add_argument('--show-plot', action='store_true', help='Display plots interactively instead of saving')
     
     args = parser.parse_args()
     
@@ -451,6 +576,15 @@ def main():
     # Save detailed data if requested
     if args.output:
         gps_parser.save_data(args.output)
+    
+    # Plot IMU data if requested
+    if args.plot or args.show_plot:
+        if args.show_plot:
+            print("\nDisplaying IMU plots...")
+            gps_parser.plot_imu_data()
+        else:
+            print(f"\nGenerating IMU plots...")
+            gps_parser.plot_imu_data(args.plot)
     
     return 0
 

@@ -114,14 +114,14 @@ void ESPudp::begin(ESPGPS* gps){
       uint8_t *_data = packet.data();
       
       // Direct forwarding mode: send raw data to GPS
-      Serial.print("NTRIP direct mode - forwarding: ");
-      Serial.print(packetLength);
-      Serial.print(" bytes - ");
-      for (size_t i = 0; i < min(packetLength, (size_t)16); i++) {
-        Serial.printf("%02X ", _data[i]);
-      }
-      if (packetLength > 16) Serial.print("...");
-      Serial.println();
+      // Serial.print("NTRIP direct mode - forwarding: ");
+      // Serial.print(packetLength);
+      // Serial.print(" bytes - ");
+      // for (size_t i = 0; i < min(packetLength, (size_t)16); i++) {
+      //   Serial.printf("%02X ", _data[i]);
+      // }
+      // if (packetLength > 16) Serial.print("...");
+      // Serial.println();
       
       if (_gps) {
         _gps->sendNTRIP(_data, packetLength);
@@ -183,7 +183,7 @@ void ESPudp::begin(ESPGPS* gps){
               break;
             
             case 200:  //Hello from AgIO
-              Serial.println("Hello from AgIO");
+              // Serial.println("Hello from AgIO");
               aioReply[0] = 0x80;
               aioReply[1] = 0x81;
               aioReply[2] = espData->wifi.ips[3];

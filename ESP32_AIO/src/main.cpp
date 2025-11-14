@@ -176,6 +176,11 @@ void webSerial(const String& message) {
 void updateDebugVars();
 
 /**
+ * @brief Get FreeRTOS task statistics including CPU usage
+ */
+void getTaskStats(std::vector<String>& stats);
+
+/**
  * @brief Update debug variables for recovery mode
  */
 void updateRecoveryDebugVars();
@@ -494,6 +499,68 @@ void updateDebugVars() {
     debugVars.push_back("..Ch" + String(i) + ": " + String(i2cManager.getVoltage(i), 3) + "V");
   }
   
+  // Add CPU/Task statistics
+  getTaskStats(debugVars);
+  
+}
+
+/**
+ * @brief Get FreeRTOS task statistics including CPU usage
+ */
+void getTaskStats(std::vector<String>& stats) {
+  stats.push_back("=== System Statistics ===");
+  
+  // Get number of tasks
+  UBaseType_t taskCount = uxTaskGetNumberOfTasks();
+  stats.push_back("Active FreeRTOS tasks: " + String(taskCount));
+  stats.push_back("");
+  
+  // System uptime
+  uint32_t uptimeSeconds = millis() / 1000;
+  uint32_t days = uptimeSeconds / 86400;
+  uint32_t hours = (uptimeSeconds % 86400) / 3600;
+  uint32_t minutes = (uptimeSeconds % 3600) / 60;
+  uint32_t seconds = uptimeSeconds % 60;
+  
+  stats.push_back("System Uptime:");
+  if (days > 0) {
+    stats.push_back("  " + String(days) + " days, " + String(hours) + "h " + String(minutes) + "m " + String(seconds) + "s");
+  } else if (hours > 0) {
+    stats.push_back("  " + String(hours) + "h " + String(minutes) + "m " + String(seconds) + "s");
+  } else {
+    stats.push_back("  " + String(minutes) + "m " + String(seconds) + "s");
+  }
+  stats.push_back("");
+  
+  // Memory statistics
+  stats.push_back("Memory Statistics:");
+  stats.push_back("  Free heap: " + String(ESP.getFreeHeap()) + " bytes");
+  stats.push_back("  Min free heap: " + String(ESP.getMinFreeHeap()) + " bytes");
+  stats.push_back("  Max alloc heap: " + String(ESP.getMaxAllocHeap()) + " bytes");
+  
+  // Calculate heap fragmentation
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t maxAlloc = ESP.getMaxAllocHeap();
+  if (freeHeap > 0) {
+    uint32_t fragmentation = 100 - ((maxAlloc * 100) / freeHeap);
+    stats.push_back("  Heap fragmentation: " + String(fragmentation) + "%");
+  }
+  
+  // PSRAM if available
+  if (ESP.getPsramSize() > 0) {
+    stats.push_back("  PSRAM total: " + String(ESP.getPsramSize()) + " bytes");
+    stats.push_back("  PSRAM free: " + String(ESP.getFreePsram()) + " bytes");
+  }
+  stats.push_back("");
+  
+  // CPU information
+  stats.push_back("CPU Information:");
+  stats.push_back("  Chip model: " + String(ESP.getChipModel()));
+  stats.push_back("  Chip revision: " + String(ESP.getChipRevision()));
+  stats.push_back("  CPU cores: " + String(ESP.getChipCores()));
+  stats.push_back("  CPU frequency: " + String(ESP.getCpuFreqMHz()) + " MHz");
+  stats.push_back("  Flash size: " + String(ESP.getFlashChipSize() / 1024) + " KB");
+  stats.push_back("  Flash speed: " + String(ESP.getFlashChipSpeed() / 1000000) + " MHz");
 }
 
 /**
@@ -548,6 +615,11 @@ void updateRecoveryDebugVars() {
   debugVars.push_back("LittleFS Total: " + String(LittleFS.totalBytes()) + " bytes");
   debugVars.push_back("LittleFS Used: " + String(LittleFS.usedBytes()) + " bytes");
   debugVars.push_back("LittleFS Free: " + String(LittleFS.totalBytes() - LittleFS.usedBytes()) + " bytes");
+  debugVars.push_back("");
+  
+  // Add CPU/Task statistics for recovery mode
+  getTaskStats(debugVars);
+  
   debugVars.push_back("");
   debugVars.push_back("=== RECOVERY ACTIONS ===");
   debugVars.push_back("• Upload new firmware via /update");
@@ -668,6 +740,9 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='form-group'><label>WAS Source:</label><select id='wasSource'><option value='0'>Wired WAS</option><option value='1'>Wireless WAS</option></select></div>";
   html += "<div class='form-group'><label>LED Brightness (0-255):</label><input type='number' id='ledBrightness' min='0' max='255'></div>";
   html += "<div class='form-group'><label>ADS Address:</label><select id='adsAddress'><option value='0x48'>0x48</option><option value='0x49'>0x49</option><option value='0x4A'>0x4A</option><option value='0x4B'>0x4B</option></select></div>";
+  html += "<div class='form-group'><label>Flip Pitch/Roll:</label><select id='flipPitchRoll'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
+  html += "<div class='form-group'><label>Invert Roll:</label><select id='invertRoll'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
+  html += "<div class='form-group'><label>Disable Heading Output:</label><select id='disableHeading'><option value='0'>No (Send Heading)</option><option value='1'>Yes (Pitch/Roll Only)</option></select></div>";
   html += "</div>";
   
   // Action buttons
@@ -716,6 +791,9 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      document.getElementById('wasSource').value = data.wasSource;";
   html += "      document.getElementById('ledBrightness').value = data.ledBrightness;";
   html += "      document.getElementById('adsAddress').value = data.adsAddress;";
+  html += "      document.getElementById('flipPitchRoll').value = data.flipPitchRoll;";
+  html += "      document.getElementById('invertRoll').value = data.invertRoll;";
+  html += "      document.getElementById('disableHeading').value = data.disableHeading;";
   html += "      showStatus('Settings loaded successfully', false);";
   html += "    })";
   html += "    .catch(error => { console.log('Settings load error:', error); showStatus('Failed to load settings: ' + error, true); });";
@@ -742,6 +820,9 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('pandaMode', document.getElementById('pandaMode').value);";
   html += "  formData.append('wasSource', document.getElementById('wasSource').value);";
   html += "  formData.append('ledBrightness', parseInt(document.getElementById('ledBrightness').value) || 100);";
+  html += "  formData.append('flipPitchRoll', document.getElementById('flipPitchRoll').value);";
+  html += "  formData.append('invertRoll', document.getElementById('invertRoll').value);";
+  html += "  formData.append('disableHeading', document.getElementById('disableHeading').value);";
   html += "  fetch('/saveSettings', {";
   html += "    method: 'POST',";
   html += "    body: formData";
@@ -812,6 +893,9 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["ledBrightness"] = espData.program.ledBrht;
   doc["adsAddress"] = "0x48"; // Default, could be made configurable
   doc["pandaMode"] = espData.gps.ntripPandaMode ? 1 : 0;
+  doc["flipPitchRoll"] = espData.gps.flipPitchRoll ? 1 : 0;
+  doc["invertRoll"] = espData.gps.invertRoll ? 1 : 0;
+  doc["disableHeading"] = espData.gps.disableHeading ? 1 : 0;
   
   String response;
   serializeJson(doc, response);
@@ -943,6 +1027,21 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
     bool oldValue = espData.gps.ntripPandaMode;
     espData.gps.ntripPandaMode = request->getParam("pandaMode", true)->value().toInt();
     Serial.println("  PANDA Mode: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.ntripPandaMode ? "Enabled" : "Disabled"));
+  }
+  if (request->hasParam("flipPitchRoll", true)) {
+    bool oldValue = espData.gps.flipPitchRoll;
+    espData.gps.flipPitchRoll = request->getParam("flipPitchRoll", true)->value().toInt();
+    Serial.println("  Flip Pitch/Roll: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.flipPitchRoll ? "Enabled" : "Disabled"));
+  }
+  if (request->hasParam("invertRoll", true)) {
+    bool oldValue = espData.gps.invertRoll;
+    espData.gps.invertRoll = request->getParam("invertRoll", true)->value().toInt();
+    Serial.println("  Invert Roll: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.invertRoll ? "Enabled" : "Disabled"));
+  }
+  if (request->hasParam("disableHeading", true)) {
+    bool oldValue = espData.gps.disableHeading;
+    espData.gps.disableHeading = request->getParam("disableHeading", true)->value().toInt();
+    Serial.println("  Disable Heading: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.disableHeading ? "Enabled" : "Disabled"));
   }
   
   Serial.println("Attempting to save configuration to NVS...");
@@ -1514,17 +1613,18 @@ void normalboot(){
   logStartupState("WiFi", "Starting Connection", "");
     
   uint32_t wifiStart = millis();
-  while (WiFi.status() != WL_CONNECTED){
-    espData.wifi.state = espWifi.connect();
-    /** @brief Check for WiFi connection, if times out, create AP */
-    if (millis()-wifiStart > 120000){
-      Serial.println("Wifi connection timed out");
-      Serial.println("Switching to AP mode");
-      logStartupState("WiFi", "Connection Timeout", "Switching to AP mode after 120s");
-      espData.wifi.state = espWifi.makeAP();
-      break;
-    }
-  }
+  // while (WiFi.status() != WL_CONNECTED){
+  //   espData.wifi.state = espWifi.connect();
+  //   /** @brief Check for WiFi connection, if times out, create AP */
+  //   if (millis()-wifiStart > 120000){
+  //     Serial.println("Wifi connection timed out");
+  //     Serial.println("Switching to AP mode");
+  //     logStartupState("WiFi", "Connection Timeout", "Switching to AP mode after 120s");
+  //     espData.wifi.state = espWifi.makeAP();
+  //     break;
+  //   }
+  // }
+  espData.wifi.state = espWifi.makeAP();
   i2cManager.setEthLED(LEDPattern::ON);
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espData.wifi.state));

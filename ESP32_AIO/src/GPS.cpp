@@ -229,12 +229,12 @@ void ESPGPS::parseVTG(const char* sentence)
     // VTG format: $GPVTG,courseTrue,T,courseMag,M,speedKnots,N,speedKmh,K,mode*checksum
     
     // Debug occasionally to avoid spam
-    static int vtgDebugCounter = 0;
-    if (++vtgDebugCounter >= 50) {
-        vtgDebugCounter = 0;
-        Serial.print("DEBUG VTG: ");
-        Serial.println(sentence);
-    }
+    // static int vtgDebugCounter = 0;
+    // if (++vtgDebugCounter >= 50) {
+    //     vtgDebugCounter = 0;
+    //     Serial.print("DEBUG VTG: ");
+    //     Serial.println(sentence);
+    // }
     
     char* fields[10];
     int fieldCount = 0;
@@ -248,17 +248,17 @@ void ESPGPS::parseVTG(const char* sentence)
         token = strtok(NULL, ",*");
     }
     
-    if (vtgDebugCounter == 1) {  // Only show field breakdown occasionally
-        Serial.print("DEBUG VTG fields: ");
-        for (int i = 0; i < fieldCount; i++) {
-            Serial.print("[");
-            Serial.print(i);
-            Serial.print("]=");
-            Serial.print(fields[i]);
-            Serial.print(" ");
-        }
-        Serial.println();
-    }
+    // if (vtgDebugCounter == 1) {  // Only show field breakdown occasionally
+    //     Serial.print("DEBUG VTG fields: ");
+    //     for (int i = 0; i < fieldCount; i++) {
+    //         Serial.print("[");
+    //         Serial.print(i);
+    //         Serial.print("]=");
+    //         Serial.print(fields[i]);
+    //         Serial.print(" ");
+    //     }
+    //     Serial.println();
+    // }
     
     if (fieldCount >= 6) {
         // Initialize fields to empty strings first
@@ -270,11 +270,11 @@ void ESPGPS::parseVTG(const char* sentence)
             strncpy(espData->gps.vtgHeading, fields[1], sizeof(espData->gps.vtgHeading) - 1);
             espData->gps.vtgHeading[sizeof(espData->gps.vtgHeading) - 1] = '\0';
             cleanDataField(espData->gps.vtgHeading);
-            if (vtgDebugCounter == 1) {
-                Serial.print("DEBUG vtgHeading set to: '");
-                Serial.print(espData->gps.vtgHeading);
-                Serial.println("'");
-            }
+            // if (vtgDebugCounter == 1) {
+            //     Serial.print("DEBUG vtgHeading set to: '");
+            //     Serial.print(espData->gps.vtgHeading);
+            //     Serial.println("'");
+            // }
         }
         
         // Extract speed in knots (field 5) and clean it
@@ -282,11 +282,11 @@ void ESPGPS::parseVTG(const char* sentence)
             strncpy(espData->gps.speedKnots, fields[5], sizeof(espData->gps.speedKnots) - 1);
             espData->gps.speedKnots[sizeof(espData->gps.speedKnots) - 1] = '\0';
             cleanDataField(espData->gps.speedKnots);
-            if (vtgDebugCounter == 1) {
-                Serial.print("DEBUG speedKnots set to: '");
-                Serial.print(espData->gps.speedKnots);
-                Serial.println("'");
-            }
+            // if (vtgDebugCounter == 1) {
+            //     Serial.print("DEBUG speedKnots set to: '");
+            //     Serial.print(espData->gps.speedKnots);
+            //     Serial.println("'");
+            // }
         }
         
         // Increment VTG message counter in ESPdata
@@ -294,7 +294,7 @@ void ESPGPS::parseVTG(const char* sentence)
         
         // Serial.println("VTG parsed successfully");
     } else {
-        Serial.println("DEBUG VTG: Not enough fields");
+        // Serial.println("DEBUG VTG: Not enough fields");
     }
 }
 
@@ -314,7 +314,7 @@ void ESPGPS::parseNMEASentence(const char* sentence)
         // Check mode: PANDA generation or raw forwarding
         if (espData->gps.ntripPandaMode) {
             // PANDA mode: build and send PANDA sentence (only for GGA)
-            Serial.println("GGA received - generating PANDA sentence");
+            // Serial.println("GGA received - generating PANDA sentence");
             buildPandaSentence();
         } else {
             // Raw forwarding mode: send original NMEA sentence
@@ -606,25 +606,27 @@ void ESPGPS::buildPandaSentence()
     }
     
     // Debug: Show what data we have before building sentence (reduce frequency)
-    static int pandaDebugCounter = 0;
-    if (++pandaDebugCounter >= 10) {
-        pandaDebugCounter = 0;
-        Serial.println("=== GPS Data Before Building PANDA ===");
-        Serial.printf("Time: '%s'\n", espData->gps.fixTime);
-        Serial.printf("Lat: '%s' %s\n", espData->gps.latitude, espData->gps.latNS);
-        Serial.printf("Lon: '%s' %s\n", espData->gps.longitude, espData->gps.lonEW);
-        Serial.printf("Quality: '%s'\n", espData->gps.fixQuality);
-        Serial.printf("Sats: '%s'\n", espData->gps.numSats);
-        Serial.printf("HDOP: '%s'\n", espData->gps.HDOP);
-        Serial.printf("Alt: '%s'\n", espData->gps.altitude);
-        Serial.printf("DGPS Age: '%s'\n", espData->gps.ageDGPS);
-        Serial.printf("Speed: '%s'\n", espData->gps.speedKnots);
-        Serial.printf("IMU Heading: '%s'\n", espData->gps.imuHeading);
-        Serial.printf("IMU Roll: '%s'\n", espData->gps.imuRoll);
-        Serial.printf("IMU Pitch: '%s'\n", espData->gps.imuPitch);
-        Serial.printf("IMU Yaw Rate: '%s'\n", espData->gps.imuYawRate);
-        Serial.println("=====================================");
-    }
+    // static int pandaDebugCounter = 0;
+    // if (++pandaDebugCounter >= 10) {
+    //     pandaDebugCounter = 0;
+    //     Serial.println("=== GPS/IMU Data Before Building PANDA ===");
+    //     Serial.println("GPS Data:");
+    //     Serial.printf("  Time: '%s'\n", espData->gps.fixTime);
+    //     Serial.printf("  Lat: '%s' %s, Lon: '%s' %s\n", 
+    //                  espData->gps.latitude, espData->gps.latNS,
+    //                  espData->gps.longitude, espData->gps.lonEW);
+    //     Serial.printf("  Quality: '%s', Sats: '%s', HDOP: '%s'\n", 
+    //                  espData->gps.fixQuality, espData->gps.numSats, espData->gps.HDOP);
+    //     Serial.printf("  Alt: '%s', DGPS Age: '%s', Speed: '%s' kts\n", 
+    //                  espData->gps.altitude, espData->gps.ageDGPS, espData->gps.speedKnots);
+    //     Serial.println("IMU Data (to be transmitted):");
+    //     Serial.printf("  Heading: '%s' %s\n", 
+    //                  espData->gps.imuHeading,
+    //                  espData->gps.disableHeading ? "(DISABLED - will send 0)" : "(enabled)");
+    //     Serial.printf("  Roll: '%s', Pitch: '%s', Yaw Rate: '%s'\n", 
+    //                  espData->gps.imuRoll, espData->gps.imuPitch, espData->gps.imuYawRate);
+    //     Serial.println("==========================================");
+    // }
     
     // Clear the NMEA buffer
     strcpy(espData->gps.nmea, "");
@@ -697,8 +699,11 @@ void ESPGPS::buildPandaSentence()
     strcat(espData->gps.nmea, ",");
     
     // FROM IMU:
-    // (12) Heading in degrees - only add if we have valid data
-    if (strlen(espData->gps.imuHeading) > 0 && espData->gps.imuHeading[0] != '\0') {
+    // (12) Heading in degrees - only add if we have valid data and heading is not disabled
+    if (espData->gps.disableHeading) {
+        // If heading is disabled, send 0
+        strcat(espData->gps.nmea, "0");
+    } else if (strlen(espData->gps.imuHeading) > 0 && espData->gps.imuHeading[0] != '\0') {
         strcat(espData->gps.nmea, espData->gps.imuHeading);
     }
     strcat(espData->gps.nmea, ",");
@@ -749,27 +754,27 @@ void ESPGPS::buildPandaSentence()
     strcat(espData->gps.nmea, "\r\n");
     
     // Debug: Show complete sentence (reduce frequency)
-    static int pandaOutputCounter = 0;
-    if (++pandaOutputCounter >= 10) {
-        pandaOutputCounter = 0;
-        Serial.print("Complete PANDA: ");
-        Serial.println(espData->gps.nmea);
-    }
+    // static int pandaOutputCounter = 0;
+    // if (++pandaOutputCounter >= 10) {
+    //     pandaOutputCounter = 0;
+    //     Serial.print("Complete PANDA: ");
+    //     Serial.println(espData->gps.nmea);
+    // }
     
     // Send via UDP if WiFi is connected
     if (espData->wifi.state == 1)
     {
-        if (pandaOutputCounter == 1) { // Only show sending message when we show the sentence
-            Serial.println("Sending PANDA via UDP");
-            int len = strlen(espData->gps.nmea);
-            Serial.print("PANDA Length: ");
-            Serial.println(len);
-        }
+        // if (pandaOutputCounter == 1) { // Only show sending message when we show the sentence
+        //     Serial.println("Sending PANDA via UDP");
+        //     int len = strlen(espData->gps.nmea);
+        //     Serial.print("PANDA Length: ");
+        //     Serial.println(len);
+        // }
         espUdp->sendUDPgps(espData->gps.nmea);
         espData->gps.pandaMessageCount++; // Increment PANDA message counter
         espData->gps.lastPandaTime = millis(); // Record timestamp
     } else {
-        Serial.println("WiFi not connected - PANDA not sent");
+        // Serial.println("WiFi not connected - PANDA not sent");
     }
 }void ESPGPS::continuousLoop(){
     uint32_t lastImuCall = 0;
@@ -978,8 +983,27 @@ void ESPGPS::imuHandler(){
         memset(tempPitch, 0, sizeof(tempPitch));
         memset(tempRoll, 0, sizeof(tempRoll));
         
+        if (espData->gps.flipPitchRoll){
+            // Swap pitch and roll values
+            float temp = heading.pitch;
+            heading.pitch = heading.roll;
+            heading.roll = temp;
+        }
+        if (espData->gps.invertRoll){
+            heading.roll = -heading.roll;
+        }
+        
+        // Normalize heading to 0-360 range (yaw can be negative)
+        float normalizedYaw = heading.yaw;
+        while (normalizedYaw < 0) {
+            normalizedYaw += 360.0;
+        }
+        while (normalizedYaw >= 360.0) {
+            normalizedYaw -= 360.0;
+        }
+        
         // Convert values to strings in temporary buffers first
-        int16_t temp = heading.yaw * 10;
+        int16_t temp = normalizedYaw * 10;
         snprintf(tempHeading, sizeof(tempHeading), "%d", temp);
         
         temp = heading.pitch * 10;
@@ -1017,17 +1041,21 @@ void ESPGPS::imuHandler(){
         validateIMUString(espData->gps.imuYawRate, sizeof(espData->gps.imuYawRate));
         
         // Debug output occasionally to avoid spam (every 100 readings)
-        static int debugCounter = 0;
-        if (++debugCounter >= 100) {
-            debugCounter = 0;
-            Serial.print("DEBUG IMU: H='");
-            Serial.print(espData->gps.imuHeading);
-            Serial.print("' P='");
-            Serial.print(espData->gps.imuPitch);
-            Serial.print("' R='");
-            Serial.print(espData->gps.imuRoll);
-            Serial.println("'");
-        }
+        // static int debugCounter = 0;
+        // if (++debugCounter >= 100) {
+        //     debugCounter = 0;
+        //     Serial.println("=== IMU DATA DEBUG ===");
+        //     Serial.printf("Raw IMU - Yaw: %.2f°, Pitch: %.2f°, Roll: %.2f°\n", 
+        //                  heading.yaw, heading.pitch, heading.roll);
+        //     Serial.printf("Normalized Heading: %.2f°\n", normalizedYaw);
+        //     Serial.printf("Transmitted Values - Heading: %s, Pitch: %s, Roll: %s\n",
+        //                  espData->gps.imuHeading, espData->gps.imuPitch, espData->gps.imuRoll);
+        //     Serial.printf("Settings - FlipPitchRoll: %s, InvertRoll: %s, DisableHeading: %s\n",
+        //                  espData->gps.flipPitchRoll ? "ON" : "OFF",
+        //                  espData->gps.invertRoll ? "ON" : "OFF",
+        //                  espData->gps.disableHeading ? "ON" : "OFF");
+        //     Serial.println("=====================");
+        // }
 
     } 
     // Note: IMU is currently always enabled (if condition above is 'true')

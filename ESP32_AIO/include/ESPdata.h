@@ -331,7 +331,8 @@ public:
         bool signalGroup = false;
         bool saveCfg2 = false;
 
-
+        bool flipPitchRoll = true;
+        bool disableHeading = false; ///< @brief Disable heading output (only send pitch/roll)
         uint8_t state;              ///< @brief GPS receiver state (0=off, 1=searching, 2=fixed)
         uint8_t imuState;           ///< @brief IMU state (0=off, 1=calibrating, 2=ready)
         uint8_t positionType;       ///< @brief Position solution type (1=GPS, 2=DGPS, 4=RTK_FIXED, 5=RTK_FLOAT)
@@ -372,7 +373,7 @@ public:
         uint8_t gpsRxPin;           ///< @brief GPS module receive pin assignment
         uint8_t bnoPin;             ///< @brief BNO055 IMU communication pin
         uint16_t bnoBaud;           ///< @brief BNO055 IMU communication baud rate
-        const bool invertRoll = true; ///< @brief IMU roll inversion flag for dual antenna setup
+        bool invertRoll = true; ///< @brief IMU roll inversion flag for dual antenna setup
         
         // NMEA message counters for monitoring parsing activity
         uint32_t ggaMessageCount;   ///< @brief Count of parsed GGA (position) messages

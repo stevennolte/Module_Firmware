@@ -54,7 +54,7 @@ uint8_t ESPWifi::makeAP(){
     WiFi.softAPConfig(local_IP, local_IP, subnet);
     MDNS.begin(NAME);
     // startMonitor();
-    return 3;
+    return 1;
 }
 
 void ESPWifi::startMonitor(){
