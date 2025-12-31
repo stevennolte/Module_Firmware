@@ -63,11 +63,29 @@ Or combine upload and monitor:
 pio run --target upload && pio device monitor
 ```
 
+## Examples
+
+The project includes several examples in the `examples/` directory:
+
+### 1. Basic Example (main.cpp)
+The main program continuously reads distance measurements from the A121 sensor at 1-second intervals and prints the results to the serial monitor.
+
+### 2. Advanced Example (examples/advanced_example.cpp)
+Demonstrates:
+- Object detection and tracking
+- Distance filtering using moving average
+- Temperature monitoring and warnings
+- Automatic error recovery
+- State change detection
+
+### 3. I2C Scanner (examples/i2c_scanner.cpp)
+A utility to scan the I2C bus and identify connected devices. Useful for debugging connection issues and verifying the A121 sensor address.
+
+To use an example, copy the desired `.cpp` file from the `examples/` directory to `src/main.cpp`.
+
 ## Usage
 
 ### Basic Usage
-
-The main program continuously reads distance measurements from the A121 sensor at 1-second intervals and prints the results to the serial monitor.
 
 ```cpp
 #include <Arduino.h>
