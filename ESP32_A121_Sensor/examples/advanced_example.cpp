@@ -149,7 +149,8 @@ void detectObject() {
     } else if (objectDetected) {
         // Track moving object
         int distanceDiff = (int)filteredDistance - (int)lastDistance;
-        if (distanceDiff > 10 || distanceDiff < -10) {
+        int absDiff = distanceDiff < 0 ? -distanceDiff : distanceDiff;
+        if (absDiff > 10) {
             Serial.print("Object moving - Distance: ");
             Serial.print(filteredDistance);
             Serial.print(" mm (Δ: ");

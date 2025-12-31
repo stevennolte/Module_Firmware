@@ -75,7 +75,8 @@ void loop() {
     Serial.println("\n--- Rescanning I2C bus ---");
     int deviceCount = 0;
     
-    for (int address = 1; address < 127; address++) {
+    // Scan all valid I2C addresses (0x00-0x7F, excluding reserved addresses)
+    for (int address = 0; address < 128; address++) {
         Wire.beginTransmission(address);
         uint8_t error = Wire.endTransmission();
         
