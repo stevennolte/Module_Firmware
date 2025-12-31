@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "A121Sensor.h"
+#include "A121Config.h"
 
 // ESP32-S3 I2C pins (can be customized)
 #define I2C_SDA 8  // GPIO8
@@ -8,8 +9,9 @@
 // Create A121 sensor instance
 A121Sensor sensor(I2C_SDA, I2C_SCL);
 
-// Measurement interval in milliseconds
-const unsigned long MEASUREMENT_INTERVAL = 1000;
+// Measurement interval in milliseconds (adjust this to change reading frequency)
+// Examples: 100 = 10 Hz, 500 = 2 Hz, 1000 = 1 Hz, 2000 = 0.5 Hz
+const unsigned long MEASUREMENT_INTERVAL = A121_DEFAULT_MEASUREMENT_INTERVAL_MS;
 unsigned long lastMeasurementTime = 0;
 
 void setup() {

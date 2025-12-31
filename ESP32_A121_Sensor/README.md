@@ -27,6 +27,7 @@ Default I2C pins (can be customized in `main.cpp`):
 - Temperature monitoring
 - Status monitoring and error detection
 - Continuous measurement mode
+- **Adjustable measurement frequency** (from 0.1 Hz to 100+ Hz)
 - Serial output for debugging and monitoring
 
 ## Building and Uploading
@@ -68,7 +69,20 @@ pio run --target upload && pio device monitor
 The project includes several examples in the `examples/` directory:
 
 ### 1. Basic Example (main.cpp)
-The main program continuously reads distance measurements from the A121 sensor at 1-second intervals and prints the results to the serial monitor.
+The main program continuously reads distance measurements from the A121 sensor at 1-second intervals (1 Hz) and prints the results to the serial monitor.
+
+**Adjusting Measurement Frequency:**
+To change how often the sensor reads data, modify the `MEASUREMENT_INTERVAL` constant in `src/main.cpp`:
+```cpp
+const unsigned long MEASUREMENT_INTERVAL = 1000;  // Default: 1000ms = 1 Hz
+```
+
+Examples:
+- `100` = 10 Hz (10 readings per second)
+- `500` = 2 Hz (2 readings per second)  
+- `1000` = 1 Hz (1 reading per second) - default
+- `2000` = 0.5 Hz (1 reading every 2 seconds)
+- `5000` = 0.2 Hz (1 reading every 5 seconds)
 
 ### 2. Advanced Example (examples/advanced_example.cpp)
 Demonstrates:
