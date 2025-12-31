@@ -7,7 +7,10 @@
 // Acconeer A121 I2C Default Address
 #define A121_I2C_ADDRESS 0x52
 
-// A121 Register addresses (based on typical I2C sensor interface)
+// A121 Register addresses
+// NOTE: These are placeholder register addresses based on typical I2C radar sensor interfaces.
+// For actual A121 implementation, consult the Acconeer A121 I2C interface documentation
+// to get the correct register map for your specific hardware configuration.
 #define A121_REG_STATUS       0x00
 #define A121_REG_COMMAND      0x01
 #define A121_REG_CONFIG       0x02

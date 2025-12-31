@@ -195,10 +195,17 @@ A121Sensor sensor(SDA_PIN, SCL_PIN, 0x53);  // Custom address
 
 ## Notes
 
+**Important:** The register addresses and command definitions in this implementation are placeholders based on typical I2C radar sensor interfaces. For production use with actual A121 hardware, you must:
+
+1. Consult the official Acconeer A121 I2C interface documentation
+2. Update the register addresses in `A121Sensor.h` to match your specific A121 module
+3. Verify the I2C address (default 0x52) matches your hardware configuration
+4. Adjust command values and configuration parameters as needed
+
+Other notes:
 - The A121 sensor requires appropriate power supply (check sensor datasheet)
 - I2C communication speed is set to 400kHz (Fast Mode)
-- Register addresses and commands are based on typical I2C sensor interfaces
-- Actual A121 register map may vary - consult Acconeer A121 I2C documentation
+- This code provides a framework that can be adapted to your specific A121 I2C implementation
 
 ## License
 

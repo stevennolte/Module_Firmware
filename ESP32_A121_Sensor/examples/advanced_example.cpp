@@ -69,9 +69,14 @@ MovingAverageFilter distanceFilter;
 void printSensorInfo() {
     Serial.println("\n=== A121 Sensor Information ===");
     Serial.println("Configuration: Medium Range");
-    Serial.println("Detection Threshold: " + String(DISTANCE_THRESHOLD_MM) + " mm");
-    Serial.println("Amplitude Threshold: " + String(AMPLITUDE_THRESHOLD));
-    Serial.println("Temperature Warning: " + String(TEMP_WARNING_C) + " C");
+    Serial.print("Detection Threshold: ");
+    Serial.print(DISTANCE_THRESHOLD_MM);
+    Serial.println(" mm");
+    Serial.print("Amplitude Threshold: ");
+    Serial.println(AMPLITUDE_THRESHOLD);
+    Serial.print("Temperature Warning: ");
+    Serial.print(TEMP_WARNING_C);
+    Serial.println(" C");
     Serial.println("===============================\n");
 }
 
@@ -143,11 +148,12 @@ void detectObject() {
         distanceFilter.reset();
     } else if (objectDetected) {
         // Track moving object
-        if (abs((int)filteredDistance - (int)lastDistance) > 10) {
+        int distanceDiff = (int)filteredDistance - (int)lastDistance;
+        if (distanceDiff > 10 || distanceDiff < -10) {
             Serial.print("Object moving - Distance: ");
             Serial.print(filteredDistance);
             Serial.print(" mm (Δ: ");
-            Serial.print((int)filteredDistance - (int)lastDistance);
+            Serial.print(distanceDiff);
             Serial.println(" mm)");
         }
     }
