@@ -94,8 +94,14 @@
         <mxCell id="_LXAMiea15LxsbTxfFkG-34" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Ideal Diode" vertex="1">
           <mxGeometry height="60" width="120" x="1110" y="530" as="geometry" />
         </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-6" edge="1" parent="1" source="_LXAMiea15LxsbTxfFkG-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="GbIjunzRCjNYcII4g9qL-5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="_LXAMiea15LxsbTxfFkG-36" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="3.3V AP" vertex="1">
           <mxGeometry height="60" width="120" x="1310" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-8" edge="1" parent="1" source="_LXAMiea15LxsbTxfFkG-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="GbIjunzRCjNYcII4g9qL-7" value="">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="_LXAMiea15LxsbTxfFkG-38" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="3.3V SWITCHED" vertex="1">
           <mxGeometry height="60" width="120" x="1310" y="620" as="geometry" />
@@ -111,6 +117,24 @@
         </mxCell>
         <mxCell id="_LXAMiea15LxsbTxfFkG-41" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Ideal Diode" vertex="1">
           <mxGeometry height="60" width="120" x="1110" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-2" edge="1" parent="1" source="GbIjunzRCjNYcII4g9qL-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="_LXAMiea15LxsbTxfFkG-40" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="USB AP" vertex="1">
+          <mxGeometry height="60" width="120" x="930" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-4" edge="1" parent="1" source="GbIjunzRCjNYcII4g9qL-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="_LXAMiea15LxsbTxfFkG-41" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="USB AIO" vertex="1">
+          <mxGeometry height="60" width="120" x="930" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="ESP32 AP" vertex="1">
+          <mxGeometry height="60" width="120" x="1510" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="GbIjunzRCjNYcII4g9qL-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="ESP32 AIO&lt;div&gt;MCP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="1510" y="620" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
