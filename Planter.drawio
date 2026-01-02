@@ -1,0 +1,46 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.2.9">
+  <diagram name="Page-1" id="LrzqaIbOsNDMo7TdwV0F">
+    <mxGraphModel dx="946" dy="658" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Wheel Sensor" vertex="1">
+          <mxGeometry height="60" width="120" x="100" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Point Row Clutch" vertex="1">
+          <mxGeometry height="60" width="120" x="670" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Point Row Clutch" vertex="1">
+          <mxGeometry height="60" width="120" x="100" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Wheel Sensor" vertex="1">
+          <mxGeometry height="60" width="120" x="670" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Shaft Sensor" vertex="1">
+          <mxGeometry height="60" width="120" x="250" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Shaft Sensor" vertex="1">
+          <mxGeometry height="60" width="120" x="500" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Row Clutch" vertex="1">
+          <mxGeometry height="60" width="50" x="100" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Row Clutch" vertex="1">
+          <mxGeometry height="60" width="50" x="170" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Row Clutch" vertex="1">
+          <mxGeometry height="60" width="50" x="740" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-11" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="240" y="350" as="sourcePoint" />
+            <mxPoint x="720" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="qGiC4AxQBT2ew7q7TYSe-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Toolbar Position" vertex="1">
+          <mxGeometry height="60" width="120" x="100" y="420" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
