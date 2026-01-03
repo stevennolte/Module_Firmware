@@ -37,8 +37,20 @@
             <mxPoint x="720" y="350" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="qGiC4AxQBT2ew7q7TYSe-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Toolbar Position" vertex="1">
-          <mxGeometry height="60" width="120" x="100" y="420" as="geometry" />
+        <mxCell id="KfB4KlPGx7RvPuu-5oAo-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Toolbar Position" vertex="1">
+          <mxGeometry height="60" width="120" x="370" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="KfB4KlPGx7RvPuu-5oAo-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Mux" vertex="1">
+          <mxGeometry height="60" width="120" x="510" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="KfB4KlPGx7RvPuu-5oAo-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Radar?" vertex="1">
+          <mxGeometry height="60" width="120" x="650" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="KfB4KlPGx7RvPuu-5oAo-9" parent="1" style="shape=module;align=left;spacingLeft=20;align=center;verticalAlign=top;whiteSpace=wrap;html=1;" value="Module" vertex="1">
+          <mxGeometry height="50" width="100" x="210" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="KfB4KlPGx7RvPuu-5oAo-10" parent="1" style="shape=module;align=left;spacingLeft=20;align=center;verticalAlign=top;whiteSpace=wrap;html=1;" value="Module" vertex="1">
+          <mxGeometry height="50" width="100" x="590" y="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
