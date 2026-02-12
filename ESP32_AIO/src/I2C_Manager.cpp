@@ -111,10 +111,10 @@ bool I2CManager::begin(TwoWire* bus, uint8_t mcp_addr, uint8_t ads_addr) {
 // FreeRTOS task function
 void I2CManager::taskRunner(void* pvParameters) {
     I2CManager* self = static_cast<I2CManager*>(pvParameters);
-    const TickType_t delayTicks = pdMS_TO_TICKS(50); // 50ms loop
+    const TickType_t delayTicks = pdMS_TO_TICKS(10); // 10ms loop for responsive non-blocking reads
     while (true) {
         if (self->_ads_initialized) {
-            self->readAllVoltages();
+            self->updateADCReadings(); // Non-blocking state machine
         }
         if (self->_mcp_initialized) {
             self->updateLEDStates();
@@ -152,6 +152,7 @@ uint8_t I2CManager::mcpDigitalRead(uint8_t pin) {
 }
 
 void I2CManager::readAllVoltages() {
+    // Legacy blocking method - deprecated but kept for compatibility
     if (_ads_initialized && xSemaphoreTake(_i2c_mutex, portMAX_DELAY) == pdTRUE) {
         for (int i = 0; i < 4; i++) {
             _rawReadings[i] = adsReadSingleEnded(i);
@@ -160,6 +161,51 @@ void I2CManager::readAllVoltages() {
         }
         xSemaphoreGive(_i2c_mutex);
     }
+}
+
+// Non-blocking ADC update method - called from task loop
+void I2CManager::updateADCReadings() {
+    processADCStateMachine();
+}
+
+// Non-blocking state machine for ADC readings
+void I2CManager::processADCStateMachine() {
+    if (!_ads_initialized) return;
+    
+    // Try to take mutex with minimal blocking (10ms timeout)
+    if (xSemaphoreTake(_i2c_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+        return; // Skip this cycle if mutex is busy
+    }
+    
+    switch (_adcState) {
+        case ADCState::IDLE:
+            // Start conversion on current channel
+            ads.startADCReading(ADS1X15_REG_CONFIG_MUX_SINGLE_0 + _currentADCChannel, false);
+            _conversionStartTime = millis();
+            _adcState = ADCState::WAITING_FOR_CONVERSION;
+            break;
+            
+        case ADCState::WAITING_FOR_CONVERSION:
+            // Check if enough time has passed for conversion (typical 8ms at default 128 SPS)
+            if (millis() - _conversionStartTime >= 8) {
+                // Read the conversion result
+                _rawReadings[_currentADCChannel] = ads.getLastConversionResults();
+                _voltages[_currentADCChannel] = ads.computeVolts(_rawReadings[_currentADCChannel]);
+                espData.adsConfig.readings[_currentADCChannel] = _rawReadings[_currentADCChannel];
+                
+                // Move to next channel
+                _currentADCChannel++;
+                if (_currentADCChannel >= 4) {
+                    _currentADCChannel = 0;
+                }
+                
+                // Return to IDLE to start next conversion
+                _adcState = ADCState::IDLE;
+            }
+            break;
+    }
+    
+    xSemaphoreGive(_i2c_mutex);
 }
 
 void I2CManager::adsSetGain(adsGain_t gain) {

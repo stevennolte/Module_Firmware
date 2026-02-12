@@ -485,7 +485,7 @@ void ESPGPS::init(ESPudp* espUdp){
             // Create GPS initialization task
             xTaskCreate([](void* param) {
                 GPSInitParams* p = (GPSInitParams*)param;
-                *p->result = p->gnss->begin(*p->serial);
+                *p->result = p->gnss->begin(*p->serial, "UM980");
                 *p->completed = true;
                 vTaskDelete(NULL);
             }, "GPSInit", 4096, &params, 1, &gpsInitTask);

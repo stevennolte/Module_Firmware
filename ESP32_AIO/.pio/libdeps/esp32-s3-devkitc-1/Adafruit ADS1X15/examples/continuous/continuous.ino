@@ -29,7 +29,6 @@ void setup(void)
   // The ADC input range (or gain) can be changed via the following
   // functions, but be careful never to exceed VDD +0.3V max, or to
   // exceed the upper and lower limits if you adjust the input range!
-  // Setting these values incorrectly may destroy your ADC!
   //                                                                ADS1015  ADS1115
   //                                                                -------  -------
   // ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
@@ -45,8 +44,8 @@ void setup(void)
   }
 
   pinMode(READY_PIN, INPUT);
-  // We get a falling edge every time a new sample is ready.
-  attachInterrupt(digitalPinToInterrupt(READY_PIN), NewDataReadyISR, FALLING);
+  // With default COMP_POL=0, get a rising edge every time a new sample is ready.
+  attachInterrupt(digitalPinToInterrupt(READY_PIN), NewDataReadyISR, RISING);
 
   // Start continuous conversions.
   ads.startADCReading(ADS1X15_REG_CONFIG_MUX_DIFF_0_1, /*continuous=*/true);

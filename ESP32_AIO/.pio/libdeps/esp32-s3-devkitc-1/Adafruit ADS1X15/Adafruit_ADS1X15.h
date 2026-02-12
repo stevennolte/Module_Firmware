@@ -66,7 +66,7 @@ constexpr uint16_t MUX_BY_CHANNEL[] = {
     ADS1X15_REG_CONFIG_MUX_SINGLE_1, ///< Single-ended AIN1
     ADS1X15_REG_CONFIG_MUX_SINGLE_2, ///< Single-ended AIN2
     ADS1X15_REG_CONFIG_MUX_SINGLE_3  ///< Single-ended AIN3
-};                                   ///< MUX config by channel
+}; ///< MUX config by channel
 
 #define ADS1X15_REG_CONFIG_PGA_MASK (0x0E00)   ///< PGA Mask
 #define ADS1X15_REG_CONFIG_PGA_6_144V (0x0000) ///< +/-6.144V range = Gain 2/3
@@ -148,10 +148,10 @@ typedef enum {
 class Adafruit_ADS1X15 {
 protected:
   // Instance-specific properties
-  Adafruit_I2CDevice *m_i2c_dev; ///< I2C bus device
-  uint8_t m_bitShift;            ///< bit shift amount
-  adsGain_t m_gain;              ///< ADC gain
-  uint16_t m_dataRate;           ///< Data rate
+  Adafruit_I2CDevice *m_i2c_dev = NULL; ///< I2C bus device
+  uint8_t m_bitShift;                   ///< bit shift amount
+  adsGain_t m_gain;                     ///< ADC gain
+  uint16_t m_dataRate;                  ///< Data rate
 
 public:
   bool begin(uint8_t i2c_addr = ADS1X15_ADDRESS, TwoWire *wire = &Wire);
@@ -162,6 +162,7 @@ public:
   int16_t readADC_Differential_2_3();
   void startComparator_SingleEnded(uint8_t channel, int16_t threshold);
   int16_t getLastConversionResults();
+  float getFsRange();
   float computeVolts(int16_t counts);
   void setGain(adsGain_t gain);
   adsGain_t getGain();

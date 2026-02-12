@@ -56,7 +56,8 @@ public:
     uint8_t mcpDigitalRead(uint8_t pin);
     bool isInitialized() const; // Check if both MCP and ADS are initialized
     // --- ADS1115 Methods (Thread-Safe) ---
-    void readAllVoltages();
+    void readAllVoltages(); // Legacy blocking method (deprecated)
+    void updateADCReadings(); // Non-blocking state machine method
     void adsSetGain(adsGain_t gain);
 
     // --- Data Getter (Does not need mutex) ---
@@ -92,6 +93,9 @@ private:
 
     // Helper function for raw ADC reads. Called internally from a mutex-protected block.
     int16_t adsReadSingleEnded(uint8_t channel);
+    
+    // Non-blocking ADC state machine
+    void processADCStateMachine();
 
     // LED state management
     void updateLEDStates();
@@ -123,6 +127,15 @@ private:
     uint16_t _rawReadings[4];
     bool prevMotorEnableA = false; ///< @brief Previous state of motor enable A
     bool prevMotorEnableB = false; ///< @brief Previous state of motor enable B
+    
+    // ADS1115 non-blocking state machine variables
+    enum class ADCState {
+        IDLE,
+        WAITING_FOR_CONVERSION
+    };
+    ADCState _adcState = ADCState::IDLE;
+    uint8_t _currentADCChannel = 0;
+    unsigned long _conversionStartTime = 0;
 };
 
 #endif // I2C_MANAGER_H
