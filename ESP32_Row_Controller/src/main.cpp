@@ -51,14 +51,28 @@ void updateRowOutputs() {
 // Webserver helpers
 // -----------------------------------------------------------------------
 
+static bool fwUpdateSkip = false;
+
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename,
                           size_t index, uint8_t *data, size_t len, bool final) {
     if (!index) {
+        fwUpdateSkip = false;
         Serial.printf("OTA Start: %s\n", filename.c_str());
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+        if (!filename.startsWith(NAME)) {
+            Serial.printf("Firmware rejected: filename '%s' does not match module '%s'\n", filename.c_str(), NAME);
+            fwUpdateSkip = true;
+        } else if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             Update.printError(Serial);
         }
     }
+
+    if (fwUpdateSkip) {
+        if (final) {
+            request->send(400, "text/plain", "Wrong firmware file! Expected a file starting with: " + String(NAME));
+        }
+        return;
+    }
+
     if (Update.write(data, len) != len) {
         Update.printError(Serial);
     }
