@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32 Row Controller</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f0f0f0; padding: 20px; }
+    h1 { color: #333; }
+    nav { margin-bottom: 20px; }
+    nav a {
+      text-decoration: none;
+      color: #4CAF50;
+      padding: 10px 20px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      margin-right: 10px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    nav a:hover { background-color: #4CAF50; color: white; }
+    .status-card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .row-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .row-cell {
+      padding: 15px 5px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 14px;
+      border: 2px solid #ccc;
+      background: #eee;
+      transition: background 0.2s;
+    }
+    .row-cell.on { background: #4CAF50; color: white; border-color: #388E3C; }
+    .row-cell.off { background: #f44336; color: white; border-color: #c62828; }
+    .toolbar-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .toolbar-up { background: #FF9800; color: white; }
+    .toolbar-down { background: #4CAF50; color: white; }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #45a049; }
+  </style>
+  <script>
+    function fetchSections() {
+      fetch('/getSections')
+        .then(r => r.json())
+        .then(data => {
+          // Toolbar badge
+          const badge = document.getElementById('toolbarBadge');
+          if (data.toolbarUp) {
+            badge.textContent = 'Toolbar UP – Sections DISABLED';
+            badge.className = 'toolbar-badge toolbar-up';
+          } else {
+            badge.textContent = 'Toolbar DOWN – Sections ENABLED';
+            badge.className = 'toolbar-badge toolbar-down';
+          }
+          document.getElementById('speedVal').textContent = data.speed.toFixed(1) + ' mph';
+          // Row cells
+          data.rows.forEach((state, i) => {
+            const cell = document.getElementById('row' + (i + 1));
+            if (cell) {
+              cell.textContent = 'Row ' + (i + 1) + '\n' + (state ? 'ON' : 'OFF');
+              cell.className = 'row-cell ' + (state ? 'on' : 'off');
+            }
+          });
+        })
+        .catch(e => console.error(e));
+    }
+    setInterval(fetchSections, 500);
+    window.onload = fetchSections;
+  </script>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Sections</a>
+    <a href="debug.html">Debug</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+  <h1>ESP32 Row Controller</h1>
+
+  <div class="status-card">
+    <h2>Toolbar Status</h2>
+    <span id="toolbarBadge" class="toolbar-badge toolbar-up">Loading...</span>
+    &nbsp;&nbsp;Speed: <strong id="speedVal">--</strong>
+  </div>
+
+  <div class="status-card">
+    <h2>Row Unit Sections (12)</h2>
+    <div class="row-grid">
+      <div id="row1" class="row-cell">Row 1</div>
+      <div id="row2" class="row-cell">Row 2</div>
+      <div id="row3" class="row-cell">Row 3</div>
+      <div id="row4" class="row-cell">Row 4</div>
+      <div id="row5" class="row-cell">Row 5</div>
+      <div id="row6" class="row-cell">Row 6</div>
+      <div id="row7" class="row-cell">Row 7</div>
+      <div id="row8" class="row-cell">Row 8</div>
+      <div id="row9" class="row-cell">Row 9</div>
+      <div id="row10" class="row-cell">Row 10</div>
+      <div id="row11" class="row-cell">Row 11</div>
+      <div id="row12" class="row-cell">Row 12</div>
+    </div>
+  </div>
+</body>
+</html>
