@@ -56,7 +56,6 @@ public:
     uint8_t mcpDigitalRead(uint8_t pin);
     bool isInitialized() const; // Check if both MCP and ADS are initialized
     // --- ADS1115 Methods (Thread-Safe) ---
-    void readAllVoltages(); // Legacy blocking method (deprecated)
     void updateADCReadings(); // Non-blocking state machine method
     void adsSetGain(adsGain_t gain);
 
@@ -110,21 +109,12 @@ private:
     static void taskRunner(void* pvParameters);
     TaskHandle_t _taskHandle = nullptr;
 
-    // Helper function for raw ADC reads. Called internally from a mutex-protected block.
-    int16_t adsReadSingleEnded(uint8_t channel);
-    
     // Non-blocking ADC state machine
     void processADCStateMachine();
 
     // LED state management
     void updateLEDStates();
     void updateLED(LEDIndicator& led);
-
-    // LED flash timing and state tracking
-    unsigned long _lastFlashTime = 0;
-    bool _flashState = false;
-    unsigned long _fastFlashTime = 0;
-    bool _fastFlashState = false;
 
     // LED Indicators
     LEDIndicator ledPowerOn;

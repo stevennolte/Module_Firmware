@@ -165,18 +165,6 @@ uint8_t I2CManager::mcpDigitalRead(uint8_t pin) {
     return value;
 }
 
-void I2CManager::readAllVoltages() {
-    // Legacy blocking method - deprecated but kept for compatibility
-    if (_ads_initialized && xSemaphoreTake(_i2c_mutex, portMAX_DELAY) == pdTRUE) {
-        for (int i = 0; i < 4; i++) {
-            _rawReadings[i] = adsReadSingleEnded(i);
-            _voltages[i] = ads.computeVolts(_rawReadings[i]);
-            espData.adsConfig.readings[i] = _rawReadings[i];
-        }
-        xSemaphoreGive(_i2c_mutex);
-    }
-}
-
 // Non-blocking ADC update method - called from task loop
 void I2CManager::updateADCReadings() {
     processADCStateMachine();
@@ -227,15 +215,6 @@ void I2CManager::adsSetGain(adsGain_t gain) {
         ads.setGain(gain);
         xSemaphoreGive(_i2c_mutex);
     }
-}
-
-// --- Private Helper (NOT thread-safe by itself) ---
-// This is only called from within a mutex-protected block (readAllVoltages)
-int16_t I2CManager::adsReadSingleEnded(uint8_t channel) {
-    if (!_ads_initialized || channel > 3) {
-        return 0;
-    }
-    return ads.readADC_SingleEnded(channel);
 }
 
 uint16_t I2CManager::getRawReading(uint8_t channel) const {
