@@ -68,6 +68,25 @@ public:
     bool isMcpReady() const;
     bool isAdsReady() const;
 
+    // --- Loop Timing Diagnostics ---
+    /**
+     * @brief Returns the duration of the last updateADCReadings() call in microseconds.
+     *        A non-blocking call should return in well under 1ms.
+     */
+    uint32_t getADCStateMachineTime() const { return _adcStateMachineTime; }
+
+    /**
+     * @brief Returns the maximum observed duration of any updateADCReadings() call in microseconds.
+     *        Spikes indicate unexpected blocking on the I2C bus or mutex.
+     */
+    uint32_t getADCStateMachineMaxTime() const { return _adcStateMachineMaxTime; }
+
+    /**
+     * @brief Returns the measured cycle time of the I2C manager background task in milliseconds.
+     *        Should be close to the 10ms vTaskDelay configured for the task.
+     */
+    uint32_t getI2CTaskCycleTime() const { return _i2cTaskCycleTime; }
+
     // --- LED State Management ---
     void setPowerLED(LEDPattern state);
     void setGPSLED(LEDPattern state);
@@ -136,6 +155,12 @@ private:
     ADCState _adcState = ADCState::IDLE;
     uint8_t _currentADCChannel = 0;
     unsigned long _conversionStartTime = 0;
+
+    // Loop timing diagnostics
+    uint32_t _adcStateMachineTime = 0;    ///< Duration of last processADCStateMachine() call (microseconds)
+    uint32_t _adcStateMachineMaxTime = 0; ///< Max observed processADCStateMachine() call duration (microseconds)
+    uint32_t _i2cTaskCycleTime = 0;       ///< I2C manager background task cycle time (milliseconds)
+    unsigned long _i2cTaskLastCycleMs = 0; ///< Timestamp of previous task cycle start (milliseconds)
 };
 
 #endif // I2C_MANAGER_H

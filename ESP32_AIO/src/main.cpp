@@ -511,6 +511,13 @@ void updateDebugVars() {
   for(int i = 0; i < 4; i++) {
     debugVars.push_back("..Ch" + String(i) + ": " + String(i2cManager.getVoltage(i), 3) + "V");
   }
+
+  // Loop timing diagnostics - confirm ADS read does not block
+  debugVars.push_back("Loop Timing Diagnostics:");
+  debugVars.push_back("..Steer Loop Time: " + String(espData.steer.looptime) + "ms");
+  debugVars.push_back("..I2C Task Cycle Time: " + String(i2cManager.getI2CTaskCycleTime()) + "ms");
+  debugVars.push_back("..ADS State Machine Time (last): " + String(i2cManager.getADCStateMachineTime()) + "us");
+  debugVars.push_back("..ADS State Machine Time (max): " + String(i2cManager.getADCStateMachineMaxTime()) + "us");
   
   // Add CPU/Task statistics
   getTaskStats(debugVars);

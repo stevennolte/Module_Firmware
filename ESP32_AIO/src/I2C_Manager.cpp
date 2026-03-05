@@ -113,8 +113,22 @@ void I2CManager::taskRunner(void* pvParameters) {
     I2CManager* self = static_cast<I2CManager*>(pvParameters);
     const TickType_t delayTicks = pdMS_TO_TICKS(10); // 10ms loop for responsive non-blocking reads
     while (true) {
+        // Measure task cycle time
+        unsigned long now = millis();
+        if (self->_i2cTaskLastCycleMs != 0) {
+            self->_i2cTaskCycleTime = (uint32_t)(now - self->_i2cTaskLastCycleMs);
+        }
+        self->_i2cTaskLastCycleMs = now;
+
         if (self->_ads_initialized) {
+            // Measure how long the non-blocking ADC state machine call takes
+            unsigned long adcStart = micros();
             self->updateADCReadings(); // Non-blocking state machine
+            uint32_t adcDuration = (uint32_t)(micros() - adcStart);
+            self->_adcStateMachineTime = adcDuration;
+            if (adcDuration > self->_adcStateMachineMaxTime) {
+                self->_adcStateMachineMaxTime = adcDuration;
+            }
         }
         if (self->_mcp_initialized) {
             self->updateLEDStates();
