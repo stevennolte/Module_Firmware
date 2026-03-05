@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug – ESP32 Row Controller</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f0f0f0; padding: 20px; }
+    h1, h2 { color: #333; }
+    nav { margin-bottom: 20px; }
+    nav a {
+      text-decoration: none;
+      color: #4CAF50;
+      padding: 10px 20px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      margin-right: 10px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    nav a:hover { background-color: #4CAF50; color: white; }
+    button, input[type="submit"] {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover, input[type="submit"]:hover { background-color: #45a049; }
+    .stop-btn { background-color: #f44336; }
+    .stop-btn:hover { background-color: #d32f2f; }
+    ul { background: white; border-radius: 8px; padding: 20px 40px; }
+  </style>
+  <script>
+    let loggingInterval = null;
+
+    function reboot() {
+      fetch('/reboot')
+        .then(r => r.text())
+        .then(() => alert('Rebooting...'))
+        .catch(e => console.error(e));
+    }
+
+    function fetchDebugVarsForUI() {
+      fetch('/getDebugVars')
+        .then(r => r.json())
+        .then(data => {
+          let list = document.getElementById('debugList');
+          list.innerHTML = '';
+          data.forEach(item => {
+            let li = document.createElement('li');
+            li.textContent = item;
+            list.appendChild(li);
+          });
+        })
+        .catch(e => console.log('Error fetching debug vars:', e));
+    }
+
+    function fetchFileList() {
+      fetch('/getFiles')
+        .then(r => r.json())
+        .then(data => {
+          let list = document.getElementById('fileList');
+          list.innerHTML = '';
+          data.forEach(file => {
+            let li = document.createElement('li');
+            li.textContent = file.name + ' (' + file.size + ' bytes)';
+            list.appendChild(li);
+          });
+        })
+        .catch(e => console.error('Error fetching file list:', e));
+    }
+
+    function startLogging() {
+      if (!loggingInterval) {
+        loggingInterval = setInterval(() => {
+          fetch('/getDebugVars')
+            .then(r => r.json())
+            .then(data => {
+              let logs = JSON.parse(localStorage.getItem('rowCtrlLogs') || '[]');
+              logs.push({ timestamp: new Date().toLocaleString(), data });
+              localStorage.setItem('rowCtrlLogs', JSON.stringify(logs));
+            });
+        }, 500);
+        alert('Started logging.');
+      } else {
+        alert('Already logging.');
+      }
+    }
+
+    function stopLogging() {
+      if (loggingInterval) {
+        clearInterval(loggingInterval);
+        loggingInterval = null;
+        alert('Stopped logging.');
+      } else {
+        alert('Not logging.');
+      }
+    }
+
+    setInterval(fetchDebugVarsForUI, 500);
+    window.onload = function() {
+      fetchDebugVarsForUI();
+      fetchFileList();
+      fetchFwModuleName();
+    };
+
+    // Firmware update: fetch module name for filename validation
+    function fetchFwModuleName() {
+      fetch('/getDebugVars')
+        .then(r => r.json())
+        .then(data => {
+          for (const item of data) {
+            if (item.startsWith('Program: ')) {
+              const name = item.replace('Program: ', '').trim();
+              const hint = document.getElementById('fwModuleHint');
+              if (hint) hint.textContent = 'Expected file: ' + name + '.bin';
+              const inp = document.getElementById('fwFile');
+              if (inp) inp.dataset.moduleName = name;
+              break;
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    function uploadFirmware() {
+      const fileInput = document.getElementById('fwFile');
+      const statusEl = document.getElementById('fwStatus');
+      if (!fileInput.files.length) {
+        statusEl.textContent = 'Please select a firmware file.';
+        statusEl.style.color = 'red';
+        return;
+      }
+      const file = fileInput.files[0];
+      const moduleName = fileInput.dataset.moduleName || '';
+      if (moduleName && !file.name.startsWith(moduleName)) {
+        statusEl.textContent = 'Wrong file! Expected a file starting with: ' + moduleName;
+        statusEl.style.color = 'red';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('firmware', file);
+      statusEl.textContent = 'Uploading...';
+      statusEl.style.color = '#333';
+      fetch('/update', { method: 'POST', body: formData })
+        .then(r => r.text())
+        .then(msg => {
+          statusEl.textContent = msg;
+          statusEl.style.color = msg.includes('complete') || msg.includes('Rebooting') ? 'green' : 'red';
+        })
+        .catch(err => {
+          statusEl.textContent = 'Upload error: ' + err;
+          statusEl.style.color = 'red';
+        });
+    }
+  </script>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Sections</a>
+    <a href="debug.html">Debug</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+  <h1>Debug</h1>
+  <button onclick="reboot()">Reboot ESP32</button>
+  <button onclick="startLogging()">Start Logging</button>
+  <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+
+  <h2>System Variables</h2>
+  <ul id="debugList"></ul>
+
+  <h2>Files on Device</h2>
+  <ul id="fileList"></ul>
+
+  <h2>Upload File</h2>
+  <form method="POST" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="upload">
+    <input type="submit" value="Upload">
+  </form>
+
+  <h2>Firmware OTA Update</h2>
+  <p id="fwModuleHint" style="color:#666; font-size:14px;">Expected file: loading...</p>
+  <input type="file" id="fwFile" accept=".bin">
+  <button onclick="uploadFirmware()">Update Firmware</button>
+  <p id="fwStatus" style="margin-top:8px;"></p>
+</body>
+</html>

@@ -1,0 +1,4 @@
+This directory is intended for PlatformIO project header files.
+
+Place .h / .hpp header files here. They will be made available to all
+source files in the src/ directory.

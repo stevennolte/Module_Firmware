@@ -848,12 +848,25 @@ void handleFileDownload(AsyncWebServerRequest *request) {
     request->send(400, "text/plain", "Filename not provided");
   }
 }
+static bool fwUpdateSkip = false;
+
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
+    fwUpdateSkip = false;
     Serial.printf("Update Start: %s\n", filename.c_str());
-    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
+    if (!filename.startsWith(NAME)) {
+      Serial.printf("Firmware rejected: filename '%s' does not match module '%s'\n", filename.c_str(), NAME);
+      fwUpdateSkip = true;
+    } else if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
       Update.printError(Serial);
     }
+  }
+
+  if (fwUpdateSkip) {
+    if (final) {
+      request->send(400, "text/plain", "Wrong firmware file! Expected a file starting with: " + String(NAME));
+    }
+    return;
   }
   
   // Write the received data to the flash memory

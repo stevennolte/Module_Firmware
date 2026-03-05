@@ -4,5 +4,6 @@
 #include "Arduino.h"
 
 #define VERSION "1.1.0077"
+#define NAME "GPS_Receiver"
 
 #endif

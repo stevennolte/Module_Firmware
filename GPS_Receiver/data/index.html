@@ -266,7 +266,58 @@
   // Fetch the toggle state when the page loads
   window.onload = function() {
     fetchToggleState();  // Load the current state on page load
+    fetchFwModuleName();
   };
+
+  // Firmware update: fetch module name for filename validation
+  function fetchFwModuleName() {
+    fetch('/getDebugVars')
+      .then(r => r.json())
+      .then(data => {
+        for (const item of data) {
+          if (item.startsWith('Program: ')) {
+            const name = item.replace('Program: ', '').trim();
+            const hint = document.getElementById('fwModuleHint');
+            if (hint) hint.textContent = 'Expected file: ' + name + '.bin';
+            const inp = document.getElementById('fwFile');
+            if (inp) inp.dataset.moduleName = name;
+            break;
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  function uploadFirmware() {
+    const fileInput = document.getElementById('fwFile');
+    const statusEl = document.getElementById('fwStatus');
+    if (!fileInput.files.length) {
+      statusEl.textContent = 'Please select a firmware file.';
+      statusEl.style.color = 'red';
+      return;
+    }
+    const file = fileInput.files[0];
+    const moduleName = fileInput.dataset.moduleName || '';
+    if (moduleName && !file.name.startsWith(moduleName)) {
+      statusEl.textContent = 'Wrong file! Expected a file starting with: ' + moduleName;
+      statusEl.style.color = 'red';
+      return;
+    }
+    const formData = new FormData();
+    formData.append('firmware', file);
+    statusEl.textContent = 'Uploading...';
+    statusEl.style.color = '#333';
+    fetch('/update', { method: 'POST', body: formData })
+      .then(r => r.text())
+      .then(msg => {
+        statusEl.textContent = msg;
+        statusEl.style.color = msg.includes('complete') || msg.includes('Rebooting') ? 'green' : 'red';
+      })
+      .catch(err => {
+        statusEl.textContent = 'Upload error: ' + err;
+        statusEl.style.color = 'red';
+      });
+  }
   </script>
 </head>
 <body>
@@ -301,10 +352,10 @@
 
   <!-- Section for Firmware Update -->
   <h2>Firmware Update</h2>
-  <form method="POST" action="/update" enctype="multipart/form-data">
-    <input type="file" name="firmware">
-    <input type="submit" value="Update Firmware">
-  </form>
+  <p id="fwModuleHint" style="color:#666; font-size:14px;">Expected file: loading...</p>
+  <input type="file" id="fwFile" accept=".bin">
+  <button onclick="uploadFirmware()">Update Firmware</button>
+  <p id="fwStatus" style="margin-top:8px;"></p>
   
   
   <h1>ESP32 Control</h1>
