@@ -113,8 +113,22 @@ void I2CManager::taskRunner(void* pvParameters) {
     I2CManager* self = static_cast<I2CManager*>(pvParameters);
     const TickType_t delayTicks = pdMS_TO_TICKS(10); // 10ms loop for responsive non-blocking reads
     while (true) {
+        // Measure task cycle time
+        unsigned long now = millis();
+        if (self->_i2cTaskLastCycleMs != 0) {
+            self->_i2cTaskCycleTime = (uint32_t)(now - self->_i2cTaskLastCycleMs);
+        }
+        self->_i2cTaskLastCycleMs = now;
+
         if (self->_ads_initialized) {
+            // Measure how long the non-blocking ADC state machine call takes
+            unsigned long adcStart = micros();
             self->updateADCReadings(); // Non-blocking state machine
+            uint32_t adcDuration = (uint32_t)(micros() - adcStart);
+            self->_adcStateMachineTime = adcDuration;
+            if (adcDuration > self->_adcStateMachineMaxTime) {
+                self->_adcStateMachineMaxTime = adcDuration;
+            }
         }
         if (self->_mcp_initialized) {
             self->updateLEDStates();
@@ -149,18 +163,6 @@ uint8_t I2CManager::mcpDigitalRead(uint8_t pin) {
         xSemaphoreGive(_i2c_mutex);
     }
     return value;
-}
-
-void I2CManager::readAllVoltages() {
-    // Legacy blocking method - deprecated but kept for compatibility
-    if (_ads_initialized && xSemaphoreTake(_i2c_mutex, portMAX_DELAY) == pdTRUE) {
-        for (int i = 0; i < 4; i++) {
-            _rawReadings[i] = adsReadSingleEnded(i);
-            _voltages[i] = ads.computeVolts(_rawReadings[i]);
-            espData.adsConfig.readings[i] = _rawReadings[i];
-        }
-        xSemaphoreGive(_i2c_mutex);
-    }
 }
 
 // Non-blocking ADC update method - called from task loop
@@ -213,15 +215,6 @@ void I2CManager::adsSetGain(adsGain_t gain) {
         ads.setGain(gain);
         xSemaphoreGive(_i2c_mutex);
     }
-}
-
-// --- Private Helper (NOT thread-safe by itself) ---
-// This is only called from within a mutex-protected block (readAllVoltages)
-int16_t I2CManager::adsReadSingleEnded(uint8_t channel) {
-    if (!_ads_initialized || channel > 3) {
-        return 0;
-    }
-    return ads.readADC_SingleEnded(channel);
 }
 
 uint16_t I2CManager::getRawReading(uint8_t channel) const {

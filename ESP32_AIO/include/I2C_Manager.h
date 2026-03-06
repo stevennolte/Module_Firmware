@@ -56,7 +56,6 @@ public:
     uint8_t mcpDigitalRead(uint8_t pin);
     bool isInitialized() const; // Check if both MCP and ADS are initialized
     // --- ADS1115 Methods (Thread-Safe) ---
-    void readAllVoltages(); // Legacy blocking method (deprecated)
     void updateADCReadings(); // Non-blocking state machine method
     void adsSetGain(adsGain_t gain);
 
@@ -67,6 +66,25 @@ public:
     // --- Status Checkers ---
     bool isMcpReady() const;
     bool isAdsReady() const;
+
+    // --- Loop Timing Diagnostics ---
+    /**
+     * @brief Returns the duration of the last updateADCReadings() call in microseconds.
+     *        A non-blocking call should return in well under 1ms.
+     */
+    uint32_t getADCStateMachineTime() const { return _adcStateMachineTime; }
+
+    /**
+     * @brief Returns the maximum observed duration of any updateADCReadings() call in microseconds.
+     *        Spikes indicate unexpected blocking on the I2C bus or mutex.
+     */
+    uint32_t getADCStateMachineMaxTime() const { return _adcStateMachineMaxTime; }
+
+    /**
+     * @brief Returns the measured cycle time of the I2C manager background task in milliseconds.
+     *        Should be close to the 10ms vTaskDelay configured for the task.
+     */
+    uint32_t getI2CTaskCycleTime() const { return _i2cTaskCycleTime; }
 
     // --- LED State Management ---
     void setPowerLED(LEDPattern state);
@@ -91,21 +109,12 @@ private:
     static void taskRunner(void* pvParameters);
     TaskHandle_t _taskHandle = nullptr;
 
-    // Helper function for raw ADC reads. Called internally from a mutex-protected block.
-    int16_t adsReadSingleEnded(uint8_t channel);
-    
     // Non-blocking ADC state machine
     void processADCStateMachine();
 
     // LED state management
     void updateLEDStates();
     void updateLED(LEDIndicator& led);
-
-    // LED flash timing and state tracking
-    unsigned long _lastFlashTime = 0;
-    bool _flashState = false;
-    unsigned long _fastFlashTime = 0;
-    bool _fastFlashState = false;
 
     // LED Indicators
     LEDIndicator ledPowerOn;
@@ -136,6 +145,12 @@ private:
     ADCState _adcState = ADCState::IDLE;
     uint8_t _currentADCChannel = 0;
     unsigned long _conversionStartTime = 0;
+
+    // Loop timing diagnostics
+    uint32_t _adcStateMachineTime = 0;    ///< Duration of last processADCStateMachine() call (microseconds)
+    uint32_t _adcStateMachineMaxTime = 0; ///< Max observed processADCStateMachine() call duration (microseconds)
+    uint32_t _i2cTaskCycleTime = 0;       ///< I2C manager background task cycle time (milliseconds)
+    unsigned long _i2cTaskLastCycleMs = 0; ///< Timestamp of previous task cycle start (milliseconds)
 };
 
 #endif // I2C_MANAGER_H
