@@ -295,6 +295,16 @@ void setup() {
               [](AsyncWebServerRequest *request) {},
               handleFirmwareUpload);
 
+    // Module identification endpoint – used by the PC management server
+    server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
+        DynamicJsonDocument doc(128);
+        doc["name"] = NAME;
+        doc["version"] = VERSION;
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
     server.begin();
 
     // Start UDP listener for AgOpenGPS messages

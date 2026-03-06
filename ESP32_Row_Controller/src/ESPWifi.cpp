@@ -1,5 +1,6 @@
 #include "ESPWifi.h"
 #include "WiFi.h"
+#include <ESPmDNS.h>
 
 ESPWifi::ESPWifi(ESPconfig* vars) {
     espConfig = vars;
@@ -14,6 +15,7 @@ uint8_t ESPWifi::connect() {
     uint8_t numNetworks = WiFi.scanNetworks();
     for (int i = 0; i < numNetworks; i++) {
         if (WiFi.SSID(i) == espConfig->wifiCfg.ssid) {
+            WiFi.setHostname(NAME);
             WiFi.begin(espConfig->wifiCfg.ssid, espConfig->wifiCfg.password);
             WiFi.config(local_IP, gateway, subnet);
             return 1;
@@ -33,6 +35,8 @@ uint8_t ESPWifi::makeAP() {
     WiFi.softAP(NAME, "1234567890");
     delay(100);
     WiFi.softAPConfig(local_IP, local_IP, subnet);
+    // mDNS is viable in AP mode immediately after softAP is configured
+    MDNS.begin(NAME);
     startMonitor();
     return 3;
 }
@@ -54,10 +58,18 @@ void ESPWifi::taskHandler(void *param) {
 }
 
 void ESPWifi::continuousLoop() {
+    bool mdnsStarted = false;
     while (true) {
         switch (espConfig->wifiCfg.state) {
             case 1:
-                if (!WiFi.isConnected()) {
+                if (WiFi.isConnected()) {
+                    // Start mDNS the first time we confirm a live connection
+                    if (!mdnsStarted) {
+                        MDNS.begin(NAME);
+                        mdnsStarted = true;
+                    }
+                } else {
+                    mdnsStarted = false;
                     connect();
                 }
                 break;

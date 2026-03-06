@@ -1,0 +1,157 @@
+name: Build and Release Firmware
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ESP32_AIO/**"
+      - "ESP32_Row_Controller/**"
+  workflow_dispatch:
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  build-esp32-aio:
+    name: Build ESP32_AIO
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Required to create GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-aio-${{ hashFiles('ESP32_AIO/platformio.ini') }}
+          restore-keys: ${{ runner.os }}-pio-aio-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Extract version info (pre-build)
+        id: info
+        working-directory: ESP32_AIO
+        run: |
+          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"         >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
+
+      - name: Build ESP32_AIO firmware
+        working-directory: ESP32_AIO
+        run: pio run --environment esp32-s3-devkitc-1
+
+      - name: Rename binary
+        run: |
+          cp ESP32_AIO/.pio/build/esp32-s3-devkitc-1/firmware.bin \
+             "${{ steps.info.outputs.binary }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.info.outputs.name }}_firmware
+          path: ${{ steps.info.outputs.binary }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: "${{ steps.info.outputs.name }} v${{ steps.info.outputs.version }}"
+          body: |
+            Automated firmware release for **${{ steps.info.outputs.name }}**
+
+            **Version:** ${{ steps.info.outputs.version }}
+            **Firmware file:** `${{ steps.info.outputs.binary }}`
+
+            Use the PC management server (`pc_server/`) to discover modules on the
+            network and push this update over-the-air.
+          files: ${{ steps.info.outputs.binary }}
+          draft: false
+          prerelease: false
+          # Update existing release/assets if the same tag was already created
+          # (e.g. when only non-firmware files changed in the same commit)
+          fail_on_unmatched_files: false
+          update_release_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────────────────
+  build-esp32-row-controller:
+    name: Build ESP32_Row_Controller
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Required to create GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-rc-${{ hashFiles('ESP32_Row_Controller/platformio.ini') }}
+          restore-keys: ${{ runner.os }}-pio-rc-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Extract version info (pre-build)
+        id: info
+        working-directory: ESP32_Row_Controller
+        run: |
+          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"         >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
+
+      - name: Build ESP32_Row_Controller firmware
+        working-directory: ESP32_Row_Controller
+        run: pio run --environment esp32-s3-devkitc-1
+
+      - name: Rename binary
+        run: |
+          cp ESP32_Row_Controller/.pio/build/esp32-s3-devkitc-1/firmware.bin \
+             "${{ steps.info.outputs.binary }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.info.outputs.name }}_firmware
+          path: ${{ steps.info.outputs.binary }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: "${{ steps.info.outputs.name }} v${{ steps.info.outputs.version }}"
+          body: |
+            Automated firmware release for **${{ steps.info.outputs.name }}**
+
+            **Version:** ${{ steps.info.outputs.version }}
+            **Firmware file:** `${{ steps.info.outputs.binary }}`
+
+            Use the PC management server (`pc_server/`) to discover modules on the
+            network and push this update over-the-air.
+          files: ${{ steps.info.outputs.binary }}
+          draft: false
+          prerelease: false
+          # Update existing release/assets if the same tag was already created
+          fail_on_unmatched_files: false
+          update_release_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
