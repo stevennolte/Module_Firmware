@@ -36,7 +36,7 @@ void WAS::loop(){
     }
         
     
-    vTaskDelay(200);  // Reduced from 100ms to 200ms to reduce I2C bus load
+    vTaskDelay(50);  // 50ms delay for responsive steering control
     #else
     updateRampValue();
     vTaskDelay(10);
