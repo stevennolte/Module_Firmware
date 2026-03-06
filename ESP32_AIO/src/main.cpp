@@ -20,6 +20,7 @@
  * - Power cycle detection using RTC memory
  * - UDP communication for AgOpen GPS integration
  */
+#define FORCE_AP_MODE false
 
 #include <Arduino.h>
 #include "nvs_flash.h"
@@ -493,11 +494,36 @@ void updateDebugVars() {
   debugVars.push_back("....VTG: " + String(espData.gps.vtgMessageCount));
   debugVars.push_back("....Other:" + String(espData.gps.otherMessageCount)); 
   debugVars.push_back("....PANDA Sent: " + String(espData.gps.pandaMessageCount));
-  debugVars.push_back("..Last PANDA Time: " + String((float)(espData.gps.lastPandaTime)/1000.0, 2) + "s"); 
+  debugVars.push_back("..Last PANDA Time: " + String((float)(espData.gps.lastPandaTime)/1000.0, 2) + "s");
+  // Calculate and display PANDA message frequency
+  if (espData.gps.pandaMessageCount > 1 && espData.gps.firstPandaTime > 0) {
+    float elapsedTime = (millis() - espData.gps.firstPandaTime) / 1000.0; // Convert to seconds
+    float frequency = (espData.gps.pandaMessageCount - 1) / elapsedTime; // Messages per second
+    debugVars.push_back("..PANDA Frequency: " + String(frequency, 2) + " Hz");
+  } else {
+    debugVars.push_back("..PANDA Frequency: N/A");
+  } 
   debugVars.push_back("..IMU State: " + String(espData.gps.imuState));
   debugVars.push_back("....IMU Heading: " + String(espData.gps.imuHeading));
   debugVars.push_back("....IMU Pitch: " + String(espData.gps.imuPitch));
   debugVars.push_back("....IMU Roll: " + String(espData.gps.imuRoll));
+  // NTRIP correction data statistics
+  debugVars.push_back("..NTRIP Data: ");
+  debugVars.push_back("....Packets Received: " + String(espData.gps.ntripPacketCount));
+  debugVars.push_back("....Total Bytes: " + String(espData.gps.ntripTotalBytes));
+  debugVars.push_back("....Last Packet Time: " + String((float)(espData.gps.lastNtripTime)/1000.0, 2) + "s");
+  // Calculate and display NTRIP packet frequency
+  if (espData.gps.ntripPacketCount > 1 && espData.gps.firstNtripTime > 0) {
+    float elapsedTime = (millis() - espData.gps.firstNtripTime) / 1000.0;
+    float frequency = (espData.gps.ntripPacketCount - 1) / elapsedTime;
+    debugVars.push_back("....Packet Frequency: " + String(frequency, 2) + " Hz");
+    if (espData.gps.ntripTotalBytes > 0) {
+      float bytesPerSec = espData.gps.ntripTotalBytes / elapsedTime;
+      debugVars.push_back("....Data Rate: " + String(bytesPerSec, 1) + " B/s");
+    }
+  } else {
+    debugVars.push_back("....Packet Frequency: N/A");
+  }
   // Steering data - essential only
   debugVars.push_back("Steer Data: ");
   debugVars.push_back("..Target Angle: " + String(espData.steer.targetSteerAngle, 2));
@@ -1631,20 +1657,26 @@ void normalboot(){
     // If everything is good, turn on power to autosteer
   Serial.println("starting wifi");
   logStartupState("WiFi", "Starting Connection", "");
-    
+  
+  if (!FORCE_AP_MODE) {
   uint32_t wifiStart = millis();
-  // while (WiFi.status() != WL_CONNECTED){
-  //   espData.wifi.state = espWifi.connect();
-  //   /** @brief Check for WiFi connection, if times out, create AP */
-  //   if (millis()-wifiStart > 120000){
-  //     Serial.println("Wifi connection timed out");
-  //     Serial.println("Switching to AP mode");
-  //     logStartupState("WiFi", "Connection Timeout", "Switching to AP mode after 120s");
-  //     espData.wifi.state = espWifi.makeAP();
-  //     break;
-  //   }
-  // }
-  espData.wifi.state = espWifi.makeAP();
+  while (WiFi.status() != WL_CONNECTED){
+    espData.wifi.state = espWifi.connect();
+    /** @brief Check for WiFi connection, if times out, create AP */
+    if (millis()-wifiStart > 120000){
+      Serial.println("Wifi connection timed out");
+      Serial.println("Switching to AP mode");
+      logStartupState("WiFi", "Connection Timeout", "Switching to AP mode after 120s");
+      espData.wifi.state = espWifi.makeAP();
+      break;
+    }
+  }
+} else {
+    Serial.println("FORCE_AP_MODE is enabled - Starting in AP mode");
+    logStartupState("WiFi", "Forced AP Mode", "FORCE_AP_MODE is true");
+    espData.wifi.state = espWifi.makeAP();
+  }
+  // espData.wifi.state = espWifi.makeAP();
   i2cManager.setEthLED(LEDPattern::ON);
   // espConfig.wifiCfg.state = espWifi.makeAP();
   Serial.println("Wifi State: " + String(espData.wifi.state));

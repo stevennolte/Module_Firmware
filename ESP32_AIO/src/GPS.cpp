@@ -22,6 +22,8 @@
  * @see GPS.h for class interface definition
  * @see ESPudp.h for NTRIP client functionality
  */
+#define SENDEXTRAGPSDATA false
+
 
 #include "GPS.h"
 
@@ -57,7 +59,12 @@ ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSeri
     espData->gps.rmcMessageCount = 0;
     espData->gps.otherMessageCount = 0;
     espData->gps.pandaMessageCount = 0;
+    espData->gps.firstPandaTime = 0;
     espData->gps.lastPandaTime = 0;
+    espData->gps.ntripPacketCount = 0;
+    espData->gps.ntripTotalBytes = 0;
+    espData->gps.firstNtripTime = 0;
+    espData->gps.lastNtripTime = 0;
     
     // No need for manual NMEA buffer when using NMEAParser library
     Serial.println("GPS constructor: Using NMEAParser library");
@@ -318,7 +325,7 @@ void ESPGPS::parseNMEASentence(const char* sentence)
             buildPandaSentence();
         } else {
             // Raw forwarding mode: send original NMEA sentence
-            if (espUdp) {
+            if (espUdp && SENDEXTRAGPSDATA) {
                 espUdp->sendUDPgps(sentence);
             }
         }
@@ -332,7 +339,7 @@ void ESPGPS::parseNMEASentence(const char* sentence)
         // In raw mode, forward the VTG sentence
         if (!espData->gps.ntripPandaMode) {
             // Raw forwarding mode: send original NMEA sentence
-            if (espUdp) {
+            if (espUdp && SENDEXTRAGPSDATA) {
                 espUdp->sendUDPgps(sentence);
             }
         }
@@ -342,7 +349,7 @@ void ESPGPS::parseNMEASentence(const char* sentence)
     else if (strstr(sentence, "GSA") != NULL) {
         // GSA parsing for satellite info if needed
         // Serial.println("GSA sentence received (not parsed yet)");
-        if (espUdp){
+        if (espUdp && SENDEXTRAGPSDATA){
             espUdp->sendUDPgps(sentence);
         }
         espData->gps.gsaMessageCount++;
@@ -350,7 +357,7 @@ void ESPGPS::parseNMEASentence(const char* sentence)
     else if (strstr(sentence, "RMC") != NULL) {
         // RMC parsing for additional data if needed
         // Serial.println("RMC sentence received (not parsed yet)");
-        if (espUdp){
+        if (espUdp && SENDEXTRAGPSDATA){
             espUdp->sendUDPgps(sentence);
         }
         espData->gps.rmcMessageCount++;
@@ -772,7 +779,11 @@ void ESPGPS::buildPandaSentence()
         // }
         espUdp->sendUDPgps(espData->gps.nmea);
         espData->gps.pandaMessageCount++; // Increment PANDA message counter
-        espData->gps.lastPandaTime = millis(); // Record timestamp
+        uint32_t currentTime = millis();
+        if (espData->gps.pandaMessageCount == 1) {
+            espData->gps.firstPandaTime = currentTime; // Record first message timestamp
+        }
+        espData->gps.lastPandaTime = currentTime; // Record timestamp
     } else {
         // Serial.println("WiFi not connected - PANDA not sent");
     }

@@ -113,6 +113,15 @@ void ESPudp::begin(ESPGPS* gps){
       size_t packetLength = packet.length();
       uint8_t *_data = packet.data();
       
+      // Track NTRIP statistics
+      espData->gps.ntripPacketCount++;
+      espData->gps.ntripTotalBytes += packetLength;
+      uint32_t currentTime = millis();
+      if (espData->gps.ntripPacketCount == 1) {
+        espData->gps.firstNtripTime = currentTime;
+      }
+      espData->gps.lastNtripTime = currentTime;
+      
       // Direct forwarding mode: send raw data to GPS
       // Serial.print("NTRIP direct mode - forwarding: ");
       // Serial.print(packetLength);
@@ -162,10 +171,6 @@ void ESPudp::begin(ESPGPS* gps){
       }
     });
     Serial.println("WAS UDP listener setup complete");
-    
-    Serial.println("Setting up GPS UDP on port 9999");
-    udpGPS.listen(9999);
-    Serial.println("GPS UDP listener setup complete");
     
     Serial.println("Setting up main UDP on port 8888");
     
@@ -310,7 +315,11 @@ void ESPudp::sendUDP(uint8_t* _data, size_t size) {
 }
 
 void ESPudp::sendUDPgps(const char * data){
-    udpGPS.broadcastTo(data,9999);
+    // Use explicit broadcast address instead of broadcastTo() for better AP mode compatibility
+    IPAddress broadcastIP(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255);
+    udpGPS.writeTo((const uint8_t*)data, strlen(data), broadcastIP, 9999);
+    // Yield to allow WiFi stack to transmit immediately
+    taskYIELD();
 }
 
 /**

@@ -338,6 +338,7 @@ public:
         uint8_t positionType;       ///< @brief Position solution type (1=GPS, 2=DGPS, 4=RTK_FIXED, 5=RTK_FLOAT)
         uint32_t posAge;            ///< @brief Age of position solution in milliseconds
         uint32_t imuMessageTime;
+        uint32_t firstPandaTime;    ///< @brief Timestamp of first PANDA message sent (millis())
         uint32_t lastPandaTime;     ///< @brief Timestamp of last PANDA message sent (millis())
         // GGA message data
         char fixTime[12];           ///< @brief UTC time of GPS fix (HHMMSS.SSS format)
@@ -382,6 +383,12 @@ public:
         uint32_t rmcMessageCount;   ///< @brief Count of parsed RMC (recommended minimum) messages
         uint32_t otherMessageCount; ///< @brief Count of other NMEA message types received
         uint32_t pandaMessageCount; ///< @brief Count of PANDA messages generated and sent
+        
+        // NTRIP correction data tracking
+        uint32_t ntripPacketCount;  ///< @brief Count of NTRIP correction packets received
+        uint32_t ntripTotalBytes;   ///< @brief Total bytes of NTRIP data received
+        uint32_t firstNtripTime;    ///< @brief Timestamp of first NTRIP packet (millis())
+        uint32_t lastNtripTime;     ///< @brief Timestamp of last NTRIP packet (millis())
     } gps;
 
     /**
