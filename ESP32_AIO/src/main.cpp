@@ -1585,7 +1585,17 @@ void recoveryBoot() {
   server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFileUpload);
   server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFirmwareUpload);
   server.on("/reboot", HTTP_GET, handleReboot);
-  
+
+  // Module identification endpoint (available in both normal and recovery mode)
+  server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
+    JsonDocument doc;
+    doc["name"] = NAME;
+    doc["version"] = VERSION;
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+  });
+
   // Start the recovery server
   logStartupState("Web Server", "Starting", "Recovery mode");
   server.begin();
@@ -2069,6 +2079,16 @@ void normalboot(){
         // server.on("/isConnected", HTTP_GET, [](AsyncWebServerRequest *request){
         //   request->send(LittleFS, "/Modu.svg", "image/svg+xml");
         // });
+        // Module identification endpoint – used by the PC management server
+        server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
+          JsonDocument doc;
+          doc["name"] = NAME;
+          doc["version"] = VERSION;
+          String json;
+          serializeJson(doc, json);
+          request->send(200, "application/json", json);
+        });
+
         logStartupState("Web Server", "Starting", "Normal mode");
         server.begin();
         logStartupState("Web Server", "Complete", "Started successfully");

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Module Management Server</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 1.4rem; }
+    header .subtitle { font-size: 0.85rem; opacity: 0.8; }
+
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+      gap: 20px;
+    }
+
+    .module-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .status-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-online  { background: #4caf50; }
+    .dot-offline { background: #f44336; }
+    .dot-loading { background: #ff9800; animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+
+    .card-header h2 { font-size: 1.1rem; flex: 1; }
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+    .badge-online  { background: #e8f5e9; color: #2e7d32; }
+    .badge-offline { background: #ffebee; color: #c62828; }
+
+    .card-body { padding: 16px 20px; }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.875rem;
+    }
+    .info-row span:first-child { color: #666; }
+    .info-row .value { font-weight: bold; }
+
+    .update-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #eee;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .version-compare {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .version-box {
+      flex: 1;
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+    }
+    .version-box .label { color: #888; font-size: 0.72rem; margin-bottom: 2px; }
+    .version-box .ver   { font-weight: bold; font-size: 0.95rem; }
+    .version-newer { color: #1565c0; }
+    .version-current { color: #4caf50; }
+
+    .btn {
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-primary:disabled { background: #90a4ae; cursor: not-allowed; }
+    .btn-warn { background: #ff9800; color: white; }
+    .btn-warn:hover { background: #e65100; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #c62828; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .status-msg {
+      font-size: 0.82rem;
+      padding: 6px 10px;
+      border-radius: 4px;
+      min-height: 28px;
+    }
+    .msg-success { background: #e8f5e9; color: #2e7d32; }
+    .msg-error   { background: #ffebee; color: #c62828; }
+    .msg-info    { background: #e3f2fd; color: #1565c0; }
+
+    .diagnostics-panel {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #eee;
+    }
+    .diagnostics-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #1565c0;
+      font-size: 0.85rem;
+      font-weight: bold;
+      padding: 0;
+      margin-bottom: 8px;
+    }
+    .diagnostics-list {
+      display: none;
+      background: #f8f8f8;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .diagnostics-list.open { display: block; }
+
+    .refresh-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .refresh-row label { font-size: 0.85rem; color: #555; }
+    #autoRefreshInterval {
+      width: 70px; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌾 Module Management Server</h1>
+    <div class="subtitle">
+      Repo: <strong>{{ repo_owner }}/{{ repo_name }}</strong> &nbsp;|&nbsp;
+      Auto-refreshes module status every <span id="refreshLabel">5</span> s
+    </div>
+  </div>
+</header>
+
+<div class="refresh-row">
+  <label for="autoRefreshInterval">Refresh interval (s):</label>
+  <input type="number" id="autoRefreshInterval" value="5" min="2" max="60">
+  <button class="btn btn-sm btn-primary" onclick="setRefreshInterval()">Apply</button>
+  <button class="btn btn-sm btn-warn" onclick="refreshAll()">↻ Refresh Now</button>
+</div>
+
+<div class="module-grid" id="moduleGrid">
+  {% for mod in modules %}
+  <div class="module-card" id="card-{{ mod.name }}">
+    <div class="card-header">
+      <span class="status-dot dot-loading" id="dot-{{ mod.name }}"></span>
+      <h2>{{ mod.name }}</h2>
+      <span class="badge badge-offline" id="badge-{{ mod.name }}">Loading…</span>
+    </div>
+    <div class="card-body">
+      <div class="info-row">
+        <span>mDNS hostname</span>
+        <span class="value">{{ mod.mdns_name }}.local</span>
+      </div>
+      <div class="info-row">
+        <span>IP address</span>
+        <span class="value" id="ip-{{ mod.name }}">—</span>
+      </div>
+      <div class="info-row">
+        <span>Current version</span>
+        <span class="value" id="curver-{{ mod.name }}">—</span>
+      </div>
+
+      <div class="update-section">
+        <div class="version-compare">
+          <div class="version-box">
+            <div class="label">On device</div>
+            <div class="ver version-current" id="dev-ver-{{ mod.name }}">—</div>
+          </div>
+          <div style="font-size:1.4rem; color:#aaa;">→</div>
+          <div class="version-box">
+            <div class="label">Latest on GitHub</div>
+            <div class="ver version-newer" id="gh-ver-{{ mod.name }}">checking…</div>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn btn-primary" id="btn-update-{{ mod.name }}"
+                  onclick="pushUpdate('{{ mod.name }}')" disabled>
+            ⬆ Push OTA Update
+          </button>
+          <button class="btn btn-sm btn-danger"
+                  onclick="rebootModule('{{ mod.name }}')" id="btn-reboot-{{ mod.name }}" disabled>
+            ⟳ Reboot
+          </button>
+        </div>
+
+        <div class="status-msg msg-info" id="msg-{{ mod.name }}">
+          Waiting for module status…
+        </div>
+      </div>
+
+      <div class="diagnostics-panel">
+        <button class="diagnostics-toggle" onclick="toggleDiag('{{ mod.name }}')">
+          ▶ Show Diagnostics
+        </button>
+        <div class="diagnostics-list" id="diag-{{ mod.name }}">
+          Loading…
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  let refreshTimerId = null;
+  let refreshSeconds = 5;
+
+  // Track which diag panels are open so they keep refreshing
+  const openDiagPanels = new Set();
+
+  // ── Utilities ──────────────────────────────────────────────────────────
+  function setMsg(name, text, type) {
+    const el = document.getElementById('msg-' + name);
+    el.textContent = text;
+    el.className = 'status-msg msg-' + (type || 'info');
+  }
+
+  function setOnline(name, online) {
+    const dot   = document.getElementById('dot-'   + name);
+    const badge = document.getElementById('badge-' + name);
+    if (online) {
+      dot.className   = 'status-dot dot-online';
+      badge.textContent = 'Online';
+      badge.className   = 'badge badge-online';
+    } else {
+      dot.className   = 'status-dot dot-offline';
+      badge.textContent = 'Offline';
+      badge.className   = 'badge badge-offline';
+    }
+  }
+
+  // ── Module status ──────────────────────────────────────────────────────
+  async function refreshModuleStatus(name) {
+    try {
+      const res  = await fetch('/api/modules');
+      const list = await res.json();
+      const mod  = list.find(m => m.name === name);
+      if (!mod) return;
+
+      setOnline(name, mod.online);
+      document.getElementById('ip-'      + name).textContent = mod.ip      || '—';
+      document.getElementById('curver-'  + name).textContent = mod.current_version || '—';
+      document.getElementById('dev-ver-' + name).textContent = mod.current_version || '—';
+
+      const rebootBtn = document.getElementById('btn-reboot-' + name);
+      if (rebootBtn) rebootBtn.disabled = !mod.online;
+
+      if (!mod.online) {
+        setMsg(name, 'Module is offline – check network/power.', 'error');
+        document.getElementById('btn-update-' + name).disabled = true;
+      } else {
+        setMsg(name, 'Module online. Checking GitHub for latest firmware…', 'info');
+        refreshLatestFirmware(name, mod.current_version);
+      }
+    } catch (e) {
+      console.error('Status fetch error:', e);
+    }
+  }
+
+  async function refreshLatestFirmware(name, currentVersion) {
+    try {
+      const res = await fetch('/api/module/' + name + '/latest-firmware');
+      if (!res.ok) {
+        document.getElementById('gh-ver-' + name).textContent = 'Not found';
+        setMsg(name, 'No firmware release found on GitHub.', 'error');
+        return;
+      }
+      const rel = await res.json();
+      document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
+
+      const updateBtn = document.getElementById('btn-update-' + name);
+      if (rel.version && currentVersion) {
+        if (rel.version !== currentVersion) {
+          updateBtn.disabled = false;
+          setMsg(name,
+            `Update available: ${currentVersion} → ${rel.version}`,
+            'info');
+        } else {
+          updateBtn.disabled = true;
+          setMsg(name, `Firmware is up to date (v${currentVersion}).`, 'success');
+        }
+      } else {
+        // Keep the button disabled until we have reliable version data on both sides
+        updateBtn.disabled = true;
+        setMsg(name, `GitHub firmware: ${rel.version || 'unknown'} – version check incomplete.`, 'info');
+      }
+    } catch (e) {
+      document.getElementById('gh-ver-' + name).textContent = 'Error';
+      setMsg(name, 'Failed to fetch GitHub release info.', 'error');
+    }
+  }
+
+  // ── Diagnostics ────────────────────────────────────────────────────────
+  async function fetchDiagnostics(name) {
+    const el = document.getElementById('diag-' + name);
+    try {
+      const res  = await fetch('/api/module/' + name + '/diagnostics');
+      if (!res.ok) { el.textContent = 'Module offline.'; return; }
+      const data = await res.json();
+      el.textContent = Array.isArray(data) ? data.join('\n') : JSON.stringify(data, null, 2);
+    } catch (e) {
+      el.textContent = 'Error fetching diagnostics.';
+    }
+  }
+
+  function toggleDiag(name) {
+    const panel  = document.getElementById('diag-' + name);
+    const btn    = panel.previousElementSibling;
+    const isOpen = panel.classList.toggle('open');
+    btn.textContent = (isOpen ? '▼ Hide' : '▶ Show') + ' Diagnostics';
+    if (isOpen) {
+      openDiagPanels.add(name);
+      fetchDiagnostics(name);
+    } else {
+      openDiagPanels.delete(name);
+    }
+  }
+
+  // ── OTA Push ───────────────────────────────────────────────────────────
+  async function pushUpdate(name) {
+    const btn = document.getElementById('btn-update-' + name);
+    btn.disabled = true;
+    setMsg(name, 'Downloading firmware from GitHub and pushing to module…', 'info');
+
+    try {
+      const res  = await fetch('/api/module/' + name + '/update', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.status === 'ok') {
+        setMsg(name,
+          `✓ Firmware v${data.firmware_version} pushed successfully. Module is rebooting…`,
+          'success');
+      } else {
+        setMsg(name, 'Error: ' + (data.error || data.message || 'Unknown error'), 'error');
+        btn.disabled = false;
+      }
+    } catch (e) {
+      setMsg(name, 'Network error: ' + e, 'error');
+      btn.disabled = false;
+    }
+  }
+
+  // ── Reboot ─────────────────────────────────────────────────────────────
+  async function rebootModule(name) {
+    if (!confirm(`Reboot ${name}?`)) return;
+    setMsg(name, 'Sending reboot command…', 'info');
+    try {
+      await fetch('/api/module/' + name + '/reboot', { method: 'POST' });
+      setMsg(name, 'Reboot command sent.', 'success');
+    } catch (e) {
+      setMsg(name, 'Error: ' + e, 'error');
+    }
+  }
+
+  // ── Auto-refresh ───────────────────────────────────────────────────────
+  function refreshAll() {
+    {% for mod in modules %}
+    refreshModuleStatus('{{ mod.name }}');
+    if (openDiagPanels.has('{{ mod.name }}')) fetchDiagnostics('{{ mod.name }}');
+    {% endfor %}
+  }
+
+  function setRefreshInterval() {
+    const val = parseInt(document.getElementById('autoRefreshInterval').value, 10);
+    if (isNaN(val) || val < 2) return;
+    refreshSeconds = val;
+    document.getElementById('refreshLabel').textContent = val;
+    if (refreshTimerId) clearInterval(refreshTimerId);
+    refreshTimerId = setInterval(refreshAll, refreshSeconds * 1000);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  window.onload = function () {
+    refreshAll();
+    refreshTimerId = setInterval(refreshAll, refreshSeconds * 1000);
+  };
+</script>
+</body>
+</html>

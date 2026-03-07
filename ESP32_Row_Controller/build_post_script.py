@@ -1,6 +1,4 @@
-import sys
 import shutil
-import time
 import os
 Import("env", "projenv")
 
