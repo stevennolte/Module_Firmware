@@ -1,5 +1,6 @@
 #include "ESPWifi.h"
 #include "WiFi.h"
+#include "Version.h"
 
 
 ESPWifi::ESPWifi(ESPdata* vars){
@@ -7,36 +8,85 @@ ESPWifi::ESPWifi(ESPdata* vars){
 }
 
 uint8_t ESPWifi::connect(){
-    // WiFi.disconnect();
+    // Ensure WiFi is in station mode and disconnected before attempting connection
+    WiFi.mode(WIFI_STA);
+    WiFi.setHostname(NAME);
+    WiFi.disconnect();
+    delay(100);
     
+    Serial.println("Scanning for networks...");
     uint8_t numNetworks = WiFi.scanNetworks();
+    Serial.print("Found ");
+    Serial.print(numNetworks);
+    Serial.println(" networks");
+    
+    // Print all found networks for debugging
+    for (int i = 0; i < numNetworks; i++){
+        Serial.print("  ");
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.print(WiFi.SSID(i));
+        Serial.print(" (");
+        Serial.print(WiFi.RSSI(i));
+        Serial.print(" dBm) ");
+        Serial.println(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "Open" : "Encrypted");
+    }
+    
     for (int i = 0; i < numNetworks; i++){
         for (int j = 0; j < 4; j++){
             // Serial.println(espData->wifiCfg.ssids[j]);
             if (WiFi.SSID(i) == espData->wifi.ssids[j]){
-                Serial.println("Found network");
+                Serial.print("Found configured network: ");
                 Serial.println(espData->wifi.ssids[j]);
+                Serial.print("Attempting connection with password: ");
                 Serial.println(espData->wifi.passwords[j]);
-                WiFi.begin(espData->wifi.ssids[j],espData->wifi.passwords[j]);
-                while(WiFi.status() != WL_CONNECTED){
+                
+                WiFi.begin(espData->wifi.ssids[j], espData->wifi.passwords[j]);
+                int attempts = 0;
+                while(WiFi.status() != WL_CONNECTED && attempts < 100){
                     Serial.print(".");
                     delay(100);
+                    attempts++;
                 }
                 Serial.println();
-                Serial.println(WiFi.localIP().toString());
-                IPAddress ip = WiFi.localIP();
-                IPAddress local_IP(ip[0],ip[1],ip[2],espData->wifi.ips[3]);
-                IPAddress gateway(ip[0],ip[1],ip[2],1);
-                espData->wifi.ips[0] = ip[0];
-                espData->wifi.ips[1] = ip[1];
-                espData->wifi.ips[2] = ip[2];
-                espData->saveConfig();
-                IPAddress subnet(255,255,255,0);
-                WiFi.config(local_IP,gateway,subnet);
-                MDNS.begin(NAME);
-                Serial.println(WiFi.localIP().toString());
-                startMonitor();
-                return 1;
+                
+                // Check if actually connected
+                wl_status_t status = WiFi.status();
+                Serial.print("WiFi status: ");
+                Serial.print(status);
+                Serial.print(" - ");
+                switch(status) {
+                    case WL_CONNECTED: Serial.println("Connected"); break;
+                    case WL_NO_SSID_AVAIL: Serial.println("SSID not available"); break;
+                    case WL_CONNECT_FAILED: Serial.println("Connection Failed (wrong password or encryption)"); break;
+                    case WL_DISCONNECTED: Serial.println("Disconnected"); break;
+                    default: Serial.println("Unknown status"); break;
+                }
+                
+                if (status == WL_CONNECTED) {
+                    Serial.print("Connected! IP: ");
+                    Serial.println(WiFi.localIP().toString());
+                    
+                    // Save the network information for future use
+                    IPAddress ip = WiFi.localIP();
+                    espData->wifi.ips[0] = ip[0];
+                    espData->wifi.ips[1] = ip[1];
+                    espData->wifi.ips[2] = ip[2];
+                    espData->wifi.ips[3] = ip[3];
+                    espData->saveConfig();
+                    
+                    MDNS.begin(NAME);
+                    startMonitor();
+                    return 1;
+                } else {
+                    Serial.println("Connection failed");
+                    Serial.print("Signal strength: ");
+                    Serial.print(WiFi.RSSI());
+                    Serial.println(" dBm");
+                    WiFi.disconnect();
+                    delay(1000);  // Wait before trying next network
+                    // Continue to try next network
+                }
             }
         }
     }
