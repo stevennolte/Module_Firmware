@@ -16,6 +16,7 @@ import socket
 import threading
 import time
 import os
+from packaging import version as pkg_version
 
 import requests
 from flask import Flask, jsonify, render_template, request, Response
@@ -102,12 +103,14 @@ def get_latest_release(module_name: str) -> dict | None:
             return cached[1]
 
     result = None
+    candidates = []
     try:
         url = (
             f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases"
         )
         r = requests.get(url, headers=_github_headers(), timeout=10)
         if r.status_code == 200:
+            # Collect all matching releases
             for release in r.json():
                 tag: str = release.get("tag_name", "")
                 if not tag.startswith(module_name):
@@ -117,17 +120,24 @@ def get_latest_release(module_name: str) -> dict | None:
                     if aname.endswith(".bin") and module_name in aname:
                         # Strip the leading "MODULE_NAME_" prefix from the tag
                         # to get just the version string.
-                        version = tag[len(module_name):].lstrip("_").lstrip("v")
-                        result = {
-                            "version":      version,
+                        ver_str = tag[len(module_name):].lstrip("_").lstrip("v")
+                        candidates.append({
+                            "version":      ver_str,
                             "tag":          tag,
                             "download_url": asset["browser_download_url"],
                             "asset_name":   aname,
                             "published_at": release.get("published_at", ""),
-                        }
+                        })
                         break
-                if result:
-                    break
+            
+            # Find the release with the highest version number
+            if candidates:
+                try:
+                    result = max(candidates, key=lambda x: pkg_version.parse(x["version"]))
+                except Exception as ver_err:
+                    app.logger.warning("Version parsing failed for %s: %s. Using first match.", module_name, ver_err)
+                    result = candidates[0]
+                    
     except Exception as e:
         app.logger.warning("GitHub release lookup failed for %s: %s", module_name, e)
 
