@@ -236,6 +236,10 @@
                   onclick="pushUpdate('{{ mod.name }}')" disabled>
             ⬆ Push OTA Update
           </button>
+          <button class="btn btn-sm btn-primary"
+                  onclick="openWebInterface('{{ mod.name }}')" id="btn-web-{{ mod.name }}" disabled>
+            🌐 Open Web Interface
+          </button>
           <button class="btn btn-sm btn-danger"
                   onclick="rebootModule('{{ mod.name }}')" id="btn-reboot-{{ mod.name }}" disabled>
             ⟳ Reboot
@@ -304,6 +308,9 @@
 
       const rebootBtn = document.getElementById('btn-reboot-' + name);
       if (rebootBtn) rebootBtn.disabled = !mod.online;
+
+      const webBtn = document.getElementById('btn-web-' + name);
+      if (webBtn) webBtn.disabled = !mod.online;
 
       if (!mod.online) {
         setMsg(name, 'Module is offline – check network/power.', 'error');
@@ -408,6 +415,16 @@
       setMsg(name, 'Reboot command sent.', 'success');
     } catch (e) {
       setMsg(name, 'Error: ' + e, 'error');
+    }
+  }
+
+  // ── Open Web Interface ─────────────────────────────────────────────────
+  function openWebInterface(name) {
+    const ip = document.getElementById('ip-' + name).textContent;
+    if (ip && ip !== '—') {
+      window.open('http://' + ip, '_blank');
+    } else {
+      setMsg(name, 'Cannot open web interface: IP address not available', 'error');
     }
   }
 

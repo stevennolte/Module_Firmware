@@ -34,11 +34,33 @@ pip install -r requirements.txt
 
 ## Running
 
+### Easy method (Windows) – Double-click launcher
+
+Simply double-click **`start_server.bat`** in the `pc_server` folder.
+
+**To create a desktop shortcut:**
+1. Right-click `start_server.bat` → **Create shortcut**
+2. Drag the shortcut to your Desktop
+3. (Optional) Right-click the shortcut → **Properties** → **Change Icon** to customize
+
+### Command line method
+
 ```bash
+# Windows (if PowerShell script execution is enabled)
+.venv\Scripts\activate
+python server.py
+
+# macOS / Linux
+source .venv/bin/activate
 python server.py
 ```
 
 Then open a browser to **http://localhost:5000**
+
+**Note for Windows users:** If you get a PowerShell execution policy error, use the `start_server.bat` launcher instead, or run:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
 ### Environment variables (all optional)
 

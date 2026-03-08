@@ -262,6 +262,24 @@ void setup() {
         }
     }
     Serial.println("Wifi State: " + String(wifiCfg.state));
+    
+    // Wait for WiFi connection and print IP address
+    if (wifiCfg.state == 1) {
+        Serial.print("Waiting for WiFi connection");
+        uint32_t connectStart = millis();
+        while (!WiFi.isConnected() && (millis() - connectStart < 15000)) {
+            delay(500);
+            Serial.print(".");
+        }
+        if (WiFi.isConnected()) {
+            Serial.println("\nConnected to WiFi!");
+            Serial.print("IP address: ");
+            Serial.println(WiFi.localIP());
+            espWifi.startMonitor();
+        } else {
+            Serial.println("\nFailed to connect to WiFi");
+        }
+    }
 
     // ----- Webserver routes -----
     // Page routes

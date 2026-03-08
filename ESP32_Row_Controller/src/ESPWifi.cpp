@@ -13,6 +13,8 @@ uint8_t ESPWifi::connect() {
                       espConfig->wifiCfg.ips[2], 1);
     IPAddress subnet(255, 255, 255, 0);
     uint8_t numNetworks = WiFi.scanNetworks();
+    
+    // Check for stored SSID from preferences first
     for (int i = 0; i < numNetworks; i++) {
         if (WiFi.SSID(i) == espConfig->wifiCfg.ssid) {
             WiFi.setHostname(NAME);
@@ -21,6 +23,17 @@ uint8_t ESPWifi::connect() {
             return 1;
         }
     }
+    
+    // Check for SSEI network
+    for (int i = 0; i < numNetworks; i++) {
+        if (WiFi.SSID(i) == "SSEI") {
+            WiFi.setHostname(NAME);
+            WiFi.begin("SSEI", "Nd14il!la");
+            WiFi.config(local_IP, gateway, subnet);
+            return 1;
+        }
+    }
+    
     return 0;
 }
 
@@ -67,6 +80,8 @@ void ESPWifi::continuousLoop() {
                     if (!mdnsStarted) {
                         MDNS.begin(NAME);
                         mdnsStarted = true;
+                        Serial.print("Connected to WiFi. IP address: ");
+                        Serial.println(WiFi.localIP());
                     }
                 } else {
                     mdnsStarted = false;
