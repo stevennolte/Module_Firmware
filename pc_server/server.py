@@ -207,6 +207,25 @@ def api_latest_firmware(name: str):
     return jsonify(release)
 
 
+@app.route("/api/module/<name>/refresh-github-version", methods=["POST"])
+def api_refresh_github_version(name: str):
+    """Clear the release cache and fetch fresh version info from GitHub."""
+    mod = next((m for m in MODULES if m["name"] == name), None)
+    if not mod:
+        return jsonify({"error": "Unknown module"}), 404
+
+    # Clear the cache for this module
+    with _release_cache_lock:
+        if name in _release_cache:
+            del _release_cache[name]
+
+    # Fetch fresh data from GitHub
+    release = get_latest_release(name)
+    if not release:
+        return jsonify({"error": "No firmware release found on GitHub"}), 404
+    return jsonify(release)
+
+
 @app.route("/api/module/<name>/update", methods=["POST"])
 def api_push_update(name: str):
     """

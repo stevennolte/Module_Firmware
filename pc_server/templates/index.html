@@ -125,6 +125,19 @@
     .btn-danger:hover { background: #c62828; }
     .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
 
+    .btn-icon {
+      background: transparent;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 0.85rem;
+      margin-left: 6px;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover { background: #f0f0f0; border-color: #1565c0; }
+    .btn-icon:active { transform: rotate(180deg); }
+
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
     .status-msg {
@@ -226,7 +239,13 @@
           </div>
           <div style="font-size:1.4rem; color:#aaa;">→</div>
           <div class="version-box">
-            <div class="label">Latest on GitHub</div>
+            <div class="label">
+              Latest on GitHub
+              <button class="btn-icon" onclick="refreshGitHubVersion('{{ mod.name }}')" 
+                      id="btn-gh-refresh-{{ mod.name }}" title="Refresh from GitHub">
+                ↻
+              </button>
+            </div>
             <div class="ver version-newer" id="gh-ver-{{ mod.name }}">checking…</div>
           </div>
         </div>
@@ -342,7 +361,50 @@
           setMsg(name,
             `Update available: ${currentVersion} → ${rel.version}`,
             'info');
+   
+
+  // ── Refresh GitHub Version ─────────────────────────────────────────────
+  async function refreshGitHubVersion(name) {
+    const btn = document.getElementById('btn-gh-refresh-' + name);
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    
+    setMsg(name, 'Refreshing latest version from GitHub…', 'info');
+    
+    try {
+      const res = await fetch('/api/module/' + name + '/refresh-github-version', { method: 'POST' });
+      if (!res.ok) {
+        document.getElementById('gh-ver-' + name).textContent = 'Not found';
+        setMsg(name, 'No firmware release found on GitHub.', 'error');
+        return;
+      }
+      const rel = await res.json();
+      document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
+      
+      // Refresh module status to update comparison
+      const currentVersion = document.getElementById('dev-ver-' + name).textContent;
+      if (rel.version && currentVersion && currentVersion !== '—') {
+        const updateBtn = document.getElementById('btn-update-' + name);
+        if (rel.version !== currentVersion) {
+          updateBtn.disabled = false;
+          setMsg(name,
+            `✓ Refreshed from GitHub. Update available: ${currentVersion} → ${rel.version}`,
+            'info');
         } else {
+          updateBtn.disabled = true;
+          setMsg(name, `✓ Refreshed from GitHub. Firmware is up to date (v${currentVersion}).`, 'success');
+        }
+      } else {
+        setMsg(name, `✓ Latest version refreshed: ${rel.version}`, 'success');
+      }
+    } catch (e) {
+      document.getElementById('gh-ver-' + name).textContent = 'Error';
+      setMsg(name, 'Failed to refresh GitHub version: ' + e, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  }     } else {
           updateBtn.disabled = true;
           setMsg(name, `Firmware is up to date (v${currentVersion}).`, 'success');
         }
