@@ -1,4 +1,6 @@
 __pycache__/
 *.pyc
 .venv/
-
+module_data_log.csv
+sync_state.json
+credentials*.json
