@@ -210,6 +210,7 @@ def log_module_data() -> int:
     """
     Poll every configured module and append one row per online module to the
     local CSV log file.  Returns the number of rows written.
+    If no modules are online, writes a single timestamp row.
     """
     _ensure_csv_header()
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -235,9 +236,19 @@ def log_module_data() -> int:
                     json.dumps(data),
                 ])
                 rows_written += 1
+            
+            # If no modules were online, still log a timestamp row
+            if rows_written == 0:
+                writer.writerow([
+                    timestamp,
+                    "NO_MODULES_ONLINE",
+                    "",
+                    "",
+                    "[]",
+                ])
+                rows_written = 1
 
-    if rows_written:
-        _log_status["last_log_time"] = timestamp
+    _log_status["last_log_time"] = timestamp
 
     return rows_written
 
@@ -357,13 +368,15 @@ def sync_to_gdrive() -> dict:
 
     try:
         _ensure_sheet_header(service, GDRIVE_SPREADSHEET_ID, GDRIVE_SHEET_NAME)
-        service.spreadsheets().values().append(
+        result = service.spreadsheets().values().append(
             spreadsheetId=GDRIVE_SPREADSHEET_ID,
             range=f"{GDRIVE_SHEET_NAME}!A1",
             valueInputOption="RAW",
             body={"values": rows_to_sync},
         ).execute()
+        app.logger.info("Google Sheets API response: %s", result)
     except Exception as e:
+        app.logger.error("Google Sheets API error: %s", e, exc_info=True)
         return {"success": False, "synced": 0, "message": f"Google Sheets API error: {e}"}
 
     new_count = last_synced_row + len(rows_to_sync)
@@ -383,7 +396,6 @@ def sync_to_gdrive() -> dict:
 def _gdrive_sync_loop() -> None:
     """Background thread: periodically sync the CSV log to Google Sheets."""
     while True:
-        time.sleep(GDRIVE_SYNC_INTERVAL)
         try:
             internet = check_internet()
             _log_status["internet_available"] = internet
@@ -391,8 +403,11 @@ def _gdrive_sync_loop() -> None:
                 result = sync_to_gdrive()
                 if not result["success"]:
                     app.logger.warning("Google Drive sync failed: %s", result["message"])
+                else:
+                    app.logger.info("Google Drive sync: %s", result["message"])
         except Exception as e:
             app.logger.warning("Google Drive sync error: %s", e)
+        time.sleep(GDRIVE_SYNC_INTERVAL)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
@@ -581,6 +596,9 @@ if __name__ == "__main__":
     # child process; we only want threads in the child (WERKZEUG_RUN_MAIN=true)
     # or when the reloader is disabled (non-debug mode).
     if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        # Check internet connectivity at startup
+        _log_status["internet_available"] = check_internet()
+        
         threading.Thread(target=_data_log_loop, daemon=True,
                          name="data-log").start()
         threading.Thread(target=_gdrive_sync_loop, daemon=True,
@@ -591,6 +609,7 @@ if __name__ == "__main__":
     print(f"Data logging: {DATA_LOG_FILE}  (every {DATA_LOG_INTERVAL}s)")
     if GDRIVE_SPREADSHEET_ID:
         print(f"Google Drive sync enabled – spreadsheet: {GDRIVE_SPREADSHEET_ID}")
+        print(f"Internet connectivity: {'Available' if _log_status['internet_available'] else 'Not detected'}")
     else:
         print("Google Drive sync disabled (GDRIVE_SPREADSHEET_ID not set)")
     app.run(host=host, port=port, debug=debug)
