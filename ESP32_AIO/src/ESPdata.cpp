@@ -204,6 +204,7 @@ uint8_t ESPdata::loadConfig(){
     gps.flipPitchRoll = preferences.getBool("flipPitchRoll", true);
     gps.invertRoll = preferences.getBool("invertRoll", true);
     gps.disableHeading = preferences.getBool("disableHeading", false);
+    gps.yawRateOnly = preferences.getBool("yawRateOnly", false);
 
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
@@ -292,6 +293,7 @@ uint8_t ESPdata::saveConfig(){
     preferences.putBool("flipPitchRoll", gps.flipPitchRoll);
     preferences.putBool("invertRoll", gps.invertRoll);
     preferences.putBool("disableHeading", gps.disableHeading);
+    preferences.putBool("yawRateOnly", gps.yawRateOnly);
 
     // Save server configuration
     preferences.putUChar("serverAdr", ota.ipAddr);

@@ -126,6 +126,11 @@ class ESPGPS{
         uint8_t _gpsFixIndPin;
         uint8_t _rtkFixIndPin;
         
+        // Yaw rate calculation variables
+        float previousYaw;
+        unsigned long previousYawTime;
+        bool yawRateInitialized;
+        
         ESPdata* espData;
         ESPudp* espUdp;
         I2CManager& i2cManager;  // Reference to I2CManager singleton

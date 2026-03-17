@@ -418,6 +418,18 @@ def index():
                            repo_owner=REPO_OWNER, repo_name=REPO_NAME)
 
 
+@app.route("/data")
+def data_viewer():
+    """Data viewer page."""
+    return render_template("data.html")
+
+
+@app.route("/charts")
+def charts_viewer():
+    """Charts viewer page."""
+    return render_template("charts.html")
+
+
 @app.route("/api/modules")
 def api_modules():
     """Return live status for all managed modules."""
@@ -584,6 +596,132 @@ def api_sync_gdrive():
     result = sync_to_gdrive()
     status_code = 200 if result["success"] else 500
     return jsonify(result), status_code
+
+
+@app.route("/api/data-log/data")
+def api_data_log_data():
+    """Return the logged data as JSON (supports pagination)."""
+    limit = request.args.get("limit", default=100, type=int)
+    offset = request.args.get("offset", default=0, type=int)
+    
+    if not DATA_LOG_FILE.exists():
+        return jsonify({"data": [], "total": 0})
+    
+    try:
+        with _data_log_lock:
+            with open(DATA_LOG_FILE, "r", newline="") as f:
+                reader = csv.DictReader(f)
+                all_rows = list(reader)
+        
+        total = len(all_rows)
+        # Return rows in reverse chronological order (newest first)
+        paginated = list(reversed(all_rows))[offset:offset + limit]
+        
+        return jsonify({
+            "data": paginated,
+            "total": total,
+            "offset": offset,
+            "limit": limit
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/data-log/parsed")
+def api_data_log_parsed():
+    """Return parsed numeric data suitable for charting."""
+    limit = request.args.get("limit", default=500, type=int)
+    module = request.args.get("module", default="", type=str)
+    
+    if not DATA_LOG_FILE.exists():
+        return jsonify({"data": [], "total": 0})
+    
+    try:
+        with _data_log_lock:
+            with open(DATA_LOG_FILE, "r", newline="") as f:
+                reader = csv.DictReader(f)
+                all_rows = list(reader)
+        
+        # Filter by module if specified
+        if module:
+            all_rows = [r for r in all_rows if r.get("module_name") == module]
+        
+        # Take most recent rows
+        recent_rows = all_rows[-limit:] if len(all_rows) > limit else all_rows
+        
+        parsed_data = []
+        for row in recent_rows:
+            if row.get("module_name") == "NO_MODULES_ONLINE":
+                continue
+                
+            parsed = {
+                "timestamp": row.get("timestamp"),
+                "module_name": row.get("module_name"),
+                "module_ip": row.get("module_ip"),
+                "version": row.get("version"),
+                "metrics": {}
+            }
+            
+            # Parse the debug data string
+            try:
+                data_array = json.loads(row.get("data", "[]"))
+                if isinstance(data_array, list):
+                    data_str = " ".join(data_array)
+                    parsed["metrics"] = _parse_debug_metrics(data_str)
+            except Exception:
+                pass
+            
+            parsed_data.append(parsed)
+        
+        return jsonify({
+            "data": parsed_data,
+            "total": len(parsed_data)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _parse_debug_metrics(data_str: str) -> dict:
+    """Parse numeric metrics from debug data string."""
+    metrics = {}
+    
+    # Define patterns to extract (key phrases and their extraction)
+    patterns = {
+        "timestamp_boot": r"Timestamp since boot \[s\]: ([\d.]+)",
+        "free_heap": r"Free Heap[: ]+(\d+)",
+        "min_free_heap": r"Min free heap[: ]+(\d+)",
+        "cpu_freq": r"CPU frequency[: ]+(\d+)",
+        "satellites": r"Satellites[: ]+(\d+)",
+        "latitude": r"Latitude[: ]+([\d.]+)",
+        "longitude": r"Longitude[: ]+([\d.]+)",
+        "altitude": r"Altitude[: ]+([\d.]+)",
+        "speed": r"Speed[: ]+([\d.]+)",
+        "heading": r"Heading[: ]+([\d.]+)",
+        "hdop": r"HDOP[: ]+([\d.]+)",
+        "target_angle": r"Target Angle[: ]+([-\d.]+)",
+        "actual_angle": r"Actual Angle[: ]+([-\d.]+)",
+        "pwm_command": r"PWM Command[: ]+(\d+)",
+        "steer_loop_time": r"Steer Loop Time[: ]+(\d+)ms",
+        "i2c_cycle_time": r"I2C Task Cycle Time[: ]+(\d+)ms",
+        "ntrip_packets": r"Packets Received[: ]+(\d+)",
+        "ntrip_bytes": r"Total Bytes[: ]+(\d+)",
+        "ntrip_frequency": r"Packet Frequency[: ]+([\d.]+)",
+        "panda_frequency": r"PANDA Frequency[: ]+([\d.]+)",
+        "imu_heading": r"IMU Heading[: ]+([-\d]+)",
+        "imu_pitch": r"IMU Pitch[: ]+([-\d]+)",
+        "imu_roll": r"IMU Roll[: ]+([-\d]+)",
+    }
+    
+    import re
+    for key, pattern in patterns.items():
+        match = re.search(pattern, data_str, re.IGNORECASE)
+        if match:
+            try:
+                metrics[key] = float(match.group(1))
+            except ValueError:
+                pass
+    
+    return metrics
 
 
 # ── Entry point ───────────────────────────────────────────────────────────

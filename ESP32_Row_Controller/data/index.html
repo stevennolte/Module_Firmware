@@ -78,6 +78,18 @@
             badge.className = 'toolbar-badge toolbar-down';
           }
           document.getElementById('speedVal').textContent = data.speed.toFixed(1) + ' mph';
+          
+          // Override status
+          const overrideStatus = document.getElementById('overrideStatus');
+          if (data.toolbarOverrideEnabled) {
+            const mode = data.toolbarOverrideValue ? 'UP (Disabled)' : 'DOWN (Enabled)';
+            overrideStatus.textContent = '🔧 Manual Override Active: ' + mode;
+            overrideStatus.style.color = '#FF9800';
+          } else {
+            overrideStatus.textContent = '✓ Using Sensor (Auto)';
+            overrideStatus.style.color = '#4CAF50';
+          }
+          
           // Row cells
           data.rows.forEach((state, i) => {
             const cell = document.getElementById('row' + (i + 1));
@@ -89,6 +101,17 @@
         })
         .catch(e => console.error(e));
     }
+    
+    function setOverride(enabled, value) {
+      let url = '/setToolbarOverride?enabled=' + (enabled ? '1' : '0');
+      if (enabled) {
+        url += '&value=' + (value ? '1' : '0');
+      }
+      fetch(url)
+        .then(() => fetchSections())
+        .catch(e => console.error(e));
+    }
+    
     setInterval(fetchSections, 500);
     window.onload = fetchSections;
   </script>
@@ -105,6 +128,13 @@
     <h2>Toolbar Status</h2>
     <span id="toolbarBadge" class="toolbar-badge toolbar-up">Loading...</span>
     &nbsp;&nbsp;Speed: <strong id="speedVal">--</strong>
+    <div style="margin-top: 15px;">
+      <h3>Manual Override</h3>
+      <button id="btnOverrideOff" onclick="setOverride(false)">Use Sensor (Auto)</button>
+      <button id="btnOverrideDown" onclick="setOverride(true, false)">Force DOWN (Enable)</button>
+      <button id="btnOverrideUp" onclick="setOverride(true, true)">Force UP (Disable)</button>
+      <div id="overrideStatus" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
   </div>
 
   <div class="status-card">

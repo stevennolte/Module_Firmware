@@ -333,6 +333,7 @@ public:
 
         bool flipPitchRoll = true;
         bool disableHeading = false; ///< @brief Disable heading output (only send pitch/roll)
+        bool yawRateOnly = false;    ///< @brief Only send yaw rate, disable heading/pitch/roll output
         uint8_t state;              ///< @brief GPS receiver state (0=off, 1=searching, 2=fixed)
         uint8_t imuState;           ///< @brief IMU state (0=off, 1=calibrating, 2=ready)
         uint8_t positionType;       ///< @brief Position solution type (1=GPS, 2=DGPS, 4=RTK_FIXED, 5=RTK_FLOAT)

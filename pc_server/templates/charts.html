@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Charts - Module Management</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.4rem; }
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .controls {
+      background: white;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .controls label { font-size: 0.9rem; font-weight: bold; }
+    .controls select, .controls input {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-secondary { background: #757575; color: white; }
+    .btn-secondary:hover { background: #616161; }
+    
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .chart-container {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+    
+    .chart-container h3 {
+      font-size: 1rem;
+      margin-bottom: 15px;
+      color: #1565c0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .chart-controls {
+      display: flex;
+      gap: 5px;
+    }
+    
+    .chart-controls button {
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      border: 1px solid #1565c0;
+      background: white;
+      color: #1565c0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .chart-controls button:hover {
+      background: #e3f2fd;
+    }
+    
+    .chart-wrapper {
+      position: relative;
+      height: 300px;
+    }
+    
+    .loading {
+      padding: 40px;
+    
+    .help-text {
+      background: #e3f2fd;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #1565c0;
+      margin-bottom: 20px;
+      border-left: 4px solid #1565c0;
+    }
+    
+    .help-text strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+      text-align: center;
+      color: #999;
+      font-size: 1.1rem;
+    }
+    
+    .error {
+      padding: 20px;
+      background: #ffebee;
+      color: #c62828;
+      border-radius: 4px;
+      margin: 20px;
+    }
+    
+    .stats {
+      background: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📈 Data Charts</h1>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="window.location.href='/'">← Dashboard</button>
+    <button class="btn btn-secondary" onclick="window.location.href='/data'">📊 Data Table</button>
+  </div>
+</header>
+
+<div class="controls">
+  <div>
+    <label for="moduleFilter">Module:</label>
+    <select id="moduleFilter" onchange="loadData()">
+      <option value="">Select module...</option>
+    </select>
+  </div>
+  
+  <div>
+    <label for="dataPoints">Data points:</label>
+    <select id="dataPoints" onchange="loadData()">
+      <option value="100">Last 100</option>
+      <option value="250">Last 250</option>
+      <option value="500" selected>Last 500</option>
+      <option value="1000">Last 1000</option>
+    </select>
+  </div>
+  
+  <button class="btn btn-primary" onclick="loadData()">↻ Refresh</button>
+  <label>
+    <input type="checkbox" id="autoRefresh" checked> Auto-refresh (30s)
+  </label>
+</div>
+
+<div class="stats" id="stats">Select a module to view charts</div>
+
+<div class="help-text">
+  <strong>📌 Interactive Features:</strong>
+  • <strong>Zoom:</strong> Scroll wheel or pinch to zoom in/out | <strong>Pan:</strong> Click and drag to move around | 
+  <strong>Reset:</strong> Use Reset Zoom button | <strong>Legend:</strong> Click to show/hide data series
+</div>
+
+<div class="charts-grid" id="chartsGrid">
+  <div class="loading">Select a module to display charts</div>
+</div>
+
+<script>
+  let charts = {};
+  let refreshInterval = null;
+  let currentData = [];
+
+  // Chart configurations
+  const chartConfigs = {
+    memory: {
+      title: '💾 Memory Usage',
+      metrics: ['free_heap', 'min_free_heap'],
+      labels: ['Free Heap (bytes)', 'Min Free Heap (bytes)'],
+      colors: ['rgb(75, 192, 192)', 'rgb(255, 159, 64)'],
+      yAxisLabel: 'Bytes'
+    },
+    gps_position: {
+      title: '🌍 GPS Position',
+      metrics: ['latitude', 'longitude'],
+      labels: ['Latitude', 'Longitude'],
+      colors: ['rgb(54, 162, 235)', 'rgb(255, 99, 132)'],
+      yAxisLabel: 'Degrees'
+    },
+    gps_quality: {
+      title: '📡 GPS Quality',
+      metrics: ['satellites', 'hdop'],
+      labels: ['Satellites', 'HDOP'],
+      colors: ['rgb(153, 102, 255)', 'rgb(255, 206, 86)'],
+      yAxisLabel: 'Count / Quality'
+    },
+    gps_motion: {
+      title: '🚜 GPS Motion',
+      metrics: ['speed', 'heading', 'altitude'],
+      labels: ['Speed', 'Heading (°)', 'Altitude (m)'],
+      colors: ['rgb(75, 192, 192)', 'rgb(255, 159, 64)', 'rgb(201, 203, 207)'],
+      yAxisLabel: 'Value'
+    },
+    steering: {
+      title: '🎯 Steering Control',
+      metrics: ['target_angle', 'actual_angle', 'pwm_command'],
+      labels: ['Target Angle (°)', 'Actual Angle (°)', 'PWM Command'],
+      colors: ['rgb(54, 162, 235)', 'rgb(255, 99, 132)', 'rgb(153, 102, 255)'],
+      yAxisLabel: 'Value'
+    },
+    imu: {
+      title: '📐 IMU Orientation',
+      metrics: ['imu_heading', 'imu_pitch', 'imu_roll'],
+      labels: ['Heading (°)', 'Pitch (°)', 'Roll (°)'],
+      colors: ['rgb(75, 192, 192)', 'rgb(255, 159, 64)', 'rgb(255, 99, 132)'],
+      yAxisLabel: 'Degrees'
+    },
+    timing: {
+      title: '⏱️ Loop Timing',
+      metrics: ['steer_loop_time', 'i2c_cycle_time'],
+      labels: ['Steer Loop (ms)', 'I2C Cycle (ms)'],
+      colors: ['rgb(54, 162, 235)', 'rgb(255, 206, 86)'],
+      yAxisLabel: 'Milliseconds'
+    },
+    ntrip: {
+      title: '📶 NTRIP Data',
+      metrics: ['ntrip_packets', 'ntrip_frequency'],
+      labels: ['Packets Received', 'Frequency (Hz)'],
+      colors: ['rgb(153, 102, 255)', 'rgb(75, 192, 192)'],
+      yAxisLabel: 'Count / Hz'
+    }
+  };
+
+  async function loadModules() {
+    try {
+      const response = await fetch('/api/modules');
+      if (!response.ok) {
+        console.error('Failed to fetch modules:', response.status);
+        return;
+      }
+      const modules = await response.json();
+      console.log('Loaded modules:', modules);
+      
+      const select = document.getElementById('moduleFilter');
+      select.innerHTML = '<option value="">Select module...</option>';
+      
+      let addedCount = 0;
+      modules.forEach(mod => {
+        // Add all configured modules, regardless of online status
+        const option = document.createElement('option');
+        option.value = mod.name;
+        option.textContent = mod.name + (mod.online ? ' ✓ Online' : ' ○ Offline');
+        select.appendChild(option);
+        addedCount++;
+      });
+      
+      console.log(`Added ${addedCount} modules to dropdown`);
+      
+      if (addedCount === 0) {
+        console.warn('No modules found in configuration');
+      }
+    } catch (e) {
+      console.error('Failed to load modules:', e);
+      document.getElementById('stats').textContent = 'Error loading modules: ' + e.message;
+    }
+  }
+
+  async function loadData() {
+    const module = document.getElementById('moduleFilter').value;
+    if (!module) {
+      document.getElementById('stats').textContent = 'Select a module to view charts';
+      document.getElementById('chartsGrid').innerHTML = '<div class="loading">Select a module to display charts</div>';
+      return;
+    }
+
+    const limit = document.getElementById('dataPoints').value;
+    document.getElementById('stats').textContent = 'Loading data...';
+
+    try {
+      const response = await fetch(`/api/data-log/parsed?module=${module}&limit=${limit}`);
+      const result = await response.json();
+      
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+
+      currentData = result.data;
+      
+      if (currentData.length === 0) {
+        document.getElementById('stats').textContent = `No data available for ${module}`;
+        document.getElementById('chartsGrid').innerHTML = '<div class="loading">No data logged yet for this module</div>';
+        return;
+      }
+
+      document.getElementById('stats').textContent = 
+        `Displaying ${currentData.length} data points for ${module} | ` +
+        `Latest: ${new Date(currentData[currentData.length - 1].timestamp).toLocaleString()}`;
+
+      createCharts();
+    } catch (e) {
+      showError('Failed to load data: ' + e);
+    }
+  }
+
+  function createCharts() {
+    // Destroy existing charts
+    Object.values(charts).forEach(chart => chart.destroy());
+    charts = {};
+
+    // Create chart containers
+    const grid = document.getElementById('chartsGrid');
+    grid.innerHTML = '';
+
+    // Extract timestamps
+    const timestamps = currentData.map(d => new Date(d.timestamp).toLocaleTimeString());
+
+    // Create each chart
+    Object.entries(chartConfigs).forEach(([key, config]) => {
+      // Check if we have data for any of these metrics
+      const hasData = config.metrics.some(metric => 
+        currentData.some(d => d.metrics[metric] !== undefined)
+      );
+
+      if (!hasData) return; // Skip if no data for this chart
+
+      // Create container
+      const container = document.createElement('div');
+      container.className = 'chart-container';
+      container.innerHTML = `
+        <h3>${config.title}</h3>
+        <div class="chart-wrapper">
+          <canvas id="chart-${key}"></canvas>
+        </div>
+      `;
+      grid.appendChild(container);
+
+      // Prepare datasets
+      const datasets = config.metrics.map((metric, idx) => {
+        const data = currentData.map(d => d.metrics[metric] || null);
+        return {
+          label: config.labels[idx],
+          data: data,
+          borderColor: config.colors[idx],
+          backgroundColor: config.colors[idx].replace('rgb', 'rgba').replace(')', ', 0.1)'),
+          tension: 0.1,
+          spanGaps: true
+        };
+      });
+
+      // Create chart
+      const ctx = document.getElementById(`chart-${key}`).getContext('2d');
+      charts[key] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: timestamps,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            intersect: false,
+            mode: 'index'
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              onClick: (e, legendItem, legend) => {
+                // Toggle dataset visibility
+                const index = legendItem.datasetIndex;
+                const chart = legend.chart;
+                const meta = chart.getDatasetMeta(index);
+                meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+                chart.update();
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed.y !== null) {
+                    label += context.parsed.y.toFixed(2);
+                  }
+                  return label;
+                }
+              }
+            },
+            zoom: {
+              zoom: {
+                wheel: {
+                  enabled: true,
+                  speed: 0.1
+                },
+                pinch: {
+                  enabled: true
+                },
+                mode: 'x'
+              },
+              pan: {
+                enabled: true,
+                mode: 'x'
+              },
+              limits: {
+                x: {min: 'original', max: 'original'}
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            },
+            y: {
+              beginAtZero: false,
+              title: {
+                display: true,
+                text: config.yAxisLabel
+              }
+            }
+          }
+        }
+      });
+    });
+
+    if (grid.children.length === 0) {
+      grid.innerHTML = '<div class="loading">No plottable data found in the logs</div>';
+    }
+  }
+
+  function resetZoom(chartKey) {
+    if (charts[chartKey]) {
+      charts[chartKey].resetZoom();
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('chartsGrid').innerHTML = 
+      `<div class="error">${msg}</div>`;
+  }
+
+  function setupAutoRefresh() {
+    const checkbox = document.getElementById('autoRefresh');
+    
+    const startRefresh = () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (checkbox.checked) {
+        refreshInterval = setInterval(() => {
+          const module = document.getElementById('moduleFilter').value;
+          if (module) loadData();
+        }, 30000);
+      }
+    };
+
+    checkbox.addEventListener('change', startRefresh);
+    startRefresh();
+  }
+
+  // Initialize
+  window.onload = function() {
+    console.log('Charts page loaded, initializing...');
+    loadModules();
+    setupAutoRefresh();
+  };
+  
+  // Also try on DOMContentLoaded in case onload doesn't fire
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM ready');
+    if (!document.getElementById('moduleFilter').options.length || 
+        document.getElementById('moduleFilter').options.length === 1) {
+      console.log('Modules not loaded yet, trying again...');
+      setTimeout(loadModules, 100);
+    }
+  });
+</script>
+
+</body>
+</html>
