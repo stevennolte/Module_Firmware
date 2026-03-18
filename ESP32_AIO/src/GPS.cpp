@@ -52,6 +52,11 @@ ESPGPS::ESPGPS(ESPdata* vars, HardwareSerial* gpsSerial, HardwareSerial* bnoSeri
     _gpsFixIndPin = espData->pins.gpsFix;
     _rtkFixIndPin = espData->pins.rtkFix;
     
+    // Initialize yaw rate calculation variables
+    previousYaw = 0.0;
+    previousYawTime = 0;
+    yawRateInitialized = false;
+    
     // Initialize NMEA message counters in ESPdata struct
     espData->gps.ggaMessageCount = 0;
     espData->gps.vtgMessageCount = 0;
@@ -449,13 +454,48 @@ void ESPGPS::init(ESPudp* espUdp){
     // if (!rvc.begin(&bnoSerial)){
     //     Serial.println("BNO08x not detected");
     // }
-    Serial.println("Starting BNO08x");
-    if (rvc.begin(bnoSerial)){
+    Serial.println("Starting BNO08x IMU...");
+    
+    // Create a task to initialize BNO08x with timeout
+    volatile bool imuTaskCompleted = false;
+    volatile bool imuConnectionResult = false;
+    
+    struct IMUInitParams {
+        Adafruit_BNO08x_RVC* rvc;
+        HardwareSerial* serial;
+        volatile bool* completed;
+        volatile bool* result;
+    };
+    
+    IMUInitParams imuParams = {&rvc, bnoSerial, &imuTaskCompleted, &imuConnectionResult};
+    
+    TaskHandle_t imuInitTask = NULL;
+    xTaskCreate([](void* param) {
+        IMUInitParams* p = (IMUInitParams*)param;
+        *p->result = p->rvc->begin(p->serial);
+        *p->completed = true;
+        vTaskDelete(NULL);
+    }, "IMUInit", 4096, &imuParams, 1, &imuInitTask);
+    
+    // Wait for completion or timeout (3 seconds)
+    uint32_t imuStart = millis();
+    while (!imuTaskCompleted && (millis() - imuStart < 3000)) {
+        delay(100);
+        Serial.print(".");
+    }
+    Serial.println();
+    
+    if (imuTaskCompleted && imuConnectionResult) {
         espData->gps.imuState = 1;
+        Serial.println("BNO08x IMU started successfully");
     } else {
         espData->gps.imuState = 2;
-        Serial.println("RVC Start Failed");
+        Serial.println("RVC Start Failed or Timeout");
+        if (imuInitTask != NULL) {
+            vTaskDelete(imuInitTask);
+        }
     }
+    
     if (!espData->gps.externalGPS){
         Serial.println("Trying to start UM980");
         uint32_t gpsStart = millis();
@@ -497,9 +537,9 @@ void ESPGPS::init(ESPudp* espUdp){
                 vTaskDelete(NULL);
             }, "GPSInit", 4096, &params, 1, &gpsInitTask);
             
-            // Wait for completion or timeout (2 seconds)
+            // Wait for completion or timeout (3 seconds)
             uint32_t attemptStart = millis();
-            while (!taskCompleted && (millis() - attemptStart < 5000)) {
+            while (!taskCompleted && (millis() - attemptStart < 3000)) {
                 delay(100);
                 Serial.print(".");
             }
@@ -528,20 +568,25 @@ void ESPGPS::init(ESPudp* espUdp){
             i2cManager.setGPSLED(LEDPattern::ON);
             espData->gps.state = 1;
             Serial.println("UM980 detected!");
+            
+            // Only send configuration commands if GPS is connected
+            Serial.println("Configuring UM980...");
+            myGNSS.sendCommand("CONFIG RTK RELIABILITY 3 1");
+            delay(500);
+            myGNSS.sendCommand("CONFIG SMOOTH RTKHEIGHT 0");
+            delay(500);
+            myGNSS.sendCommand("CONFIG HEADING RELIABILITY 3");
+            delay(500);
+            myGNSS.sendCommand("CONFIG HEADING VARIABLELENGTH");
+            delay(500);
+            myGNSS.sendCommand("CONFIG SMOOTH HEADING 0");
+            delay(500);
+            myGNSS.sendCommand("GNGGA, .1");
+            delay(500);
+            myGNSS.sendCommand("GPVTG, .1");
+            Serial.println("UM980 configuration complete");
         }
-        myGNSS.sendCommand("CONFIG RTK RELIABILITY 3 1");
-        delay(500);
-        myGNSS.sendCommand("CONFIG SMOOTH RTKHEIGHT 0");
-        delay(500);
-        myGNSS.sendCommand("CONFIG HEADING RELIABILITY 3");
-        delay(500);
-        myGNSS.sendCommand("CONFIG HEADING VARIABLELENGTH");
-        delay(500);
-        myGNSS.sendCommand("CONFIG SMOOTH HEADING 0");
-        delay(500);
-        myGNSS.sendCommand("GNGGA, .1");
-        delay(500);
-        myGNSS.sendCommand("GPVTG, .1");
+        
         Serial.print("Time to start gps: ");
         Serial.print(millis() - gpsStart);
         Serial.println(" ms");
@@ -1023,6 +1068,36 @@ void ESPGPS::imuHandler(){
         temp = heading.roll * 10;
         snprintf(tempRoll, sizeof(tempRoll), "%d", temp);
         
+        // Calculate yaw rate (degrees per second)
+        unsigned long currentTime = millis();
+        float yawRate = 0.0;
+        
+        if (yawRateInitialized && (currentTime > previousYawTime)) {
+            float deltaTime = (currentTime - previousYawTime) / 1000.0; // Convert to seconds
+            float deltaYaw = normalizedYaw - previousYaw;
+            
+            // Handle 360-degree wrap-around
+            if (deltaYaw > 180.0) {
+                deltaYaw -= 360.0;
+            } else if (deltaYaw < -180.0) {
+                deltaYaw += 360.0;
+            }
+            
+            // Calculate rate (degrees per second)
+            if (deltaTime > 0.001) { // Avoid division by very small numbers
+                yawRate = deltaYaw / deltaTime;
+                
+                // Sanity check: limit to reasonable values (±500 deg/s)
+                if (yawRate > 500.0) yawRate = 500.0;
+                if (yawRate < -500.0) yawRate = -500.0;
+            }
+        }
+        
+        // Update previous values for next calculation
+        previousYaw = normalizedYaw;
+        previousYawTime = currentTime;
+        yawRateInitialized = true;
+        
         // Validate the strings don't contain invalid characters
         for (int i = 0; i < strlen(tempHeading); i++) {
             if (tempHeading[i] < 32 || tempHeading[i] > 126) tempHeading[i] = '0';
@@ -1040,10 +1115,23 @@ void ESPGPS::imuHandler(){
         memset(espData->gps.imuRoll, 0, sizeof(espData->gps.imuRoll));
         memset(espData->gps.imuYawRate, 0, sizeof(espData->gps.imuYawRate));
         
-        strcpy(espData->gps.imuHeading, tempHeading);
-        strcpy(espData->gps.imuPitch, tempPitch);
-        strcpy(espData->gps.imuRoll, tempRoll);
-        strcpy(espData->gps.imuYawRate, "0");
+        // Check if yawRateOnly mode is enabled
+        if (espData->gps.yawRateOnly) {
+            // Only populate yaw rate, set others to 0
+            strcpy(espData->gps.imuHeading, "0");
+            strcpy(espData->gps.imuPitch, "0");
+            strcpy(espData->gps.imuRoll, "0");
+        } else {
+            // Normal mode: populate all IMU values
+            strcpy(espData->gps.imuHeading, tempHeading);
+            strcpy(espData->gps.imuPitch, tempPitch);
+            strcpy(espData->gps.imuRoll, tempRoll);
+        }
+        
+        // Format yaw rate with one decimal place (multiply by 10 like other IMU values)
+        // Yaw rate is always populated regardless of yawRateOnly setting
+        int16_t yawRateInt = yawRate * 10;
+        snprintf(espData->gps.imuYawRate, sizeof(espData->gps.imuYawRate), "%d", yawRateInt);
         
         // Validate all IMU strings to ensure they're clean
         validateIMUString(espData->gps.imuHeading, sizeof(espData->gps.imuHeading));
@@ -1059,12 +1147,14 @@ void ESPGPS::imuHandler(){
         //     Serial.printf("Raw IMU - Yaw: %.2f°, Pitch: %.2f°, Roll: %.2f°\n", 
         //                  heading.yaw, heading.pitch, heading.roll);
         //     Serial.printf("Normalized Heading: %.2f°\n", normalizedYaw);
-        //     Serial.printf("Transmitted Values - Heading: %s, Pitch: %s, Roll: %s\n",
-        //                  espData->gps.imuHeading, espData->gps.imuPitch, espData->gps.imuRoll);
-        //     Serial.printf("Settings - FlipPitchRoll: %s, InvertRoll: %s, DisableHeading: %s\n",
+        //     Serial.printf("Calculated Yaw Rate: %.2f°/s\n", yawRate);
+        //     Serial.printf("Transmitted Values - Heading: %s, Pitch: %s, Roll: %s, YawRate: %s\n",
+        //                  espData->gps.imuHeading, espData->gps.imuPitch, espData->gps.imuRoll, espData->gps.imuYawRate);
+        //     Serial.printf("Settings - FlipPitchRoll: %s, InvertRoll: %s, DisableHeading: %s, YawRateOnly: %s\n",
         //                  espData->gps.flipPitchRoll ? "ON" : "OFF",
         //                  espData->gps.invertRoll ? "ON" : "OFF",
-        //                  espData->gps.disableHeading ? "ON" : "OFF");
+        //                  espData->gps.disableHeading ? "ON" : "OFF",
+        //                  espData->gps.yawRateOnly ? "ON" : "OFF");
         //     Serial.println("=====================");
         // }
 

@@ -188,6 +188,30 @@
     #autoRefreshInterval {
       width: 70px; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;
     }
+
+    .data-log-panel {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .data-log-panel .panel-header {
+      background: #37474f;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .data-log-panel .panel-header h2 { font-size: 1rem; flex: 1; }
+    .data-log-panel .panel-body { padding: 16px 20px; }
+    .data-log-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px 24px;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
@@ -207,6 +231,53 @@
   <input type="number" id="autoRefreshInterval" value="5" min="2" max="60">
   <button class="btn btn-sm btn-primary" onclick="setRefreshInterval()">Apply</button>
   <button class="btn btn-sm btn-warn" onclick="refreshAll()">↻ Refresh Now</button>
+</div>
+
+<!-- ── Data log status panel ─────────────────────────────────────────── -->
+<div class="data-log-panel">
+  <div class="panel-header">
+    <h2>📊 Data Logging</h2>
+    <span class="badge" id="log-status-badge" style="background:#546e7a;color:white;">Loading…</span>
+  </div>
+  <div class="panel-body">
+    <div class="data-log-grid">
+      <div class="info-row">
+        <span>Last log time</span>
+        <span class="value" id="lastLogTime">—</span>
+      </div>
+      <div class="info-row">
+        <span>Rows logged locally</span>
+        <span class="value" id="rowsLogged">—</span>
+      </div>
+      <div class="info-row">
+        <span>Google Drive sync</span>
+        <span class="value" id="gdriveStatus">—</span>
+      </div>
+      <div class="info-row">
+        <span>Last sync time</span>
+        <span class="value" id="lastSyncTime">—</span>
+      </div>
+      <div class="info-row">
+        <span>Rows synced</span>
+        <span class="value" id="rowsSynced">—</span>
+      </div>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-sm btn-primary" id="btn-sync-gdrive"
+              onclick="syncGDrive()" disabled>
+        ☁ Sync to Google Drive Now
+      </button>
+      <button class="btn btn-sm btn-primary" onclick="window.location.href='/data'">
+        📊 View Data Log
+      </button>
+      <button class="btn btn-sm btn-primary" onclick="window.location.href='/charts'">
+        📈 View Charts
+      </button>
+    </div>
+    <div class="status-msg msg-info" id="sync-msg" style="margin-top:8px;">
+      Checking status…
+    </div>
+  </div>
 </div>
 
 <div class="module-grid" id="moduleGrid">
@@ -496,6 +567,7 @@
     refreshModuleStatus('{{ mod.name }}');
     if (openDiagPanels.has('{{ mod.name }}')) fetchDiagnostics('{{ mod.name }}');
     {% endfor %}
+    fetchDataLogStatus();
   }
 
   function setRefreshInterval() {
@@ -505,6 +577,80 @@
     document.getElementById('refreshLabel').textContent = val;
     if (refreshTimerId) clearInterval(refreshTimerId);
     refreshTimerId = setInterval(refreshAll, refreshSeconds * 1000);
+  }
+
+  // ── Data log status ────────────────────────────────────────────────────
+  async function fetchDataLogStatus() {
+    try {
+      const res = await fetch('/api/data-log/status');
+      if (!res.ok) {
+        console.error('Data log status error:', res.status);
+        return;
+      }
+      const data = await res.json();
+
+      document.getElementById('lastLogTime').textContent  = data.last_log_time  || '—';
+      document.getElementById('rowsLogged').textContent   = data.rows_logged    ?? '—';
+      document.getElementById('rowsSynced').textContent   = data.rows_synced    ?? '—';
+      document.getElementById('lastSyncTime').textContent = data.last_sync_time || '—';
+
+      const gdriveEnabled = data.gdrive_enabled;
+      let gdriveLabel;
+      if (!gdriveEnabled) {
+        gdriveLabel = '✗ Not configured';
+      } else if (data.internet_available) {
+        gdriveLabel = '✓ Connected';
+      } else {
+        gdriveLabel = '⚠ No internet';
+      }
+      document.getElementById('gdriveStatus').textContent = gdriveLabel;
+
+      const badge = document.getElementById('log-status-badge');
+      badge.textContent  = 'Active';
+      badge.style.background = '#43a047';
+
+      const syncBtn = document.getElementById('btn-sync-gdrive');
+      syncBtn.disabled = !gdriveEnabled;
+
+      const msgEl = document.getElementById('sync-msg');
+      if (data.last_sync_status === 'success' && data.last_sync_time) {
+        msgEl.textContent = `Last Google Drive sync: ${data.last_sync_time}`;
+        msgEl.className   = 'status-msg msg-success';
+      } else if (!gdriveEnabled) {
+        msgEl.textContent = 'Google Drive sync is not configured. See README for setup instructions.';
+        msgEl.className   = 'status-msg msg-info';
+      } else {
+        msgEl.textContent = 'Sync pending – will run automatically when internet is available.';
+        msgEl.className   = 'status-msg msg-info';
+      }
+    } catch (e) {
+      console.error('Failed to fetch data log status:', e);
+    }
+  }
+
+  async function syncGDrive() {
+    const btn   = document.getElementById('btn-sync-gdrive');
+    const msgEl = document.getElementById('sync-msg');
+    btn.disabled     = true;
+    msgEl.textContent = 'Syncing to Google Drive…';
+    msgEl.className   = 'status-msg msg-info';
+    try {
+      const res  = await fetch('/api/data-log/sync-gdrive', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        msgEl.textContent = '✓ ' + data.message;
+        msgEl.className   = 'status-msg msg-success';
+      } else {
+        msgEl.textContent = '✗ ' + (data.message || 'Sync failed');
+        msgEl.className   = 'status-msg msg-error';
+      }
+    } catch (e) {
+      msgEl.textContent = 'Error: ' + e;
+      msgEl.className   = 'status-msg msg-error';
+    } finally {
+      btn.disabled = false;
+      fetchDataLogStatus();
+    }
   }
 
   // ── Init ───────────────────────────────────────────────────────────────

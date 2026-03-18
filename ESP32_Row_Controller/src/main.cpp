@@ -35,7 +35,15 @@ void initRowOutputs() {
 // Apply section states to physical MOSFET outputs.
 // If the toolbar is up all outputs are forced off regardless of section state.
 void updateRowOutputs() {
-    bool toolbarUp = digitalRead(gpioDefs.TOOLBAR_PIN) == HIGH;
+    bool toolbarUp;
+    
+    // Check if manual override is enabled
+    if (sectionData.toolbarOverrideEnabled) {
+        toolbarUp = sectionData.toolbarOverrideValue;
+    } else {
+        toolbarUp = digitalRead(gpioDefs.TOOLBAR_PIN) == HIGH;
+    }
+    
     sectionData.toolbarUp = toolbarUp;
 
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -220,6 +228,8 @@ void handleGetSections(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(512);
     doc["toolbarUp"] = sectionData.toolbarUp;
     doc["speed"] = sectionData.speed;
+    doc["toolbarOverrideEnabled"] = sectionData.toolbarOverrideEnabled;
+    doc["toolbarOverrideValue"] = sectionData.toolbarOverrideValue;
     JsonArray rows = doc.createNestedArray("rows");
     for (int i = 0; i < NUM_ROWS; i++) {
         rows.add(sectionData.rowStates[i]);
@@ -227,6 +237,19 @@ void handleGetSections(AsyncWebServerRequest *request) {
     String jsonResponse;
     serializeJson(doc, jsonResponse);
     request->send(200, "application/json", jsonResponse);
+}
+
+// Set toolbar manual override
+void handleSetToolbarOverride(AsyncWebServerRequest *request) {
+    if (request->hasParam("enabled")) {
+        String enabled = request->getParam("enabled")->value();
+        sectionData.toolbarOverrideEnabled = (enabled == "1" || enabled == "true");
+    }
+    if (request->hasParam("value")) {
+        String value = request->getParam("value")->value();
+        sectionData.toolbarOverrideValue = (value == "1" || value == "true");
+    }
+    request->send(200, "text/plain", "OK");
 }
 
 // -----------------------------------------------------------------------
@@ -251,6 +274,10 @@ void setup() {
     // Setup row MOSFET outputs and toolbar input
     initRowOutputs();
     pinMode(gpioDefs.TOOLBAR_PIN, INPUT_PULLDOWN);
+    
+    // Setup power relay (starts LOW, will turn on after boot)
+    pinMode(gpioDefs.POWER_RELAY_PIN, OUTPUT);
+    digitalWrite(gpioDefs.POWER_RELAY_PIN, LOW);
 
     // Connect to WiFi; fall back to AP mode after 60 s
     while (wifiCfg.state != 1) {
@@ -302,6 +329,7 @@ void setup() {
     server.on("/download", HTTP_GET, handleFileDownload);
     server.on("/reboot", HTTP_GET, handleReboot);
     server.on("/getSections", HTTP_GET, handleGetSections);
+    server.on("/setToolbarOverride", HTTP_GET, handleSetToolbarOverride);
     server.on("/saveSettings", HTTP_POST, handleSaveSettings);
     server.on("/saveSettings", HTTP_GET, handleSaveSettingsGet);
 
@@ -329,6 +357,11 @@ void setup() {
     espUdp.begin();
 
     progData.state = 1;
+    
+    // Turn on main power relay after boot process is complete
+    digitalWrite(gpioDefs.POWER_RELAY_PIN, HIGH);
+    Serial.println("Power relay activated.");
+    
     Serial.println("Setup complete.");
 }
 
@@ -348,6 +381,14 @@ void debugPrint() {
 
 void loop() {
     updateRowOutputs();
+    
+    // Send section control data (PGN 234) to AgOpenGPS at 10Hz
+    static uint32_t lastUdpSend = 0;
+    if (millis() - lastUdpSend >= 100) {
+        lastUdpSend = millis();
+        espUdp.sendUDP();
+    }
+    
     delay(50);
 
     static uint32_t lastDebugPrint = 0;

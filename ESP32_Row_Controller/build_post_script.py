@@ -61,12 +61,27 @@ def copy_firmware(source, target, env):
     shutil.copy(bin_path, dest)
 
 
+def upload_filesystem(source, target, env):
+    """Build and upload filesystem before firmware upload."""
+    print("")
+    print("=" * 60)
+    print("Building and uploading filesystem (HTML files)...")
+    print("=" * 60)
+    env.Execute("pio run --target buildfs")
+    env.Execute("pio run --target uploadfs")
+    print("=" * 60)
+    print("Filesystem upload complete. Proceeding with firmware upload...")
+    print("=" * 60)
+    print("")
+
+
 # ── Execution ──────────────────────────────────────────────────────────────
 getInfo()
 if not IS_CI:
     increment_version()
 
 env.AddPostAction("buildprog", copy_firmware)
+env.AddPreAction("upload", upload_filesystem)
 env.AddPostAction("upload", copy_firmware)
 
 print("")

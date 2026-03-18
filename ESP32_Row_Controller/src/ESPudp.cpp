@@ -1,7 +1,7 @@
 #include "ESPudp.h"
 #include <Update.h>
 
-ESPudp::ESPudp(ESPconfig* vars) : udp() {
+ESPudp::ESPudp(ESPconfig* vars) : udp(), udpSend() {
     espConfig = vars;
 }
 
@@ -55,5 +55,84 @@ void ESPudp::begin() {
 }
 
 void ESPudp::sendUDP() {
-    // Reserved for future use: sending status/telemetry back to AgOpenGPS
+    sendPGN234();
+}
+
+// Calculate CRC checksum for AgOpenGPS messages
+uint8_t ESPudp::calcCRC(uint8_t* data, uint8_t length) {
+    uint8_t crc = 0;
+    for (uint8_t i = 2; i < length; i++) {
+        crc += data[i];
+    }
+    return crc;
+}
+
+// Send PGN 234 - Section control data (matches official AgOpenGPS implementation)
+void ESPudp::sendPGN234() {
+    uint8_t message[14];
+    message[0] = 0x80;  // Header
+    message[1] = 0x81;  // Header
+    message[2] = 0x7B;  // From section control (123)
+    message[3] = 0xEA;  // PGN 234 - Section control data
+    message[4] = 8;     // Data length (8 bytes)
+    
+    // Byte 5: Main control byte
+    // Bit 0: Auto mode on (sections controlled by AOG)
+    // Bit 1: Main switch OFF (all sections off)
+    message[5] = 0;
+    
+    bool autoMode = !espConfig->sectionData.toolbarUp;  // Auto when toolbar is down
+    
+    // Bytes 6-8: Reserved/unused in this implementation
+    message[6] = 0;
+    message[7] = 0;
+    message[8] = 0;
+    
+    // Bytes 9 & 11: Section relay states (only sent in MANUAL mode to override AOG)
+    // In AUTO mode, send 0 to let AgOpenGPS control the sections
+    message[9] = 0;
+    message[11] = 0;
+    
+    // Bytes 10 & 12: Sections forced OFF
+    message[10] = 0;
+    message[12] = 0;
+    
+    if (autoMode) {
+        // AUTO mode: toolbar is down, let AgOpenGPS control sections
+        message[5] |= 0x01;  // Set auto bit
+        // Leave bytes 9, 11 as 0 (AgOpenGPS controls sections)
+        // Leave bytes 10, 12 as 0 (no sections forced off)
+    } else {
+        // MANUAL/OFF mode: toolbar is up, force all sections OFF
+        message[5] |= 0x02;  // Set main OFF bit
+        // Force all sections OFF by setting bits in forced-off bytes
+        for (int i = 0; i < 8 && i < NUM_ROWS; i++) {
+            message[10] |= (1 << i);
+        }
+        for (int i = 8; i < 16 && i < NUM_ROWS; i++) {
+            message[12] |= (1 << (i - 8));
+        }
+    }
+    
+    // Byte 13: CRC checksum
+    message[13] = calcCRC(message, 13);
+    
+    // Send using beginPacket/write/endPacket pattern (official AgOpenGPS method)
+    IPAddress destIP(espConfig->wifiCfg.ips[0], 
+                     espConfig->wifiCfg.ips[1], 
+                     espConfig->wifiCfg.ips[2], 
+                     255);
+    
+    AsyncUDPMessage udpMsg;
+    udpMsg.write(message, sizeof(message));
+    udpSend.sendTo(udpMsg, destIP, 9999);
+    
+    // Debug output
+    static uint32_t lastDebug = 0;
+    if (millis() - lastDebug >= 2000) {
+        lastDebug = millis();
+        Serial.printf("PGN234: Mode=%s, Main=%02X, Relay=%02X %02X, ForceOff=%02X %02X, CRC=%02X\n",
+                      autoMode ? "AUTO" : "OFF",
+                      message[5], message[9], message[11], message[10], message[12], message[13]);
+    }
 }

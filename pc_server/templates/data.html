@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Module Data Log Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.4rem; }
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .controls {
+      background: white;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .controls label { font-size: 0.9rem; font-weight: bold; }
+    .controls select, .controls input {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-secondary { background: #757575; color: white; }
+    .btn-secondary:hover { background: #616161; }
+    
+    .data-container {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .stats {
+      padding: 12px 20px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    
+    .table-wrapper {
+      overflow-x: auto;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    thead {
+      position: sticky;
+      top: 0;
+      background: #1565c0;
+      color: white;
+      z-index: 10;
+    }
+    
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: bold;
+      font-size: 0.85rem;
+      border-bottom: 2px solid #0d47a1;
+    }
+    
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 0.85rem;
+    }
+    
+    tbody tr:hover {
+      background: #f5f5f5;
+    }
+    
+    .module-name {
+      font-weight: bold;
+      color: #1565c0;
+    }
+    
+    .timestamp {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #555;
+    }
+    
+    .debug-data {
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    
+    .debug-data:hover {
+      overflow: visible;
+      white-space: normal;
+      word-break: break-all;
+    }
+    
+    .offline-row {
+      background: #fff3e0;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .badge-online { background: #e8f5e9; color: #2e7d32; }
+    .badge-offline { background: #ffebee; color: #c62828; }
+    
+    .pagination {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .loading {
+      padding: 40px;
+      text-align: center;
+      color: #999;
+      font-size: 1.1rem;
+    }
+    
+    .error {
+      padding: 20px;
+      background: #ffebee;
+      color: #c62828;
+      border-radius: 4px;
+      margin: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Module Data Log Viewer</h1>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="window.location.href='/charts'">📈 View Charts</button>
+    <button class="btn btn-secondary" onclick="window.location.href='/'">← Back to Dashboard</button>
+  </div>
+</header>
+
+<div class="controls">
+  <div>
+    <label for="moduleFilter">Filter by module:</label>
+    <select id="moduleFilter" onchange="applyFilter()">
+      <option value="">All modules</option>
+    </select>
+  </div>
+  
+  <div>
+    <label for="limitSelect">Rows per page:</label>
+    <select id="limitSelect" onchange="changeLimit()">
+      <option value="50">50</option>
+      <option value="100" selected>100</option>
+      <option value="250">250</option>
+      <option value="500">500</option>
+    </select>
+  </div>
+  
+  <button class="btn btn-primary" onclick="refreshData()">↻ Refresh</button>
+</div>
+
+<div class="data-container">
+  <div class="stats" id="stats">Loading...</div>
+  
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Module</th>
+          <th>IP Address</th>
+          <th>Version</th>
+          <th>Debug Data</th>
+        </tr>
+      </thead>
+      <tbody id="dataTable">
+        <tr><td colspan="5" class="loading">Loading data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="pagination">
+    <button class="btn btn-secondary" id="prevBtn" onclick="previousPage()" disabled>← Previous</button>
+    <span id="pageInfo">Page 1</span>
+    <button class="btn btn-secondary" id="nextBtn" onclick="nextPage()" disabled>Next →</button>
+  </div>
+</div>
+
+<script>
+  let currentOffset = 0;
+  let currentLimit = 100;
+  let totalRows = 0;
+  let allData = [];
+  let filteredData = [];
+  let currentFilter = '';
+
+  async function loadData() {
+    try {
+      const response = await fetch(`/api/data-log/data?limit=1000&offset=0`);
+      const result = await response.json();
+      
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+      
+      allData = result.data;
+      totalRows = result.total;
+      
+      // Populate module filter
+      const modules = [...new Set(allData.map(row => row.module_name))].sort();
+      const filterSelect = document.getElementById('moduleFilter');
+      filterSelect.innerHTML = '<option value="">All modules</option>';
+      modules.forEach(mod => {
+        const option = document.createElement('option');
+        option.value = mod;
+        option.textContent = mod;
+        filterSelect.appendChild(option);
+      });
+      
+      applyFilter();
+    } catch (e) {
+      showError('Failed to load data: ' + e);
+    }
+  }
+
+  function applyFilter() {
+    currentFilter = document.getElementById('moduleFilter').value;
+    
+    if (currentFilter === '') {
+      filteredData = allData;
+    } else {
+      filteredData = allData.filter(row => row.module_name === currentFilter);
+    }
+    
+    currentOffset = 0;
+    renderTable();
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('dataTable');
+    const start = currentOffset;
+    const end = Math.min(start + currentLimit, filteredData.length);
+    const pageData = filteredData.slice(start, end);
+    
+    if (pageData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="loading">No data available</td></tr>';
+      updateStats();
+      return;
+    }
+    
+    tbody.innerHTML = pageData.map(row => {
+      const isOffline = row.module_name === 'NO_MODULES_ONLINE';
+      const rowClass = isOffline ? 'offline-row' : '';
+      const statusBadge = isOffline 
+        ? '<span class="status-badge badge-offline">OFFLINE</span>'
+        : '<span class="status-badge badge-online">ONLINE</span>';
+      
+      // Format timestamp
+      const date = new Date(row.timestamp);
+      const timeStr = date.toLocaleString();
+      
+      // Format debug data
+      let debugDisplay = row.data;
+      try {
+        const parsed = JSON.parse(row.data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          debugDisplay = parsed.join(', ');
+        }
+      } catch(e) {}
+      
+      return `
+        <tr class="${rowClass}">
+          <td class="timestamp">${timeStr}</td>
+          <td class="module-name">${row.module_name} ${statusBadge}</td>
+          <td>${row.module_ip || '—'}</td>
+          <td>${row.version || '—'}</td>
+          <td class="debug-data" title="${debugDisplay}">${debugDisplay}</td>
+        </tr>
+      `;
+    }).join('');
+    
+    updateStats();
+    updatePagination();
+  }
+
+  function updateStats() {
+    const start = currentOffset + 1;
+    const end = Math.min(currentOffset + currentLimit, filteredData.length);
+    const stats = document.getElementById('stats');
+    
+    const filterText = currentFilter ? ` (filtered: ${currentFilter})` : '';
+    stats.textContent = `Showing ${start}-${end} of ${filteredData.length} rows${filterText} | Total logged: ${totalRows}`;
+  }
+
+  function updatePagination() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const pageInfo = document.getElementById('pageInfo');
+    
+    prevBtn.disabled = currentOffset === 0;
+    nextBtn.disabled = currentOffset + currentLimit >= filteredData.length;
+    
+    const currentPage = Math.floor(currentOffset / currentLimit) + 1;
+    const totalPages = Math.ceil(filteredData.length / currentLimit);
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  }
+
+  function previousPage() {
+    if (currentOffset > 0) {
+      currentOffset = Math.max(0, currentOffset - currentLimit);
+      renderTable();
+    }
+  }
+
+  function nextPage() {
+    if (currentOffset + currentLimit < filteredData.length) {
+      currentOffset += currentLimit;
+      renderTable();
+    }
+  }
+
+  function changeLimit() {
+    currentLimit = parseInt(document.getElementById('limitSelect').value);
+    currentOffset = 0;
+    renderTable();
+  }
+
+  function refreshData() {
+    loadData();
+  }
+
+  function showError(msg) {
+    const tbody = document.getElementById('dataTable');
+    tbody.innerHTML = `<tr><td colspan="5" class="error">${msg}</td></tr>`;
+  }
+
+  // Load data on page load
+  window.onload = function() {
+    loadData();
+    // Auto-refresh every 30 seconds
+    setInterval(loadData, 30000);
+  };
+</script>
+
+</body>
+</html>

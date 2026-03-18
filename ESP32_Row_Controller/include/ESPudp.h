@@ -13,7 +13,10 @@ class ESPudp {
         ESPudp(ESPconfig* vars);
     private:
         AsyncUDP udp;
+        AsyncUDP udpSend;  // Separate UDP instance for sending
         ESPconfig* espConfig;
+        void sendPGN234();  // Send section control data
+        uint8_t calcCRC(uint8_t* data, uint8_t length);
 };
 
 #endif

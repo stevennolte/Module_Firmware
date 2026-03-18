@@ -18,10 +18,12 @@ public:
     class GPIO_Definitions {
         public:
             uint8_t LED_PIN = 48;
+            // Main power relay control (turns on after boot)
+            uint8_t POWER_RELAY_PIN = 14;
             // 12 row unit MOSFET output pins
-            uint8_t rowPins[NUM_ROWS] = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+            uint8_t rowPins[NUM_ROWS] = {11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4};
             // Digital input: toolbar lifted sensor (HIGH = toolbar up, LOW = toolbar down)
-            uint8_t TOOLBAR_PIN = 16;
+            uint8_t TOOLBAR_PIN = 1;
             GPIO_Definitions() {}
     };
     GPIO_Definitions gpioDefs;
@@ -72,11 +74,16 @@ public:
             float speed;
             // Toolbar state: true = toolbar is UP (do not plant), false = toolbar is DOWN (allow planting)
             bool toolbarUp;
+            // Manual toolbar override
+            bool toolbarOverrideEnabled;
+            bool toolbarOverrideValue;  // true = force UP, false = force DOWN
             SectionData() {
                 memset(rowStates, 0, sizeof(rowStates));
                 lastSectionMsg = 0;
                 speed = 0.0f;
                 toolbarUp = true;
+                toolbarOverrideEnabled = false;
+                toolbarOverrideValue = false;
             }
     };
     SectionData sectionData;
