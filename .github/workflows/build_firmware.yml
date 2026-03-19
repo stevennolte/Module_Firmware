@@ -44,21 +44,30 @@ jobs:
           echo "name=$NAME"         >> $GITHUB_OUTPUT
           echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
           echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
 
       - name: Build ESP32_AIO firmware
         working-directory: ESP32_AIO
         run: pio run --environment esp32-s3-devkitc-1
 
-      - name: Rename binary
+      - name: Build ESP32_AIO filesystem image
+        working-directory: ESP32_AIO
+        run: pio run --target buildfs --environment esp32-s3-devkitc-1
+
+      - name: Rename firmware and filesystem binaries
         run: |
           cp ESP32_AIO/.pio/build/esp32-s3-devkitc-1/firmware.bin \
              "${{ steps.info.outputs.binary }}"
+          cp ESP32_AIO/.pio/build/esp32-s3-devkitc-1/littlefs.bin \
+             "${{ steps.info.outputs.fs_binary }}"
 
-      - name: Upload build artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.info.outputs.name }}_firmware
-          path: ${{ steps.info.outputs.binary }}
+          path: |
+            ${{ steps.info.outputs.binary }}
+            ${{ steps.info.outputs.fs_binary }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -70,10 +79,15 @@ jobs:
 
             **Version:** ${{ steps.info.outputs.version }}
             **Firmware file:** `${{ steps.info.outputs.binary }}`
+            **Filesystem image:** `${{ steps.info.outputs.fs_binary }}`
 
             Use the PC management server (`pc_server/`) to discover modules on the
             network and push this update over-the-air.
-          files: ${{ steps.info.outputs.binary }}
+            The server will automatically push the filesystem image first, then
+            the firmware binary, so the web interface and firmware are always in sync.
+          files: |
+            ${{ steps.info.outputs.binary }}
+            ${{ steps.info.outputs.fs_binary }}
           draft: false
           prerelease: false
           # Update existing release/assets if the same tag was already created
@@ -118,21 +132,30 @@ jobs:
           echo "name=$NAME"         >> $GITHUB_OUTPUT
           echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
           echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
 
       - name: Build ESP32_Row_Controller firmware
         working-directory: ESP32_Row_Controller
         run: pio run --environment esp32-s3-devkitc-1
 
-      - name: Rename binary
+      - name: Build ESP32_Row_Controller filesystem image
+        working-directory: ESP32_Row_Controller
+        run: pio run --target buildfs --environment esp32-s3-devkitc-1
+
+      - name: Rename firmware and filesystem binaries
         run: |
           cp ESP32_Row_Controller/.pio/build/esp32-s3-devkitc-1/firmware.bin \
              "${{ steps.info.outputs.binary }}"
+          cp ESP32_Row_Controller/.pio/build/esp32-s3-devkitc-1/littlefs.bin \
+             "${{ steps.info.outputs.fs_binary }}"
 
-      - name: Upload build artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.info.outputs.name }}_firmware
-          path: ${{ steps.info.outputs.binary }}
+          path: |
+            ${{ steps.info.outputs.binary }}
+            ${{ steps.info.outputs.fs_binary }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -144,10 +167,15 @@ jobs:
 
             **Version:** ${{ steps.info.outputs.version }}
             **Firmware file:** `${{ steps.info.outputs.binary }}`
+            **Filesystem image:** `${{ steps.info.outputs.fs_binary }}`
 
             Use the PC management server (`pc_server/`) to discover modules on the
             network and push this update over-the-air.
-          files: ${{ steps.info.outputs.binary }}
+            The server will automatically push the filesystem image first, then
+            the firmware binary, so the web interface and firmware are always in sync.
+          files: |
+            ${{ steps.info.outputs.binary }}
+            ${{ steps.info.outputs.fs_binary }}
           draft: false
           prerelease: false
           # Update existing release/assets if the same tag was already created

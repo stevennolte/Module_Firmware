@@ -121,8 +121,9 @@ _release_cache_lock = threading.Lock()
 def get_latest_release(module_name: str) -> dict | None:
     """
     Fetch the latest GitHub release whose tag starts with <module_name>.
-    Returns a dict with keys: version, tag, download_url, asset_name, published_at
-    or None if nothing is found.
+    Returns a dict with keys: version, tag, download_url, asset_name, published_at,
+    and optionally fs_download_url, fs_asset_name if a LittleFS image is present.
+    Returns None if nothing is found.
     """
     with _release_cache_lock:
         cached = _release_cache.get(module_name)
@@ -142,20 +143,38 @@ def get_latest_release(module_name: str) -> dict | None:
                 tag: str = release.get("tag_name", "")
                 if not tag.startswith(module_name):
                     continue
+                fw_url = None
+                fw_name = None
+                fs_url = None
+                fs_name = None
                 for asset in release.get("assets", []):
                     aname: str = asset.get("name", "")
-                    if aname.endswith(".bin") and module_name in aname:
-                        # Strip the leading "MODULE_NAME_" prefix from the tag
-                        # to get just the version string.
-                        ver_str = tag[len(module_name):].lstrip("_").lstrip("v")
-                        candidates.append({
-                            "version":      ver_str,
-                            "tag":          tag,
-                            "download_url": asset["browser_download_url"],
-                            "asset_name":   aname,
-                            "published_at": release.get("published_at", ""),
-                        })
-                        break
+                    if not (aname.endswith(".bin") and module_name in aname):
+                        continue
+                    if aname.endswith(".littlefs.bin"):
+                        # Filesystem image asset
+                        fs_url = asset["browser_download_url"]
+                        fs_name = aname
+                    else:
+                        # Firmware binary asset (first non-filesystem .bin wins)
+                        if fw_url is None:
+                            fw_url = asset["browser_download_url"]
+                            fw_name = aname
+                if fw_url:
+                    # Strip the leading "MODULE_NAME_" prefix from the tag
+                    # to get just the version string.
+                    ver_str = tag[len(module_name):].lstrip("_").lstrip("v")
+                    entry = {
+                        "version":      ver_str,
+                        "tag":          tag,
+                        "download_url": fw_url,
+                        "asset_name":   fw_name,
+                        "published_at": release.get("published_at", ""),
+                    }
+                    if fs_url:
+                        entry["fs_download_url"] = fs_url
+                        entry["fs_asset_name"]   = fs_name
+                    candidates.append(entry)
             
             # Find the release with the highest version number
             if candidates:
@@ -504,8 +523,10 @@ def api_refresh_github_version(name: str):
 @app.route("/api/module/<name>/update", methods=["POST"])
 def api_push_update(name: str):
     """
-    Download the latest firmware from GitHub and push it to the module via OTA.
-    The module is located via mDNS and updated through its /update HTTP endpoint.
+    Download the latest firmware (and filesystem image if available) from GitHub
+    and push them to the module via OTA.
+    If a filesystem image is present in the release, it is pushed first via
+    /updatefs, the module reboots, and then the firmware is pushed via /update.
     """
     mod = next((m for m in MODULES if m["name"] == name), None)
     if not mod:
@@ -519,14 +540,49 @@ def api_push_update(name: str):
     if not release:
         return jsonify({"error": "No firmware release found on GitHub"}), 404
 
-    # Download firmware binary from GitHub
+    # ── Step 1: Push filesystem image (if available) ──────────────────────
+    if release.get("fs_download_url"):
+        try:
+            fs_resp = requests.get(release["fs_download_url"], timeout=60)
+            fs_resp.raise_for_status()
+        except Exception as e:
+            return jsonify({"error": f"Failed to download filesystem image: {e}"}), 500
+
+        try:
+            fs_files = {
+                "filesystem": (
+                    release["fs_asset_name"],
+                    fs_resp.content,
+                    "application/octet-stream",
+                )
+            }
+            fs_update_resp = requests.post(
+                f"http://{ip}/updatefs", files=fs_files, timeout=120
+            )
+            if fs_update_resp.status_code != 200:
+                return jsonify({
+                    "error": f"Filesystem update failed: {fs_update_resp.text}",
+                    "firmware_version": release["version"],
+                    "module_ip": ip,
+                }), fs_update_resp.status_code
+        except Exception as e:
+            return jsonify({"error": f"Failed to push filesystem to module: {e}"}), 500
+
+        # Wait for module to reboot after filesystem update
+        time.sleep(15)
+
+        # Re-resolve IP after reboot
+        ip = resolve_mdns(mod["mdns_name"])
+        if not ip:
+            return jsonify({"error": "Module did not come back online after filesystem update"}), 503
+
+    # ── Step 2: Download and push firmware binary ─────────────────────────
     try:
         fw_resp = requests.get(release["download_url"], timeout=60)
         fw_resp.raise_for_status()
     except Exception as e:
         return jsonify({"error": f"Failed to download firmware: {e}"}), 500
 
-    # Push firmware to module via its /update endpoint
     try:
         files = {
             "firmware": (
@@ -546,6 +602,7 @@ def api_push_update(name: str):
         "message":          update_resp.text,
         "firmware_version": release["version"],
         "module_ip":        ip,
+        "filesystem_updated": bool(release.get("fs_download_url")),
     }), update_resp.status_code
 
 

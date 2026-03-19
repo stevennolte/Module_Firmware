@@ -97,6 +97,32 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename,
     }
 }
 
+void handleFilesystemUpload(AsyncWebServerRequest *request, String filename,
+                            size_t index, uint8_t *data, size_t len, bool final) {
+    if (!index) {
+        Serial.printf("Filesystem OTA Start: %s\n", filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
+            Update.printError(Serial);
+            request->send(500, "text/plain", "Filesystem update failed to start.");
+            return;
+        }
+    }
+    if (Update.write(data, len) != len) {
+        Update.printError(Serial);
+    }
+    if (final) {
+        if (Update.end(true)) {
+            Serial.printf("Filesystem OTA Success: %u bytes\n", index + len);
+            request->send(200, "text/html", "Filesystem update complete! Rebooting...");
+            delay(1000);
+            ESP.restart();
+        } else {
+            Update.printError(Serial);
+            request->send(500, "text/html", "Filesystem update failed.");
+        }
+    }
+}
+
 void updateDebugVars() {
     debugVars.clear();
     debugVars.push_back("Program: " + String(NAME));
@@ -340,6 +366,9 @@ void setup() {
     server.on("/update", HTTP_POST,
               [](AsyncWebServerRequest *request) {},
               handleFirmwareUpload);
+    server.on("/updatefs", HTTP_POST,
+              [](AsyncWebServerRequest *request) {},
+              handleFilesystemUpload);
 
     // Module identification endpoint – used by the PC management server
     server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
