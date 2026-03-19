@@ -5,63 +5,50 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; background-color: #f0f0f0; padding: 20px; }
-    h1 { color: #333; }
-    nav { margin-bottom: 20px; }
-    nav a {
-      text-decoration: none;
-      color: #4CAF50;
-      padding: 10px 20px;
-      border: 2px solid #4CAF50;
-      border-radius: 8px;
-      margin-right: 10px;
-      transition: background-color 0.3s, color 0.3s;
-    }
-    nav a:hover { background-color: #4CAF50; color: white; }
-    .status-card {
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .row-grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 10px;
-      margin-top: 15px;
-    }
-    .row-cell {
-      padding: 15px 5px;
-      border-radius: 8px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 14px;
-      border: 2px solid #ccc;
-      background: #eee;
-      transition: background 0.2s;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 20px; }
+    header { background: #1565c0; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; }
+    header h1 { font-size: 1.4rem; color: white; }
+    nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0d47a1; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    h3 { font-size: 0.95rem; margin: 8px 0; color: #333; }
+    button, input[type="submit"] { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: #1565c0; color: white; transition: background 0.2s; }
+    button:hover, input[type="submit"]:hover { background: #0d47a1; }
+    button:disabled { background: #90a4ae; cursor: not-allowed; }
+    .stop-btn { background: #f44336; }
+    .stop-btn:hover { background: #c62828; }
+    .btn { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #c62828; }
+    .btn-warn { background: #ff9800; color: white; }
+    .btn-warn:hover { background: #e65100; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    input[type="text"], input[type="password"], input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    form { margin-top: 12px; }
+    ul { background: #f8f9fa; border-radius: 6px; padding: 12px 12px 12px 36px; margin: 8px 0; }
+    li { margin: 4px 0; font-size: 0.875rem; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #4CAF50; }
+    input:checked + .slider:before { transform: translateX(26px); }
+    /* Row grid */
+    .row-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 15px; }
+    .row-cell { padding: 15px 5px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 14px; border: 2px solid #ccc; background: #eee; transition: background 0.2s; }
     .row-cell.on { background: #4CAF50; color: white; border-color: #388E3C; }
     .row-cell.off { background: #f44336; color: white; border-color: #c62828; }
-    .toolbar-badge {
-      display: inline-block;
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 16px;
-    }
+    .toolbar-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 16px; }
     .toolbar-up { background: #FF9800; color: white; }
     .toolbar-down { background: #4CAF50; color: white; }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    button:hover { background-color: #45a049; }
   </style>
   <script>
     function fetchSections() {
@@ -117,27 +104,29 @@
   </script>
 </head>
 <body>
+  <header><h1>ESP32 Row Controller</h1></header>
   <nav>
     <a href="index.html">Sections</a>
     <a href="debug.html">Debug</a>
     <a href="settings.html">Settings</a>
   </nav>
-  <h1>ESP32 Row Controller</h1>
 
-  <div class="status-card">
+  <div class="card">
     <h2>Toolbar Status</h2>
     <span id="toolbarBadge" class="toolbar-badge toolbar-up">Loading...</span>
     &nbsp;&nbsp;Speed: <strong id="speedVal">--</strong>
     <div style="margin-top: 15px;">
       <h3>Manual Override</h3>
-      <button id="btnOverrideOff" onclick="setOverride(false)">Use Sensor (Auto)</button>
-      <button id="btnOverrideDown" onclick="setOverride(true, false)">Force DOWN (Enable)</button>
-      <button id="btnOverrideUp" onclick="setOverride(true, true)">Force UP (Disable)</button>
+      <div class="action-row">
+        <button id="btnOverrideOff" onclick="setOverride(false)">Use Sensor (Auto)</button>
+        <button id="btnOverrideDown" onclick="setOverride(true, false)">Force DOWN (Enable)</button>
+        <button id="btnOverrideUp" onclick="setOverride(true, true)">Force UP (Disable)</button>
+      </div>
       <div id="overrideStatus" style="margin-top: 10px; font-weight: bold;"></div>
     </div>
   </div>
 
-  <div class="status-card">
+  <div class="card">
     <h2>Row Unit Sections (12)</h2>
     <div class="row-grid">
       <div id="row1" class="row-cell">Row 1</div>
