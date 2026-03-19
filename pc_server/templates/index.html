@@ -318,6 +318,7 @@
               </button>
             </div>
             <div class="ver version-newer" id="gh-ver-{{ mod.name }}">checking…</div>
+            <div style="font-size:0.7rem; color:#777; margin-top:4px;" id="gh-fs-{{ mod.name }}"></div>
           </div>
         </div>
 
@@ -425,6 +426,12 @@
       const rel = await res.json();
       document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
 
+      // Show filesystem indicator
+      const fsEl = document.getElementById('gh-fs-' + name);
+      if (fsEl) {
+        fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
+      }
+
       const updateBtn = document.getElementById('btn-update-' + name);
       if (rel.version && currentVersion) {
         if (rel.version !== currentVersion) {
@@ -452,6 +459,12 @@
       const rel = await res.json();
       document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
       
+      // Update filesystem indicator
+      const fsEl = document.getElementById('gh-fs-' + name);
+      if (fsEl) {
+        fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
+      }
+
       // Refresh module status to update comparison
       const currentVersion = document.getElementById('dev-ver-' + name).textContent;
       if (rel.version && currentVersion && currentVersion !== '—') {
@@ -520,14 +533,15 @@
   async function pushUpdate(name) {
     const btn = document.getElementById('btn-update-' + name);
     btn.disabled = true;
-    setMsg(name, 'Downloading firmware from GitHub and pushing to module…', 'info');
+    setMsg(name, 'Downloading from GitHub and pushing to module (filesystem + firmware)…', 'info');
 
     try {
       const res  = await fetch('/api/module/' + name + '/update', { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
+        const fsNote = data.filesystem_updated ? ' (web interface + firmware updated)' : '';
         setMsg(name,
-          `✓ Firmware v${data.firmware_version} pushed successfully. Module is rebooting…`,
+          `✓ Firmware v${data.firmware_version} pushed successfully${fsNote}. Module is rebooting…`,
           'success');
       } else {
         setMsg(name, 'Error: ' + (data.error || data.message || 'Unknown error'), 'error');

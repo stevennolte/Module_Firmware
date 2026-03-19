@@ -1,245 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boom Control</title>
-    <style>
-        body{-webkit-user-select:none;-moz-user-select:-moz-none;
--ms-user-select:none;
-user-select:none;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            padding: 20px;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .switch-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: 0.4s;
-            border-radius: 34px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: #4CAF50;
-        }
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-        .switch-label {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
-        .button-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2 columns */
-            gap: 10px; /* Spacing between buttons */
-            margin-top: 20px;
-        }
-        .button-grid button {
-            padding: 10px;
-            height: 50px;;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        .button-grid button:hover {
-            background-color: #45a049;
-        }
-        .button-grid button:active {
-            background-color: #3e8e41;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boom Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    header h1 { font-size: 1.4rem; }
+    nav {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      text-decoration: none;
+      color: white;
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      background: #1565c0;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: #0d47a1; }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    h3 { font-size: 0.95rem; margin: 8px 0; color: #333; }
+    button, input[type="submit"] {
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1565c0;
+      color: white;
+      transition: background 0.2s;
+    }
+    button:hover, input[type="submit"]:hover { background: #0d47a1; }
+    button:disabled { background: #90a4ae; cursor: not-allowed; }
+    .stop-btn { background: #f44336; }
+    .stop-btn:hover { background: #c62828; }
+    .btn { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #c62828; }
+    .btn-warn { background: #ff9800; color: white; }
+    .btn-warn:hover { background: #e65100; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    input[type="text"], input[type="password"], input[type="number"] {
+      padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem;
+    }
+    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    form { margin-top: 12px; }
+    ul { background: #f8f9fa; border-radius: 6px; padding: 12px 12px 12px 36px; margin: 8px 0; }
+    li { margin: 4px 0; font-size: 0.875rem; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc; transition: .4s; border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute; content: "";
+      height: 26px; width: 26px; left: 4px; bottom: 4px;
+      background-color: white; transition: .4s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #4CAF50; }
+    input:checked + .slider:before { transform: translateX(26px); }
+    body { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+    .switch-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .switch-label {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #333;
+    }
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .button-grid button {
+      height: 50px;
+      font-size: 0.9rem;
+      background: #1565c0;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .button-grid button:hover { background: #0d47a1; }
+    .button-grid button:active { background: #0a3880; }
+  </style>
 </head>
 <body>
-    <nav>
-        <a href="boom.html">Boom Control</a>
-        <a href="product.html">Product Control</a>
-        <a href="debug.html">Debug</a>
-        <a href="settings.html">Settings</a>
-    </nav>
-    <h1>Boom Control</h1>
-    
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="joystick" onchange="handleToggleChange('joystick', this.checked)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Joystick Enable</span>
-    </div>
-    <hr class="dotted">
-    <!-- #region Fold or Unfold -->
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="fold" onchange="handleToggleChange('fold', this.checked)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Fold</span>
-    </div>
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="unfold" onchange="handleToggleChange('unfold', this.checked)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Unfold</span>
-    </div>
-    <!-- #endregion -->
-    <hr class="dotted">
-    <!-- #region Pick function -->
-    <div class="button-grid">
+  <nav>
+    <a href="boom.html">Boom Control</a>
+    <a href="debug.html">Debug</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+  <header><h1>Boom Control</h1></header>
 
- 
+  <div class="card">
+    <h1>Fold Controls</h1>
     <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="joystick" onchange="handleToggleChange('joystick', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Joystick Enable</span>
+    </div>
+    <hr style="border:none;border-top:1px solid #eee;margin:12px 0;">
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="fold" onchange="handleToggleChange('fold', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Fold</span>
+    </div>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="unfold" onchange="handleToggleChange('unfold', this.checked)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Unfold</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1>Wing Controls</h1>
+    <div class="button-grid">
+      <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="flipOutWings" onchange="handleToggleChange('flipOutWings', this.checked)">
-            <span class="slider"></span>
+          <input type="checkbox" id="flipOutWings" onchange="handleToggleChange('flipOutWings', this.checked)">
+          <span class="slider"></span>
         </label>
         <span class="switch-label">Flip Out Wings</span>
-    </div>
-    <div class="switch-container">
+      </div>
+      <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="flipInWings" onchange="handleToggleChange('flipInWings', this.checked)">
-            <span class="slider"></span>
+          <input type="checkbox" id="flipInWings" onchange="handleToggleChange('flipInWings', this.checked)">
+          <span class="slider"></span>
         </label>
         <span class="switch-label">Flip In Wings</span>
-    </div>
-    <div class="switch-container">
+      </div>
+      <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="unfoldWings" onchange="handleToggleChange('unfoldWings', this.checked)">
-            <span class="slider"></span>
+          <input type="checkbox" id="unfoldWings" onchange="handleToggleChange('unfoldWings', this.checked)">
+          <span class="slider"></span>
         </label>
         <span class="switch-label">Unfold Wings</span>
-    </div>
-    <div class="switch-container">
+      </div>
+      <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="foldWings" onchange="handleToggleChange('foldWings', this.checked)">
-            <span class="slider"></span>
+          <input type="checkbox" id="foldWings" onchange="handleToggleChange('foldWings', this.checked)">
+          <span class="slider"></span>
         </label>
         <span class="switch-label">Fold Wings</span>
-    </div>
-    <div class="switch-container">
+      </div>
+      <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="raiseWings" onchange="handleToggleChange('raiseWings', this.checked)">
-            <span class="slider"></span>
+          <input type="checkbox" id="raiseWings" onchange="handleToggleChange('raiseWings', this.checked)">
+          <span class="slider"></span>
         </label>
         <span class="switch-label">Raise Wings</span>
-    </div>
-    <div class="switch-container">
+      </div>
+      <div class="switch-container">
         <label class="switch">
-            <input type="checkbox" id="lowerWings" onchange="handleToggleChange('lowerWings', this.checked)">
-            <span class="slider"></span>
+          <input type="checkbox" id="lowerWings" onchange="handleToggleChange('lowerWings', this.checked)">
+          <span class="slider"></span>
         </label>
         <span class="switch-label">Lower Wings</span>
+      </div>
     </div>
-</div>
-    <!-- #endregion -->
-    <hr class="dotted">
-    <!-- #region Momentary -->
-    <div class="button-grid">
-        <button 
-            onmousedown="handleButtonPress(event, 'leftFlipOut')" 
-            onmouseup="handleButtonRelease('leftFlipOut')" 
-            ontouchstart="handleButtonPress(event, 'leftFlipOut')" 
-            ontouchend="handleButtonRelease('leftFlipOut')">
-            Left Flip Out
-        </button>
-        <button onmousedown="startSendingCommand('leftFlipIn')" onmouseup="stopSendingCommand('leftFlipIn')" 
-                ontouchstart="startSendingCommand('leftFlipIn')" ontouchend="stopSendingCommand('leftFlipIn')">
-            Left Flip In
-        </button>
-        <button onmousedown="startSendingCommand('leftLiftUp')" onmouseup="stopSendingCommand('leftLiftUp')" 
-                ontouchstart="startSendingCommand('leftLiftUp')" ontouchend="stopSendingCommand('leftLiftUp')">
-            Left Lift
-        </button>
-        <button onmousedown="startSendingCommand('leftLiftDown')" onmouseup="stopSendingCommand('leftLiftDown')" 
-                ontouchstart="startSendingCommand('leftLiftDown')" ontouchend="stopSendingCommand('leftLiftDown')">
-            Left Lower
-        </button>
-        <button onmousedown="startSendingCommand('leftFoldOut')" onmouseup="stopSendingCommand('leftFoldOut')" 
-                ontouchstart="startSendingCommand('leftFoldOut')" ontouchend="stopSendingCommand('leftFoldOut')">
-            Left Fold Out
-        </button>
-        <button onmousedown="startSendingCommand('leftFoldIn')" onmouseup="stopSendingCommand('leftFoldIn')" 
-                ontouchstart="startSendingCommand('leftFoldIn')" ontouchend="stopSendingCommand('leftFoldIn')">
-            Left Fold In
-        </button>
-        <button onmousedown="startSendingCommand('centerUp')" onmouseup="stopSendingCommand('centerUp')" 
-                ontouchstart="startSendingCommand('centerUp')" ontouchend="stopSendingCommand('centerUp')">
-            Center Raise
-        </button>
-        <button onmousedown="startSendingCommand('centerDown')" onmouseup="stopSendingCommand('centerDown')" 
-                ontouchstart="startSendingCommand('centerDown')" ontouchend="stopSendingCommand('centerDown')">
-            Center Lower
-        </button>
-        <button onmousedown="startSendingCommand('rightFoldOut')" onmouseup="stopSendingCommand('rightFoldOut')" 
-                ontouchstart="startSendingCommand('rightFoldOut')" ontouchend="stopSendingCommand('rightFoldOut')">
-            Right Fold Out
-        </button>
-        <button onmousedown="startSendingCommand('rightFoldIn')" onmouseup="stopSendingCommand('rightFoldIn')" 
-                ontouchstart="startSendingCommand('rightFoldIn')" ontouchend="stopSendingCommand('rightFoldIn')">
-            Right Fold In
-        </button>
-        <button onmousedown="startSendingCommand('rightLiftUp')" onmouseup="stopSendingCommand('rightLiftUp')" 
-                ontouchstart="startSendingCommand('rightLiftUp')" ontouchend="stopSendingCommand('rightLiftUp')">
-            Right Lift
-        </button>
-        <button onmousedown="startSendingCommand('rightLiftDown')" onmouseup="stopSendingCommand('rightLiftDown')" 
-                ontouchstart="startSendingCommand('rightLiftDown')" ontouchend="stopSendingCommand('rightLiftDown')">
-            Right Lower
-        </button>
-        <button onmousedown="startSendingCommand('rightFlipOut')" onmouseup="stopSendingCommand('rightFlipOut')" 
-                ontouchstart="startSendingCommand('rightFlipOut')" ontouchend="stopSendingCommand('rightFlipOut')">
-            Right Flip Out
-        </button>
-        <button onmousedown="startSendingCommand('rightFlipIn')" onmouseup="stopSendingCommand('rightFlipIn')" 
-                ontouchstart="startSendingCommand('rightFlipIn')" ontouchend="stopSendingCommand('rightFlipIn')">
-            Right Flip In
-        </button>
-        
-    </div>
-    <!-- #endregion -->
+  </div>
 
-    <script>
+  <div class="card">
+    <h1>Momentary Controls</h1>
+    <div class="button-grid">
+      <button
+          onmousedown="handleButtonPress(event, 'leftFlipOut')"
+          onmouseup="handleButtonRelease('leftFlipOut')"
+          ontouchstart="handleButtonPress(event, 'leftFlipOut')"
+          ontouchend="handleButtonRelease('leftFlipOut')">
+        Left Flip Out
+      </button>
+      <button onmousedown="startSendingCommand('leftFlipIn')" onmouseup="stopSendingCommand('leftFlipIn')"
+              ontouchstart="startSendingCommand('leftFlipIn')" ontouchend="stopSendingCommand('leftFlipIn')">
+        Left Flip In
+      </button>
+      <button onmousedown="startSendingCommand('leftLiftUp')" onmouseup="stopSendingCommand('leftLiftUp')"
+              ontouchstart="startSendingCommand('leftLiftUp')" ontouchend="stopSendingCommand('leftLiftUp')">
+        Left Lift
+      </button>
+      <button onmousedown="startSendingCommand('leftLiftDown')" onmouseup="stopSendingCommand('leftLiftDown')"
+              ontouchstart="startSendingCommand('leftLiftDown')" ontouchend="stopSendingCommand('leftLiftDown')">
+        Left Lower
+      </button>
+      <button onmousedown="startSendingCommand('leftFoldOut')" onmouseup="stopSendingCommand('leftFoldOut')"
+              ontouchstart="startSendingCommand('leftFoldOut')" ontouchend="stopSendingCommand('leftFoldOut')">
+        Left Fold Out
+      </button>
+      <button onmousedown="startSendingCommand('leftFoldIn')" onmouseup="stopSendingCommand('leftFoldIn')"
+              ontouchstart="startSendingCommand('leftFoldIn')" ontouchend="stopSendingCommand('leftFoldIn')">
+        Left Fold In
+      </button>
+      <button onmousedown="startSendingCommand('centerUp')" onmouseup="stopSendingCommand('centerUp')"
+              ontouchstart="startSendingCommand('centerUp')" ontouchend="stopSendingCommand('centerUp')">
+        Center Raise
+      </button>
+      <button onmousedown="startSendingCommand('centerDown')" onmouseup="stopSendingCommand('centerDown')"
+              ontouchstart="startSendingCommand('centerDown')" ontouchend="stopSendingCommand('centerDown')">
+        Center Lower
+      </button>
+      <button onmousedown="startSendingCommand('rightFoldOut')" onmouseup="stopSendingCommand('rightFoldOut')"
+              ontouchstart="startSendingCommand('rightFoldOut')" ontouchend="stopSendingCommand('rightFoldOut')">
+        Right Fold Out
+      </button>
+      <button onmousedown="startSendingCommand('rightFoldIn')" onmouseup="stopSendingCommand('rightFoldIn')"
+              ontouchstart="startSendingCommand('rightFoldIn')" ontouchend="stopSendingCommand('rightFoldIn')">
+        Right Fold In
+      </button>
+      <button onmousedown="startSendingCommand('rightLiftUp')" onmouseup="stopSendingCommand('rightLiftUp')"
+              ontouchstart="startSendingCommand('rightLiftUp')" ontouchend="stopSendingCommand('rightLiftUp')">
+        Right Lift
+      </button>
+      <button onmousedown="startSendingCommand('rightLiftDown')" onmouseup="stopSendingCommand('rightLiftDown')"
+              ontouchstart="startSendingCommand('rightLiftDown')" ontouchend="stopSendingCommand('rightLiftDown')">
+        Right Lower
+      </button>
+      <button onmousedown="startSendingCommand('rightFlipOut')" onmouseup="stopSendingCommand('rightFlipOut')"
+              ontouchstart="startSendingCommand('rightFlipOut')" ontouchend="stopSendingCommand('rightFlipOut')">
+        Right Flip Out
+      </button>
+      <button onmousedown="startSendingCommand('rightFlipIn')" onmouseup="stopSendingCommand('rightFlipIn')"
+              ontouchstart="startSendingCommand('rightFlipIn')" ontouchend="stopSendingCommand('rightFlipIn')">
+        Right Flip In
+      </button>
+    </div>
+  </div>
+
+  <script>
         // Function to send a command to the controller
         function sendCommand(command, state) {
             const action = state ? 'on' : 'off';

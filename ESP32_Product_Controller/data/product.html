@@ -1,428 +1,375 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controller with Performance Variables</title>
-    <style>
-        /* General Styles */
-        body {
-            font-family: Arial, sans-serif;
-            text-align: left;
-            background-color: #f0f0f0;
-            padding: 20px;
-        }
-        h1 { color: #333; }
-        nav {
-            margin-bottom: 20px;
-        }
-        nav a {
-            text-decoration: none;
-            color: #ffffff;
-            padding: 10px 20px;
-            border: 2px solid #020204;
-            background-color: #4CAF50;
-            border-radius: 8px;
-            margin-right: 10px;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        nav a:hover {
-            background-color: #45a049;
-            color: white;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    header h1 { font-size: 1.4rem; }
+    nav {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      text-decoration: none;
+      color: white;
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      background: #1565c0;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: #0d47a1; }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    h3 { font-size: 0.95rem; margin: 8px 0; color: #333; }
+    button, input[type="submit"] {
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1565c0;
+      color: white;
+      transition: background 0.2s;
+    }
+    button:hover, input[type="submit"]:hover { background: #0d47a1; }
+    button:disabled { background: #90a4ae; cursor: not-allowed; }
+    .stop-btn { background: #f44336; }
+    .stop-btn:hover { background: #c62828; }
+    .btn { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #c62828; }
+    .btn-warn { background: #ff9800; color: white; }
+    .btn-warn:hover { background: #e65100; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    input[type="text"], input[type="password"], input[type="number"] {
+      padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem;
+    }
+    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    form { margin-top: 12px; }
+    ul { background: #f8f9fa; border-radius: 6px; padding: 12px 12px 12px 36px; margin: 8px 0; }
+    li { margin: 4px 0; font-size: 0.875rem; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc; transition: .4s; border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute; content: "";
+      height: 26px; width: 26px; left: 4px; bottom: 4px;
+      background-color: white; transition: .4s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #4CAF50; }
+    input:checked + .slider:before { transform: translateX(26px); }
+    .switch-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .switch-label {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #333;
+    }
 
-        /* Switch Styles */
-        .switch-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: 0.4s;
-            border-radius: 34px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        input:checked + .slider {
-            background-color: #4CAF50;
-        }
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-        .switch-label {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
+    /* Progress Bar Styles */
+    .progress-container { margin-bottom: 16px; }
+    .progress-label { font-size: 0.875rem; margin-bottom: 5px; color: #555; }
+    .progress-bar-container {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      width: 100%;
+      background-color: #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 20px;
+      border-radius: 8px;
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .target-bar { background-color: #FFC107; }
+    .actual-bar { background-color: #4CAF50; }
 
-        /* Progress Bar Styles */
-        .progress-container {
-            margin-bottom: 20px;
-        }
-        .progress-label {
-            font-size: 14px;
-            margin-bottom: 5px;
-            color: #333;
-        }
-        .progress-bar-container {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            width: 100%;
-            background-color: #ddd;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .progress-bar {
-            height: 20px;
-            border-radius: 8px;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .target-bar {
-            background-color: #FFC107;
-        }
-        .actual-bar {
-            background-color: #4CAF50;
-        }
-        .bar-label {
-            position: relative;
-            z-index: 1;
-        }
+    /* Input / Set Rate */
+    .input-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .input-label { font-size: 0.95rem; font-weight: bold; color: #333; }
+    .input-box {
+      padding: 8px;
+      font-size: 0.9rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 150px;
+    }
 
-        /* Input Styles */
-        .input-container {
-            margin-top: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .input-label {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
-        .input-box {
-            padding: 5px;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            width: 150px;
-        }
-        .input-button {
-            padding: 5px 10px;
-            font-size: 14px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .input-button:hover {
-            background-color: #45a049;
-        }
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 300px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .number-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .number-pad button {
+      padding: 15px;
+      font-size: 1.1rem;
+      background: #1565c0;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .number-pad button:hover { background: #0d47a1; }
+    .modal-footer { margin-top: 10px; display: flex; gap: 8px; justify-content: center; }
 
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.4);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 300px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .number-pad {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .number-pad button {
-            padding: 15px;
-            font-size: 18px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .number-pad button:hover {
-            background-color: #45a049;
-        }
-        .modal-footer {
-            margin-top: 10px;
-        }
-        .modal-footer button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .modal-footer button:hover {
-            background-color: #45a049;
-        }
+    /* Slider */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .slider-label { font-size: 0.95rem; font-weight: bold; color: #333; }
+    .slider-input { width: 200px; }
+    .slider-value { font-size: 0.95rem; font-weight: bold; color: #333; }
 
-        /* Slider Styles */
-        .slider-container {
-            margin-top: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .slider-label {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
-        .slider-input {
-            width: 200px;
-        }
-        .slider-value {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
-        .indicator {
-            display: inline-block;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            margin-left: 10px;
-            background-color: gray; /* Default color */
-            border: 1px solid #ccc;
-        }
-        .indicator.green {
-            background-color: green;
-        }
-        .indicator.red {
-            background-color: red;
-        }
-    </style>
+    /* Indicator */
+    .indicator {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      margin-left: 10px;
+      background-color: gray;
+      border: 1px solid #ccc;
+    }
+    .indicator.green { background-color: green; }
+    .indicator.red { background-color: red; }
+
+    .separator { margin: 8px 0; }
+  </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav>
-        <a href="boom.html">Boom Control</a>
-        <a href="product.html">Product Control</a>
-        <a href="debug.html">Debug</a>
-        <a href="settings.html">Settings</a>
-        <a href="serverdata.html">Server Data</a>
-    </nav>
+  <header><h1>Product Control</h1></header>
 
-    <!-- Header -->
-    <h1>Controller</h1>
+  <nav>
+    <a href="boom.html">Boom Control</a>
+    <a href="product.html">Product Control</a>
+    <a href="debug.html">Debug</a>
+    <a href="settings.html">Settings</a>
+    <a href="serverdata.html">Server Data</a>
+  </nav>
 
-    <!-- Switches -->
+  <!-- Main Switches -->
+  <div class="card">
+    <h1>Control Switches</h1>
     <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="enableSwitch" onchange="toggleEnable(event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Enable</span>
+      <label class="switch">
+        <input type="checkbox" id="enableSwitch" onchange="toggleEnable(event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Enable</span>
     </div>
     <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="regulatorManualControlSwitch" onchange="toggleRegulatorManualControl(event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Regulator Manual Control</span>
+      <label class="switch">
+        <input type="checkbox" id="regulatorManualControlSwitch" onchange="toggleRegulatorManualControl(event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Regulator Manual Control</span>
     </div>
     <div class="switch-container">
-        <span id="threeSectionIndicator" class="indicator"></span>
-        <label class="switch">
-            <input type="checkbox" id="3sectiontoggle" onchange="toggle3section(event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">3 Section Mode</span>
-        
+      <span id="threeSectionIndicator" class="indicator"></span>
+      <label class="switch">
+        <input type="checkbox" id="3sectiontoggle" onchange="toggle3section(event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">3 Section Mode</span>
     </div>
+  </div>
 
-    
-    <!-- Input Section -->
-    <div class="separator"></div>
+  <!-- Application Rate Input -->
+  <div class="card">
+    <h1>Application Rate</h1>
     <div class="input-container">
-        <label for="applicationRateInput" class="input-label">Application Rate:</label>
-        <input type="text" id="applicationRateInput" readonly placeholder="Enter rate" class="input-box" onclick="openNumberPad()">
-        <button onclick="setApplicationRate()" class="input-button">Set</button>
+      <label for="applicationRateInput" class="input-label">Application Rate:</label>
+      <input type="text" id="applicationRateInput" readonly placeholder="Enter rate" class="input-box" onclick="openNumberPad()">
+      <button onclick="setApplicationRate()">Set</button>
     </div>
+  </div>
 
-    <!-- Modal -->
-    <div id="numberPadModal" class="modal">
-        <div class="modal-content">
-            <h3>Enter Application Rate</h3>
-            <input type="text" id="numberPadInput" readonly style="width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px;">
-            <div class="number-pad">
-                <button onclick="appendNumber('1')">1</button>
-                <button onclick="appendNumber('2')">2</button>
-                <button onclick="appendNumber('3')">3</button>
-                <button onclick="appendNumber('4')">4</button>
-                <button onclick="appendNumber('5')">5</button>
-                <button onclick="appendNumber('6')">6</button>
-                <button onclick="appendNumber('7')">7</button>
-                <button onclick="appendNumber('8')">8</button>
-                <button onclick="appendNumber('9')">9</button>
-                <button onclick="appendNumber('.')">.</button>
-                <button onclick="appendNumber('0')">0</button>
-                <button onclick="clearNumber()">C</button>
-            </div>
-            <div class="modal-footer">
-                <button onclick="closeNumberPad()">Cancel</button>
-                <button onclick="setRateFromNumberPad()">Set</button>
-            </div>
-        </div>
+  <!-- Number Pad Modal -->
+  <div id="numberPadModal" class="modal">
+    <div class="modal-content">
+      <h3>Enter Application Rate</h3>
+      <input type="text" id="numberPadInput" readonly style="width:100%;padding:10px;font-size:1rem;margin-bottom:10px;border:1px solid #ccc;border-radius:4px;">
+      <div class="number-pad">
+        <button onclick="appendNumber('1')">1</button>
+        <button onclick="appendNumber('2')">2</button>
+        <button onclick="appendNumber('3')">3</button>
+        <button onclick="appendNumber('4')">4</button>
+        <button onclick="appendNumber('5')">5</button>
+        <button onclick="appendNumber('6')">6</button>
+        <button onclick="appendNumber('7')">7</button>
+        <button onclick="appendNumber('8')">8</button>
+        <button onclick="appendNumber('9')">9</button>
+        <button onclick="appendNumber('.')">.</button>
+        <button onclick="appendNumber('0')">0</button>
+        <button onclick="clearNumber()">C</button>
+      </div>
+      <div class="modal-footer">
+        <button class="stop-btn" onclick="closeNumberPad()">Cancel</button>
+        <button onclick="setRateFromNumberPad()">Set</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Progress Bars -->
-    <div class="separator"></div>
+  <!-- Progress Bars -->
+  <div class="card">
+    <h1>Performance</h1>
     <div class="progress-container">
-        <div class="progress-label">Pressure</div>
-        <div class="progress-bar-container">
-            <div class="progress-bar target-bar" id="PressureTarget">
-                <span class="bar-label">Target</span>
-            </div>
-            <div class="progress-bar actual-bar" id="PressureActual">
-                <span class="bar-label">Actual</span>
-            </div>
-        </div>
+      <div class="progress-label">Pressure</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar target-bar" id="PressureTarget"><span>Target</span></div>
+        <div class="progress-bar actual-bar" id="PressureActual"><span>Actual</span></div>
+      </div>
     </div>
     <div class="progress-container">
-        <div class="progress-label">Flowrate</div>
-        <div class="progress-bar-container">
-            <div class="progress-bar target-bar" id="FlowrateTarget">
-                <span class="bar-label">Target</span>
-            </div>
-            <div class="progress-bar actual-bar" id="FlowrateProgress">
-                <span class="bar-label">Actual</span>
-            </div>
-        </div>
+      <div class="progress-label">Flowrate</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar target-bar" id="FlowrateTarget"><span>Target</span></div>
+        <div class="progress-bar actual-bar" id="FlowrateProgress"><span>Actual</span></div>
+      </div>
     </div>
     <div class="progress-container">
-        <div class="progress-label">Level</div>
-        <div class="progress-bar-container">
-            <div class="progress-bar target-bar" id="LevelTarget">
-                <span class="bar-label">Target</span>
-            </div>
-            <div class="progress-bar actual-bar" id="LevelProgress">
-                <span class="bar-label">Actual</span>
-            </div>
-        </div>
+      <div class="progress-label">Level</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar target-bar" id="LevelTarget"><span>Target</span></div>
+        <div class="progress-bar actual-bar" id="LevelProgress"><span>Actual</span></div>
+      </div>
     </div>
     <div class="progress-container">
-    
-        <div class="progress-label">Regulator</div>
-        <div class="progress-bar-container">
-            <div class="progress-bar target-bar" id="RegulatorTarget">
-                <span class="bar-label">Target</span>
-            </div>
-            <div class="progress-bar actual-bar" id="RegulatorActual">
-                <span class="bar-label">Actual</span>
-            </div>
-        </div>
+      <div class="progress-label">Regulator</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar target-bar" id="RegulatorTarget"><span>Target</span></div>
+        <div class="progress-bar actual-bar" id="RegulatorActual"><span>Actual</span></div>
+      </div>
     </div>
+  </div>
 
-    <!-- Regulator Section -->
-    <div class="separator"></div>
-    <h3>Regulator:</h3>
-    
-
-    <!-- Slider -->
-    <div class="separator"></div>
+  <!-- Regulator -->
+  <div class="card">
+    <h1>Regulator</h1>
     <div class="slider-container">
-        <label for="customSlider" class="slider-label">Regulator Position Control:</label>
-        <input type="range" id="customSlider" min="0" max="100" value="50" class="slider-input" oninput="updateSliderValue(this.value)">
-        <span id="sliderValue" class="slider-value">50</span>
+      <label for="customSlider" class="slider-label">Position Control:</label>
+      <input type="range" id="customSlider" min="0" max="100" value="50" class="slider-input" oninput="updateSliderValue(this.value)">
+      <span id="sliderValue" class="slider-value">50</span>
     </div>
-    <!-- Section Control -->
-    <div class="separator"></div>
-    <h3>Section Control</h3>
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="section1toggle" onchange="toggleSection(1, event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Section 1</span>
-    </div>
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="section2toggle" onchange="toggleSection(2, event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Section 2</span>
-    </div>
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="section3toggle" onchange="toggleSection(3, event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Section 3</span>
-    </div>
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="section4toggle" onchange="toggleSection(4, event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Section 4</span>
-    </div>
-    <div class="switch-container">
-        <label class="switch">
-            <input type="checkbox" id="section5toggle" onchange="toggleSection(5, event)">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label">Section 5</span>
-    </div>
+  </div>
 
-    <!-- Scripts -->
-    <script>
+  <!-- Section Control -->
+  <div class="card">
+    <h1>Section Control</h1>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="section1toggle" onchange="toggleSection(1, event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Section 1</span>
+    </div>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="section2toggle" onchange="toggleSection(2, event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Section 2</span>
+    </div>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="section3toggle" onchange="toggleSection(3, event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Section 3</span>
+    </div>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="section4toggle" onchange="toggleSection(4, event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Section 4</span>
+    </div>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" id="section5toggle" onchange="toggleSection(5, event)">
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Section 5</span>
+    </div>
+  </div>
+
+  <script>
     
     // Create an EventSource to listen for SSE events
     const eventSource = new EventSource('/events');
