@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Settings – ESP32 WiFi AP</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 20px; }
+    header { background: #00695c; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; }
+    header h1 { font-size: 1.4rem; color: white; }
+    nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #00695c; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #004d40; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; max-width: 520px; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.875rem; }
+    input[type="text"], input[type="password"], input[type="number"] {
+      width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 0.9rem; margin-top: 4px;
+    }
+    select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; margin-top: 4px; }
+    button, input[type="submit"] { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: #00695c; color: white; transition: background 0.2s; margin-top: 14px; }
+    button:hover { background: #004d40; }
+    #statusMsg, #fwStatus { margin-top: 10px; color: #333; font-size: 0.875rem; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    small { color: #666; font-size: 0.8rem; }
+  </style>
+  <script>
+    function saveSettings() {
+      const fields = ['ap_ssid', 'ap_pass', 'ap_ch', 'ap_ip3', 'sta_en', 'sta_ssid', 'sta_pass'];
+      const formData = new URLSearchParams();
+      fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          const val = (el.type === 'checkbox') ? (el.checked ? '1' : '0') : el.value;
+          formData.append(id, val);
+        }
+      });
+      fetch('/saveSettings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      })
+        .then(r => r.text())
+        .then(msg => { document.getElementById('statusMsg').textContent = msg; })
+        .catch(e => console.error(e));
+    }
+
+    function fetchModuleName() {
+      fetch('/getDebugVars')
+        .then(r => r.json())
+        .then(data => {
+          for (const item of data) {
+            if (item.startsWith('Program: ')) {
+              const name = item.replace('Program: ', '').trim();
+              const hint = document.getElementById('fwModuleHint');
+              if (hint) hint.textContent = 'Expected file: ' + name + '_*.bin';
+              const inp = document.getElementById('fwFile');
+              if (inp) inp.dataset.moduleName = name;
+              break;
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    function uploadFirmware() {
+      const fileInput = document.getElementById('fwFile');
+      const statusEl  = document.getElementById('fwStatus');
+      if (!fileInput.files.length) { statusEl.textContent = 'Please select a firmware file.'; statusEl.style.color = 'red'; return; }
+      const file = fileInput.files[0];
+      const moduleName = fileInput.dataset.moduleName || '';
+      if (moduleName && !file.name.startsWith(moduleName)) {
+        statusEl.textContent = 'Wrong file! Expected a file starting with: ' + moduleName;
+        statusEl.style.color = 'red';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('firmware', file);
+      statusEl.textContent = 'Uploading...';
+      statusEl.style.color = '#333';
+      fetch('/update', { method: 'POST', body: formData })
+        .then(r => r.text())
+        .then(msg => {
+          statusEl.textContent = msg;
+          statusEl.style.color = (msg.includes('complete') || msg.includes('Rebooting')) ? 'green' : 'red';
+        })
+        .catch(err => { statusEl.textContent = 'Upload error: ' + err; statusEl.style.color = 'red'; });
+    }
+
+    window.onload = fetchModuleName;
+  </script>
+</head>
+<body>
+  <header><h1>Settings – ESP32 WiFi AP</h1></header>
+  <nav>
+    <a href="index.html">Status</a>
+    <a href="debug.html">Debug</a>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <div class="card">
+    <h2>Access Point</h2>
+    <small>Changes take effect after reboot.</small>
+
+    <label>AP SSID</label>
+    <input type="text" id="ap_ssid" placeholder="AgOpenGPS">
+
+    <label>AP Password <small>(min 8 chars)</small></label>
+    <input type="password" id="ap_pass" placeholder="1234567890">
+
+    <label>WiFi Channel (1–13)</label>
+    <input type="number" id="ap_ch" min="1" max="13" placeholder="6">
+
+    <label>AP IP Last Octet <small>(e.g. 1 → 192.168.1.1)</small></label>
+    <input type="number" id="ap_ip3" min="1" max="254" placeholder="1">
+
+    <button onclick="saveSettings()">Save &amp; Reboot</button>
+    <p id="statusMsg"></p>
+  </div>
+
+  <div class="card">
+    <h2>Upstream (STA) Connection <small>– optional</small></h2>
+    <small>Connect to an upstream network for internet access or bridging.</small>
+
+    <label>
+      <input type="checkbox" id="sta_en" style="width:auto; margin-top:0;">
+      Enable STA connection
+    </label>
+
+    <label>STA SSID</label>
+    <input type="text" id="sta_ssid" placeholder="Upstream network name">
+
+    <label>STA Password</label>
+    <input type="password" id="sta_pass" placeholder="Upstream network password">
+  </div>
+
+  <div class="card">
+    <h2>Firmware OTA Update</h2>
+    <p id="fwModuleHint" style="color:#666; font-size:0.875rem; margin-bottom:10px;">Expected file: loading...</p>
+    <div class="action-row">
+      <input type="file" id="fwFile" accept=".bin">
+      <button onclick="uploadFirmware()">Upload Firmware</button>
+    </div>
+    <p id="fwStatus" style="margin-top:8px;"></p>
+  </div>
+</body>
+</html>
