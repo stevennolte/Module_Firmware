@@ -1,77 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ESP32 Web Manager</title>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug – Fold Controller</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: left; background-color: #f0f0f0; padding: 20px; }
-    h1 { color: #333; }
-    button, input[type="submit"] { padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
-    button:hover, input[type="submit"]:hover { background-color: #45a049; }
-    form { margin-top: 20px; }
-    .stop-btn { background-color: #f44336; } /* Red button for stop */
-    .stop-btn:hover { background-color: #d32f2f; }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 60px;
-      height: 34px;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
     }
-    .column {
-      float: left;
-      width: 30%;
-      padding: 10px;
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 24px;
     }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #0eebd9f6;
-      transition: .4s;
-      border-radius: 34px;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-    input:checked + .slider {
-      background-color: #4CAF50;
-    }
-    input:checked + .slider:before {
-      transform: translateX(26px);
-    }
-    /* Navigation styles */
+    header h1 { font-size: 1.4rem; }
     nav {
       margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
     nav a {
       text-decoration: none;
-      color: #4CAF50;
-      padding: 10px 20px;
-      border: 2px solid #4CAF50;
-      border-radius: 8px;
-      margin-right: 10px;
-      transition: background-color 0.3s, color 0.3s;
-    }
-    nav a:hover {
-      background-color: #4CAF50;
       color: white;
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      background: #1565c0;
+      border-radius: 6px;
+      transition: background 0.2s;
     }
+    nav a:hover { background: #0d47a1; }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    h3 { font-size: 0.95rem; margin: 8px 0; color: #333; }
+    button, input[type="submit"] {
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1565c0;
+      color: white;
+      transition: background 0.2s;
+    }
+    button:hover, input[type="submit"]:hover { background: #0d47a1; }
+    button:disabled { background: #90a4ae; cursor: not-allowed; }
+    .stop-btn { background: #f44336; }
+    .stop-btn:hover { background: #c62828; }
+    .btn { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #1565c0; color: white; }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #c62828; }
+    .btn-warn { background: #ff9800; color: white; }
+    .btn-warn:hover { background: #e65100; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    input[type="text"], input[type="password"], input[type="number"] {
+      padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem;
+    }
+    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    form { margin-top: 12px; }
+    ul { background: #f8f9fa; border-radius: 6px; padding: 12px 12px 12px 36px; margin: 8px 0; }
+    li { margin: 4px 0; font-size: 0.875rem; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc; transition: .4s; border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute; content: "";
+      height: 26px; width: 26px; left: 4px; bottom: 4px;
+      background-color: white; transition: .4s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #4CAF50; }
+    input:checked + .slider:before { transform: translateX(26px); }
   </style>
   <script>
     let loggingInterval = null;  // Variable to store the logging interval ID
@@ -334,55 +354,50 @@
   </script>
 </head>
 <body>
-  
-      
+  <header><h1>Debug – Fold Controller</h1></header>
+
   <nav>
     <a href="boom.html">Boom Control</a>
-    <a href="product.html">Product Control</a>
     <a href="debug.html">Debug</a>
     <a href="settings.html">Settings</a>
-</nav>
-      <h1>ESP32 Web Server</h1>
-      
+  </nav>
+
+  <div class="card">
+    <div class="action-row">
       <button onclick="reboot()">Reboot ESP32</button>
-      
-      <!-- Button to Start Logging Data Locally -->
       <button onclick="startLogging()">Start Logging</button>
-
-      <!-- Button to Stop Logging Data Locally -->
       <button class="stop-btn" onclick="stopLogging()">Stop Logging</button>
+    </div>
+    <div class="action-row">
+      <button onclick="toggleAPMode()">Toggle AP Mode</button>
+    </div>
+    <p id="toggleStatus">Status: Unknown</p>
+  </div>
 
-      <!-- Section for Debug Variables -->
-      <h1>ESP32 Debug Variables</h1>
-      <ul id="debugList">
-        <!-- Debug variables will be dynamically added here -->
-      </ul>
+  <div class="card">
+    <h1>Debug Variables</h1>
+    <ul id="debugList"></ul>
+  </div>
 
-      <!-- Section for File List -->
-      <h1>Files on Device</h1>
-      <ul id="fileList">
-        <!-- File list will be dynamically added here -->
-      </ul>
+  <div class="card">
+    <h1>Files on Device</h1>
+    <ul id="fileList"></ul>
+    <h2>Upload File</h2>
+    <form method="POST" action="/upload" enctype="multipart/form-data">
+      <input type="file" name="upload">
+      <input type="submit" value="Upload">
+    </form>
+  </div>
 
-      <!-- Section for Uploading Regular Files -->
-      <h2>Upload File</h2>
-      <form method="POST" action="/upload" enctype="multipart/form-data">
-        <input type="file" name="upload">
-        <input type="submit" value="Upload">
-      </form>
-
-      <!-- Section for Firmware Update -->
-      <h2>Firmware Update</h2>
-      <p id="fwModuleHint" style="color:#666; font-size:14px;">Expected file: loading...</p>
+  <div class="card">
+    <h2>Firmware Update</h2>
+    <p id="fwModuleHint" style="color:#666; font-size:0.875rem; margin-bottom:8px;">Expected file: loading...</p>
+    <div class="action-row">
       <input type="file" id="fwFile" accept=".bin">
       <button onclick="uploadFirmware()">Update Firmware</button>
-      <p id="fwStatus" style="margin-top:8px;"></p>
-  
-  
-      <h1>ESP32 Control</h1>
-        <button onclick="toggleAPMode()">Toggle AP_Mode</button>
-        <p id="toggleStatus">Status: Unknown</p>
+    </div>
+    <p id="fwStatus" style="margin-top:8px;"></p>
+  </div>
 
-  
 </body>
 </html>
