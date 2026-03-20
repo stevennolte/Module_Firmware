@@ -12,6 +12,7 @@ A Flask web application that:
 Supported modules (initial):
   - ESP32_AIO
   - ESP32_Row_Controller
+  - ESP32_WiFi_AP
 """
 
 import csv
@@ -37,6 +38,7 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")   # Optional – avoids rate l
 MODULES = [
     {"name": "ESP32_AIO",            "mdns_name": "ESP32_AIO"},
     {"name": "ESP32_Row_Controller", "mdns_name": "ESP32_Row_Controller"},
+    {"name": "ESP32_WiFi_AP",        "mdns_name": "ESP32_WiFi_AP"},
 ]
 
 # How long (seconds) to cache the result of a GitHub release lookup
