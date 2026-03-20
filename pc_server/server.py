@@ -22,6 +22,7 @@ import socket
 import threading
 import time
 import os
+import webbrowser
 from pathlib import Path
 from packaging import version as pkg_version
 
@@ -809,4 +810,15 @@ if __name__ == "__main__":
         print(f"Internet connectivity: {'Available' if _log_status['internet_available'] else 'Not detected'}")
     else:
         print("Google Drive sync disabled (GDRIVE_SPREADSHEET_ID not set)")
+
+    # Open the web interface in the default browser after a short delay to allow
+    # the server to finish starting up.
+    url = f"http://localhost:{port}"
+    def _open_browser():
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass  # Non-critical: best-effort browser launch
+    threading.Timer(1.5, _open_browser).start()
+
     app.run(host=host, port=port, debug=debug)
