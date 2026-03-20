@@ -180,12 +180,21 @@ void I2CManager::processADCStateMachine() {
     }
     
     switch (_adcState) {
-        case ADCState::IDLE:
-            // Start conversion on current channel
-            ads.startADCReading(ADS1X15_REG_CONFIG_MUX_SINGLE_0 + _currentADCChannel, false);
+        case ADCState::IDLE: {
+            // Start conversion on current channel.
+            // The MUX constants are spaced 0x1000 apart (0x4000, 0x5000, 0x6000, 0x7000),
+            // so use a lookup table instead of adding the channel index directly.
+            static const uint16_t muxChannels[4] = {
+                ADS1X15_REG_CONFIG_MUX_SINGLE_0,
+                ADS1X15_REG_CONFIG_MUX_SINGLE_1,
+                ADS1X15_REG_CONFIG_MUX_SINGLE_2,
+                ADS1X15_REG_CONFIG_MUX_SINGLE_3
+            };
+            ads.startADCReading(muxChannels[_currentADCChannel], false);
             _conversionStartTime = millis();
             _adcState = ADCState::WAITING_FOR_CONVERSION;
             break;
+        }
             
         case ADCState::WAITING_FOR_CONVERSION:
             // Check if enough time has passed for conversion (typical 8ms at default 128 SPS)
