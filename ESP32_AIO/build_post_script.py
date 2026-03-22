@@ -6,6 +6,7 @@ Import("env", "projenv")
 
 version_path = r"./include/Version.h"
 bin_path = r"./.pio/build/esp32-s3-devkitc-1/firmware.bin"
+littlefs_path = r"./.pio/build/esp32-s3-devkitc-1/littlefs.bin"
 program = ""
 newVersion = ""
 
@@ -63,6 +64,16 @@ def copy_firmware(source, target, env):
     shutil.copy(bin_path, dest)
 
 
+def copy_filesystem(source, target, env):
+    """Copy the built filesystem binary to the project root as {NAME}_{VERSION}.littlefs.bin."""
+    if os.path.exists(littlefs_path):
+        dest = f"./{program}_{newVersion}.littlefs.bin"
+        print(f"Copying filesystem to {dest}")
+        shutil.copy(littlefs_path, dest)
+    else:
+        print(f"Filesystem binary not found at {littlefs_path}, skipping copy")
+
+
 # ── Execution ──────────────────────────────────────────────────────────────
 getInfo()
 if not IS_CI:
@@ -70,6 +81,8 @@ if not IS_CI:
 
 env.AddPostAction("buildprog", copy_firmware)
 env.AddPostAction("upload", copy_firmware)
+env.AddPostAction("buildfs", copy_filesystem)
+env.AddPostAction("uploadfs", copy_filesystem)
 
 print("")
 print("#########################################################")
