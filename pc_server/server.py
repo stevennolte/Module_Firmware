@@ -623,6 +623,95 @@ def api_push_update(name: str):
     }), update_resp.status_code
 
 
+@app.route("/api/module/<name>/update-firmware", methods=["POST"])
+def api_push_firmware_update(name: str):
+    """Download the latest firmware binary from GitHub and push it to the module via OTA."""
+    mod = next((m for m in MODULES if m["name"] == name), None)
+    if not mod:
+        return jsonify({"error": "Unknown module"}), 404
+
+    ip = resolve_mdns(mod["mdns_name"])
+    if not ip:
+        return jsonify({"error": "Module not reachable on network"}), 503
+
+    release = get_latest_release(name)
+    if not release:
+        return jsonify({"error": "No firmware release found on GitHub"}), 404
+
+    try:
+        fw_resp = requests.get(release["download_url"], timeout=60)
+        fw_resp.raise_for_status()
+    except Exception as e:
+        return jsonify({"error": f"Failed to download firmware: {e}"}), 500
+
+    try:
+        files = {
+            "firmware": (
+                release["asset_name"],
+                fw_resp.content,
+                "application/octet-stream",
+            )
+        }
+        update_resp = requests.post(
+            f"http://{ip}/update", files=files, timeout=120
+        )
+    except Exception as e:
+        return jsonify({"error": f"Failed to push firmware to module: {e}"}), 500
+
+    return jsonify({
+        "status":           "ok" if update_resp.status_code == 200 else "error",
+        "message":          update_resp.text,
+        "firmware_version": release["version"],
+        "module_ip":        ip,
+    }), update_resp.status_code
+
+
+@app.route("/api/module/<name>/update-filesystem", methods=["POST"])
+def api_push_filesystem_update(name: str):
+    """Download the latest filesystem image from GitHub and push it to the module via OTA."""
+    mod = next((m for m in MODULES if m["name"] == name), None)
+    if not mod:
+        return jsonify({"error": "Unknown module"}), 404
+
+    ip = resolve_mdns(mod["mdns_name"])
+    if not ip:
+        return jsonify({"error": "Module not reachable on network"}), 503
+
+    release = get_latest_release(name)
+    if not release:
+        return jsonify({"error": "No firmware release found on GitHub"}), 404
+
+    if not release.get("fs_download_url"):
+        return jsonify({"error": "No filesystem image available in the latest release"}), 404
+
+    try:
+        fs_resp = requests.get(release["fs_download_url"], timeout=60)
+        fs_resp.raise_for_status()
+    except Exception as e:
+        return jsonify({"error": f"Failed to download filesystem image: {e}"}), 500
+
+    try:
+        fs_files = {
+            "filesystem": (
+                release["fs_asset_name"],
+                fs_resp.content,
+                "application/octet-stream",
+            )
+        }
+        fs_update_resp = requests.post(
+            f"http://{ip}/updatefs", files=fs_files, timeout=120
+        )
+    except Exception as e:
+        return jsonify({"error": f"Failed to push filesystem to module: {e}"}), 500
+
+    return jsonify({
+        "status":           "ok" if fs_update_resp.status_code == 200 else "error",
+        "message":          fs_update_resp.text,
+        "release_version":  release["version"],
+        "module_ip":        ip,
+    }), fs_update_resp.status_code
+
+
 @app.route("/api/module/<name>/reboot", methods=["POST"])
 def api_reboot(name: str):
     """Send a reboot command to the named module."""
