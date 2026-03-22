@@ -19,6 +19,7 @@ import csv
 import datetime
 import json
 import socket
+import sys
 import threading
 import time
 import os
@@ -887,11 +888,44 @@ def _parse_debug_metrics(data_str: str) -> dict:
     return metrics
 
 
+@app.route("/api/server/stop", methods=["POST"])
+def api_server_stop():
+    """Gracefully shut down the server."""
+    import signal
+
+    def _shutdown():
+        time.sleep(0.5)  # Give the response time to be sent
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=_shutdown, daemon=True).start()
+    return jsonify({"status": "ok", "message": "Server shutting down…"})
+
+
+def _is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    """Return True if the given TCP port is already bound."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex((host, port)) == 0
+
+
 # ── Entry point ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+
+    # Verify that no other instance is already running on this port.
+    # Skip this check in the Werkzeug reloader child process (WERKZEUG_RUN_MAIN=true),
+    # since the parent already holds the port in debug/reload mode.
+    if not (debug and os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
+        # Always connect via 127.0.0.1: a server bound to 0.0.0.0 is reachable
+        # there, and 0.0.0.0 itself is not a valid connect destination.
+        if _is_port_in_use(port):
+            print(
+                f"ERROR: Port {port} is already in use. "
+                "Another instance of the server may already be running."
+            )
+            sys.exit(1)
 
     # Start background threads.  When Flask's reloader is active it forks a
     # child process; we only want threads in the child (WERKZEUG_RUN_MAIN=true)

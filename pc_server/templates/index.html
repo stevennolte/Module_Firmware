@@ -224,6 +224,9 @@
       Auto-refreshes module status every <span id="refreshLabel">5</span> s
     </div>
   </div>
+  <button class="btn btn-sm btn-danger" onclick="stopServer()" style="margin-left: auto;">
+    ⏹ Stop Server
+  </button>
 </header>
 
 <div class="refresh-row">
@@ -328,7 +331,7 @@
             ⬆ Update Firmware
           </button>
           <button class="btn btn-primary btn-sm" id="btn-update-fs-{{ mod.name }}"
-                  onclick="pushFilesystemUpdate('{{ mod.name }}')" disabled style="display:none">
+                  onclick="pushFilesystemUpdate('{{ mod.name }}')" disabled>
             📦 Update Filesystem
           </button>
           <button class="btn btn-sm btn-primary"
@@ -439,15 +442,12 @@
       if (fsEl) {
         fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
       }
-      if (fsBtnEl) {
-        fsBtnEl.style.display = rel.fs_download_url ? '' : 'none';
-      }
 
       const fwBtn = document.getElementById('btn-update-fw-' + name);
       if (rel.version && currentVersion) {
         if (rel.version !== currentVersion) {
           fwBtn.disabled = false;
-          if (fsBtnEl && rel.fs_download_url) fsBtnEl.disabled = false;
+          if (fsBtnEl) fsBtnEl.disabled = !rel.fs_download_url;
           setMsg(name,
             `Update available: ${currentVersion} → ${rel.version}`,
             'info');
@@ -492,9 +492,6 @@
       if (fsEl) {
         fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
       }
-      if (fsBtnEl) {
-        fsBtnEl.style.display = rel.fs_download_url ? '' : 'none';
-      }
 
       // Refresh module status to update comparison
       const currentVersion = document.getElementById('dev-ver-' + name).textContent;
@@ -502,7 +499,7 @@
       if (rel.version && currentVersion && currentVersion !== '—') {
         if (rel.version !== currentVersion) {
           fwBtn.disabled = false;
-          if (fsBtnEl && rel.fs_download_url) fsBtnEl.disabled = false;
+          if (fsBtnEl) fsBtnEl.disabled = !rel.fs_download_url;
           setMsg(name,
             `✓ Refreshed from GitHub. Update available: ${currentVersion} → ${rel.version}`,
             'info');
@@ -706,6 +703,26 @@
       btn.disabled = false;
       fetchDataLogStatus();
     }
+  }
+
+  // ── Stop Server ────────────────────────────────────────────────────────
+  async function stopServer() {
+    if (!confirm('Stop the server session? The web interface will become unavailable.')) return;
+    try {
+      await fetch('/api/server/stop', { method: 'POST' });
+    } catch (e) {
+      // Expected – the server may close the connection before sending a response
+    }
+    document.body.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'padding:40px;text-align:center;font-family:Arial,sans-serif;';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Server has been stopped.';
+    const msg = document.createElement('p');
+    msg.textContent = 'You may close this window.';
+    wrapper.appendChild(heading);
+    wrapper.appendChild(msg);
+    document.body.appendChild(wrapper);
   }
 
   // ── Init ───────────────────────────────────────────────────────────────
