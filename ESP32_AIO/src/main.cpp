@@ -21,7 +21,7 @@
  * - UDP communication for AgOpen GPS integration
  */
 #define FORCE_AP_MODE false
-
+// force build
 #include <Arduino.h>
 #include "nvs_flash.h"
 #include "ESPdata.h"
