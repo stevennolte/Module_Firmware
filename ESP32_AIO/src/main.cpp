@@ -372,6 +372,7 @@ void handleWASzero(AsyncWebServerRequest *request) {
 }
 
 static bool fwUpdateSkip = false;
+static bool fsUpdateSkip = false;
 
 void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
@@ -413,13 +414,21 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_
 
 void handleFilesystemUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
+    fsUpdateSkip = false;
     Serial.printf("Filesystem Update Start: %s\n", filename.c_str());
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
       Update.printError(Serial);
-      request->send(500, "text/plain", "Filesystem update failed to start.");
-      return;
+      fsUpdateSkip = true;
     }
   }
+
+  if (fsUpdateSkip) {
+    if (final) {
+      request->send(500, "text/plain", "Filesystem update failed to start.");
+    }
+    return;
+  }
+
   if (Update.write(data, len) != len) {
     Update.printError(Serial);
   }
