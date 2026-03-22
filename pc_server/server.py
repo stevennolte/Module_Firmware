@@ -571,11 +571,25 @@ def api_push_update(name: str):
         except Exception as e:
             return jsonify({"error": f"Failed to push filesystem to module: {e}"}), 500
 
-        # Wait for module to reboot after filesystem update
-        time.sleep(15)
+        # Wait for the module to reboot and its web server to become ready.
+        # mDNS registers early (during WiFi connect) but server.begin() is
+        # called later in the boot sequence, so we poll /version until the
+        # web server actually responds rather than relying on a fixed sleep.
+        REBOOT_POLL_TIMEOUT = 60    # seconds to wait for web server readiness
+        INITIAL_REBOOT_DELAY = 8    # seconds to let the reboot start
+        REBOOT_POLL_INTERVAL = 3    # seconds between readiness checks
 
-        # Re-resolve IP after reboot
-        ip = resolve_mdns(mod["mdns_name"])
+        reboot_deadline = time.time() + REBOOT_POLL_TIMEOUT
+        time.sleep(INITIAL_REBOOT_DELAY)  # initial pause to let the reboot start
+
+        ip = None
+        while time.time() < reboot_deadline:
+            candidate_ip = resolve_mdns(mod["mdns_name"])
+            if candidate_ip and get_module_version(candidate_ip) is not None:
+                ip = candidate_ip
+                break
+            time.sleep(REBOOT_POLL_INTERVAL)
+
         if not ip:
             return jsonify({"error": "Module did not come back online after filesystem update"}), 503
 
