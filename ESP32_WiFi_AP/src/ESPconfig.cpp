@@ -1,6 +1,6 @@
 #include "ESPconfig.h"
 
-ESPconfig::ESPconfig() : progCfg(), progData(), apCfg(), staCfg(), udpStats() {}
+ESPconfig::ESPconfig() : progCfg(), progData(), apCfg(), staCfg(), wifiMode(0), udpStats() {}
 
 uint8_t ESPconfig::loadConfig() {
     preferences.begin("config", false);
@@ -20,14 +20,38 @@ uint8_t ESPconfig::loadConfig() {
     apCfg.ssid[sizeof(apCfg.ssid) - 1]         = '\0';
     apCfg.password[sizeof(apCfg.password) - 1] = '\0';
 
-    // STA settings
-    staCfg.enabled = preferences.getBool("sta_en", false);
-    String staSSID = preferences.getString("sta_ssid", "");
-    String staPass = preferences.getString("sta_pass", "");
-    strncpy(staCfg.ssid,     staSSID.c_str(), sizeof(staCfg.ssid) - 1);
-    strncpy(staCfg.password, staPass.c_str(),  sizeof(staCfg.password) - 1);
-    staCfg.ssid[sizeof(staCfg.ssid) - 1]         = '\0';
-    staCfg.password[sizeof(staCfg.password) - 1] = '\0';
+    // WiFi operating mode (0=AP only, 1=AP+STA, 2=STA only)
+    wifiMode = (uint8_t)preferences.getInt("wifi_mode", 0);
+
+    // STA network list
+    // Migrate from old single-network format if needed
+    if (!preferences.isKey("sta_count") && preferences.isKey("sta_ssid")) {
+        String legSSID = preferences.getString("sta_ssid", "");
+        String legPass = preferences.getString("sta_pass", "");
+        bool   legEn   = preferences.getBool("sta_en", false);
+        if (legSSID.length() > 0) {
+            preferences.putInt("sta_count", 1);
+            preferences.putString("sta_ssid_0", legSSID);
+            preferences.putString("sta_pass_0", legPass);
+            if (legEn && wifiMode == 0) {
+                wifiMode = 1;  // AP+STA
+                preferences.putInt("wifi_mode", wifiMode);
+            }
+        }
+    }
+
+    staCfg.count = (uint8_t)preferences.getInt("sta_count", 0);
+    if (staCfg.count > STAConfig::MAX_NETWORKS) staCfg.count = STAConfig::MAX_NETWORKS;
+    for (int i = 0; i < staCfg.count; i++) {
+        String keySSID = "sta_ssid_" + String(i);
+        String keyPass = "sta_pass_" + String(i);
+        String s = preferences.getString(keySSID.c_str(), "");
+        String p = preferences.getString(keyPass.c_str(), "");
+        strncpy(staCfg.ssids[i],     s.c_str(), sizeof(staCfg.ssids[i]) - 1);
+        strncpy(staCfg.passwords[i], p.c_str(), sizeof(staCfg.passwords[i]) - 1);
+        staCfg.ssids[i][sizeof(staCfg.ssids[i]) - 1]         = '\0';
+        staCfg.passwords[i][sizeof(staCfg.passwords[i]) - 1] = '\0';
+    }
     staCfg.ips[0] = preferences.getInt("sta_ip0", 0);
     staCfg.ips[1] = preferences.getInt("sta_ip1", 0);
     staCfg.ips[2] = preferences.getInt("sta_ip2", 0);
