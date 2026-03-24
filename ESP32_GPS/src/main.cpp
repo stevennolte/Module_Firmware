@@ -115,6 +115,7 @@ struct GPSState {
     bool     disableHeading  = false; ///< Send 0 in heading field
     bool     invertRoll      = true;  ///< Negate roll (dual-antenna default)
     bool     flipPitchRoll   = true;  ///< Swap pitch and roll axes
+    volatile bool enablePandaBroadcast = true;  ///< Broadcast PANDA on UDP 9999
 
     // ── Statistics ──
     volatile uint32_t pandaCount  = 0;
@@ -434,6 +435,7 @@ static void gpsTask(void* param) {
     static char  buf[200];
     static int   idx      = 0;
     static uint32_t lastStatusMs = 0;
+    static uint32_t lastPandaSentMs = 0;  // Rate limiter for 10Hz
 
     Serial.println("GPS task started on core " + String(xPortGetCoreID()));
 
@@ -461,20 +463,26 @@ static void gpsTask(void* param) {
 
                     // On GGA sentences: read latest IMU then build + send PANDA
                     if (strstr(buf, "GGA") != nullptr) {
-                        readIMU();  // get the freshest IMU frame before PANDA
-                        buildPandaSentence();
-
-                        // Broadcast on the AP subnet
-                        IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
-                                        gpsState.agioSubnet[2], 255);
-                        udpGPS.writeTo((const uint8_t*)gpsState.nmea,
-                                       strlen(gpsState.nmea), bcast, PORT_GPS);
-                        taskYIELD();
-
-                        gpsState.pandaCount++;
                         uint32_t now = millis();
-                        if (gpsState.pandaCount == 1) gpsState.firstPandaMs = now;
-                        gpsState.lastPandaMs = now;
+                        // Rate limit: only send PANDA once every 95ms (allowing 10Hz with jitter)
+                        if (now - lastPandaSentMs >= 95) {
+                            readIMU();  // get the freshest IMU frame before PANDA
+                            buildPandaSentence();
+
+                            // Broadcast on the AP subnet (if enabled)
+                            if (gpsState.enablePandaBroadcast) {
+                                IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
+                                                gpsState.agioSubnet[2], 255);
+                                udpGPS.writeTo((const uint8_t*)gpsState.nmea,
+                                               strlen(gpsState.nmea), bcast, PORT_GPS);
+                                taskYIELD();
+                            }
+
+                            gpsState.pandaCount++;
+                            if (gpsState.pandaCount == 1) gpsState.firstPandaMs = now;
+                            gpsState.lastPandaMs = now;
+                            lastPandaSentMs = now;
+                        }
                     }
                 }
 
@@ -494,7 +502,7 @@ static void gpsTask(void* param) {
                           gpsState.imuState == 1 ? "ok" : (gpsState.imuState == 2 ? "fail" : "init"));
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
@@ -521,10 +529,12 @@ static void startUDPntrip() {
         size_t   len  = pkt.length();
         uint8_t* data = pkt.data();
 
-        gpsSerial.write(data, len);
-
-        gpsState.ntripCount++;
-        gpsState.ntripBytes += len;
+        // Write immediately to GPS UART for minimal latency
+        size_t written = gpsSerial.write(data, len);
+        if (written == len) {
+            gpsState.ntripCount++;
+            gpsState.ntripBytes += len;
+        }
 
         static uint32_t lastPrint = 0;
         if (millis() - lastPrint > 5000) {
@@ -660,9 +670,9 @@ static void initGPS() {
         myGNSS.sendCommand("CONFIG HEADING RELIABILITY 3"); delay(300);
         myGNSS.sendCommand("CONFIG HEADING VARIABLELENGTH");delay(300);
         myGNSS.sendCommand("CONFIG SMOOTH HEADING 0");      delay(300);
-        myGNSS.sendCommand("GNGGA, .1");                    delay(300);
-        myGNSS.sendCommand("GPVTG, .1");                    delay(300);
-        Serial.println("UM980 configured");
+        myGNSS.sendCommand("GNGGA 0.1");                    delay(300);
+        myGNSS.sendCommand("GPVTG 0.1");                    delay(300);
+        Serial.println("UM980 configured for 10Hz output");
     }
 }
 
@@ -769,6 +779,7 @@ static void updateDebugVars() {
     debugVars.push_back("Pitch (×10): "   + String(gpsState.imuPitch));
     debugVars.push_back("Yaw rate (×10): "+ String(gpsState.imuYawRate));
     debugVars.push_back("--- NTRIP ---");
+    debugVars.push_back("PANDA broadcast: " + String(gpsState.enablePandaBroadcast ? "ON" : "OFF"));
     debugVars.push_back("NTRIP packets: " + String((unsigned long)gpsState.ntripCount));
     debugVars.push_back("NTRIP bytes: "   + String((uint32_t)gpsState.ntripBytes));
 }
@@ -920,6 +931,27 @@ void setup() {
     server.on("/getDebugVars", HTTP_GET, handleDebugVars);
     server.on("/getFiles",     HTTP_GET, handleFileList);
     server.on("/reboot",       HTTP_GET, handleReboot);
+
+    // PANDA broadcast control
+    server.on("/getGpsForwarding", HTTP_GET, [](AsyncWebServerRequest* r) {
+        JsonDocument doc;
+        doc["enabled"] = gpsState.enablePandaBroadcast;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+    server.on("/setGpsForwarding", HTTP_GET, [](AsyncWebServerRequest* r) {
+        if (r->hasParam("enable")) {
+            gpsState.enablePandaBroadcast = r->getParam("enable")->value() == "1" || 
+                                            r->getParam("enable")->value() == "true";
+            Serial.printf("PANDA broadcast %s\n", gpsState.enablePandaBroadcast ? "enabled" : "disabled");
+        }
+        JsonDocument doc;
+        doc["enabled"] = gpsState.enablePandaBroadcast;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
 
     server.on("/update", HTTP_POST,
               [](AsyncWebServerRequest* r) {},

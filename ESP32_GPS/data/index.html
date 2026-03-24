@@ -29,6 +29,8 @@
     .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; color: white; transition: background 0.2s; }
     .btn-green { background: #1a6b2f; } .btn-green:hover { background: #0f4520; }
     .btn-red   { background: #c0392b; } .btn-red:hover   { background: #922b21; }
+    .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
+    .toggle-container { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
     #lastUpdate { font-size: 0.75rem; color: #aaa; text-align: right; margin-top: 6px; }
   </style>
 </head>
@@ -104,6 +106,10 @@
     <div class="stat-row"><span class="lbl">PANDA rate</span>    <span class="val" id="pandaHz">--</span></div>
     <div class="stat-row"><span class="lbl">NTRIP pkts</span>    <span class="val" id="ntripCnt">--</span></div>
     <div class="stat-row"><span class="lbl">NTRIP bytes</span>   <span class="val" id="ntripByt">--</span></div>
+    <div class="toggle-container">
+      <span class="lbl">PANDA Broadcast</span>
+      <button id="fwdBtn" class="btn btn-sm btn-green" onclick="toggleGpsForwarding()">ON</button>
+    </div>
     <h2 style="margin-top:12px;">Last PANDA sentence</h2>
     <div class="panda-box" id="pandaRaw">waiting for data…</div>
   </div>
@@ -131,6 +137,33 @@
   function parseImu(raw) {
     const n = parseInt(raw, 10);
     return isNaN(n) ? '--' : (n / 10).toFixed(1) + '°';
+  }
+
+  function updateGpsForwardingButton(enabled) {
+    const btn = document.getElementById('fwdBtn');
+    if (enabled) {
+      btn.textContent = 'ON';
+      btn.className = 'btn btn-sm btn-green';
+    } else {
+      btn.textContent = 'OFF';
+      btn.className = 'btn btn-sm btn-red';
+    }
+  }
+
+  function loadGpsForwarding() {
+    fetch('/getGpsForwarding')
+      .then(r => r.json())
+      .then(data => updateGpsForwardingButton(data.enabled))
+      .catch(e => console.warn('panda broadcast fetch error', e));
+  }
+
+  function toggleGpsForwarding() {
+    const btn = document.getElementById('fwdBtn');
+    const newState = btn.textContent === 'OFF';
+    fetch('/setGpsForwarding?enable=' + (newState ? '1' : '0'))
+      .then(r => r.json())
+      .then(data => updateGpsForwardingButton(data.enabled))
+      .catch(e => console.warn('panda broadcast toggle error', e));
   }
 
   function load() {
@@ -191,7 +224,11 @@
   }
 
   setInterval(load, 1000);
-  window.onload = load;
+  setInterval(loadGpsForwarding, 2000);
+  window.onload = function() {
+    load();
+    loadGpsForwarding();
+  };
 </script>
 </body>
 </html>
