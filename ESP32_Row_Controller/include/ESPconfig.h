@@ -19,7 +19,6 @@ public:
         public:
             uint8_t LED_PIN = 48;
             // Main power relay control (turns on after boot)
-            uint8_t POWER_RELAY_PIN = 14;
             uint8_t POWER_RELAY_PIN = 12;
             // 12 row unit MOSFET output pins
             uint8_t rowPins[NUM_ROWS] = {11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4};
