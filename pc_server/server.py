@@ -13,6 +13,7 @@ Supported modules (initial):
   - ESP32_AIO
   - ESP32_Row_Controller
   - ESP32_WiFi_AP
+  - ESP32_GPS
 """
 
 import csv
@@ -40,6 +41,7 @@ MODULES = [
     {"name": "ESP32_AIO",            "mdns_name": "ESP32_AIO"},
     {"name": "ESP32_Row_Controller", "mdns_name": "ESP32_Row_Controller"},
     {"name": "ESP32_WiFi_AP",        "mdns_name": "ESP32_WiFi_AP"},
+    {"name": "ESP32_GPS",            "mdns_name": "ESP32_GPS"},
 ]
 
 # How long (seconds) to cache the result of a GitHub release lookup
