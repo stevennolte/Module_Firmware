@@ -290,20 +290,61 @@ public:
 
     /**
      * @brief WiFi network configuration and connection management
-     * @details Manages wireless network connectivity with multiple SSID support
-     *          and network service port configurations
+     * @details Manages wireless network connectivity and network service port configurations
      */
     struct Wifi {
-        const char* ssids[4] = {"NOLTE_FARM", "FERT","SSEI","ss"};        ///< @brief Available WiFi network SSIDs
-        const char* passwords[4] = {"DontLoseMoney89","Fert504!","Nd14il!la","ss"}; ///< @brief WiFi network passwords
-        uint8_t ips[4];             ///< @brief IP address octets for static assignment
+        uint8_t ips[4];             ///< @brief Runtime IP address octets (AP IP at boot, STA IP when connected)
         IPAddress moduleIP;         ///< @brief Module's assigned IP address
         uint8_t state;              ///< @brief WiFi connection state (0=disconnected, 1=connected, 2=failed)
-        uint8_t apMode;             ///< @brief Access Point mode flag (0=station, 1=AP)
+        uint8_t apMode;             ///< @brief Access Point mode flag (legacy, use wifiMode instead)
         uint16_t aioPort = 9999;    ///< @brief AgIO communication service port
         uint16_t ntripPort = 2233;  ///< @brief NTRIP correction data service port
         uint16_t modPort = 8888;    ///< @brief Module communication service port
     } wifi;
+
+    // AP (access point) settings
+    class APConfig {
+    public:
+        char ssid[64];
+        char password[64];
+        uint8_t ips[4];    // AP IP address
+        uint8_t channel;   // WiFi channel (1–13)
+        uint8_t maxClients;
+        APConfig() {
+            strncpy(ssid, NAME, sizeof(ssid) - 1);
+            ssid[sizeof(ssid) - 1] = '\0';
+            strncpy(password, "1234567890", sizeof(password) - 1);
+            password[sizeof(password) - 1] = '\0';
+            ips[0] = 192; ips[1] = 168; ips[2] = 5; ips[3] = 1;
+            channel    = 6;
+            maxClients = 8;
+        }
+    };
+    APConfig apCfg;
+
+    // STA (station / upstream) settings – supports up to MAX_NETWORKS networks
+    class STAConfig {
+    public:
+        static const int MAX_NETWORKS = 4;
+        char ssids[MAX_NETWORKS][64];
+        char passwords[MAX_NETWORKS][64];
+        uint8_t count;     // number of configured networks
+        uint8_t state;     // 0 = not connected, 1 = connected
+        int8_t  activeIdx; // index of currently connected network (-1 = none)
+        STAConfig() {
+            for (int i = 0; i < MAX_NETWORKS; i++) {
+                memset(ssids[i], 0, sizeof(ssids[i]));
+                memset(passwords[i], 0, sizeof(passwords[i]));
+            }
+            count     = 0;
+            state     = 0;
+            activeIdx = -1;
+        }
+    };
+    STAConfig staCfg;
+
+    // WiFi operating mode: 0 = AP only, 1 = AP+STA, 2 = STA only
+    uint8_t wifiMode = 0;
 
     /**
      * @brief Power management and monitoring data

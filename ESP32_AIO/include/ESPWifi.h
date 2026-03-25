@@ -37,27 +37,29 @@ class ESPWifi
 {
     public:
         /**
-         * @brief Attempts to connect to configured WiFi networks
+         * @brief Constructor for WiFi management system
          * 
-         * @return uint8_t Connection status (0=failed, 1=connected, 2=timeout)
-         * 
-         * @details Tries to connect to each configured SSID in sequence until
-         *          successful connection is established. Includes timeout handling
-         *          and connection quality assessment.
+         * @param vars Pointer to ESPdata singleton for configuration access
          */
-        uint8_t connect();
-        
+        ESPWifi(ESPdata* vars);
+
         /**
-         * @brief Creates WiFi Access Point for configuration access
+         * @brief Starts the WiFi access point (and sets the WiFi mode)
          * 
-         * @return uint8_t AP creation status (0=failed, 1=success)
-         * 
-         * @details Sets up WiFi access point mode for emergency configuration
-         *          access when normal WiFi connection fails. Uses device name
-         *          as SSID with security configuration.
+         * @details Sets up AP / AP+STA / STA-only mode based on wifiMode setting.
+         *          Starts the softAP when not in STA-only mode.
          */
-        uint8_t makeAP();
-        
+        void startAP();
+
+        /**
+         * @brief Attempts to connect to a configured STA network
+         * 
+         * @details Scans for visible networks, picks the first configured match,
+         *          and initiates an async WiFi.begin(). Does nothing when
+         *          wifiMode == 0 or no networks are configured.
+         */
+        void connectSTA();
+
         /**
          * @brief Starts WiFi monitoring task for connection reliability
          * 
@@ -66,32 +68,19 @@ class ESPWifi
          *          when connection is lost.
          */
         void startMonitor();
-        
+
         /**
-         * @brief Scans for available WiFi networks
+         * @brief Returns the number of stations connected to the AP
          * 
-         * @details Performs active scan for nearby WiFi networks and logs
-         *          results for network selection and troubleshooting purposes.
+         * @return int Number of connected clients (0 in STA-only mode)
          */
-        void scanNetworks();
-        
-        /**
-         * @brief Constructor for WiFi management system
-         * 
-         * @param vars Pointer to ESPdata singleton for configuration access
-         * 
-         * @details Initializes WiFi system with configuration parameters
-         *          including SSID list, passwords, and connection preferences.
-         */
-        ESPWifi(ESPdata* vars);
+        int getConnectedClients() const;
 
     private:
         /**
          * @brief FreeRTOS task handler for WiFi monitoring
          * 
          * @param param Task parameters (pointer to ESPWifi instance)
-         * 
-         * @details Static task handler function for FreeRTOS multithreading
          */
         static void taskHandler(void *param);
         
