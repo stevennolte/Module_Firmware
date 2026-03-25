@@ -722,6 +722,8 @@ static void initIMU() {
  * @details Uses WIFI_AP mode (AP-only) so the module is always reachable
  *          at a predictable IP regardless of upstream network availability.
  *          The AP IP is 192.168.5.1 / 255.255.255.0.
+ *          WiFi sleep is disabled and TX power is set to maximum to minimize
+ *          packet latency and maximize link reliability for real-time GPS data.
  */
 static void startWiFiAP() {
     IPAddress ip(AP_IP_1, AP_IP_2, AP_IP_3, AP_IP_4);
@@ -731,6 +733,13 @@ static void startWiFiAP() {
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(ip, gw, subnet);
     WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, 0, AP_MAX_CLIENTS);
+
+    // Keep radio fully awake – modem-sleep adds 100–300 ms of latency that
+    // disrupts 10–20 Hz NMEA/PANDA broadcasts to AgIO clients.
+    WiFi.setSleep(false);
+
+    // Maximize TX power for best range and link quality.
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
     Serial.printf("WiFi AP started  SSID=%s  IP=%s\n",
                   AP_SSID, WiFi.softAPIP().toString().c_str());
@@ -890,6 +899,13 @@ static void handleFileUpload(AsyncWebServerRequest* req, String filename,
 // ── setup() ───────────────────────────────────────────────────────────────
 
 void setup() {
+    // ── CPU / radio init ──────────────────────────────────────────────────
+    // Run at maximum clock for fastest UART/UDP processing.
+    setCpuFrequencyMhz(240);
+    // Bluetooth is unused; stop it to free ~40 KB RAM and reduce 2.4 GHz
+    // RF interference with the WiFi AP.
+    btStop();
+
     // ── Serial (USB-CDC) ──────────────────────────────────────────────────
     Serial.begin(115200);
     delay(1000);
