@@ -497,9 +497,14 @@ void updateDebugVars() {
   debugVars.push_back("Version: " + String(VERSION));
   
   // WiFi info  
-  debugVars.push_back("Wifi SSID: " + WiFi.SSID());
-  debugVars.push_back("IP Address: " + String(espData.wifi.ips[0])+"."+String(espData.wifi.ips[1])+"."+String(espData.wifi.ips[2])+"."+String(espData.wifi.ips[3]));
-  debugVars.push_back("Wifi State: " + String(espData.wifi.state) + " (" + (espData.wifi.state == 1 ? "Connected" : "Disconnected") + ")");
+  debugVars.push_back("AP SSID: "    + String(espData.apCfg.ssid));
+  debugVars.push_back("AP IP: "      + String(espData.apCfg.ips[0]) + "." + String(espData.apCfg.ips[1]) + "." + String(espData.apCfg.ips[2]) + "." + String(espData.apCfg.ips[3]));
+  debugVars.push_back("Connected Clients: " + String(espWifi.getConnectedClients()));
+  debugVars.push_back("STA Mode: "   + String(espData.staCfg.count > 0 && espData.wifiMode != 0 ? "Enabled" : "Disabled"));
+  debugVars.push_back("STA Connected: " + String(espData.staCfg.state == 1 ? "YES" : "NO"));
+  if (espData.staCfg.state == 1) {
+    debugVars.push_back("STA IP: " + WiFi.localIP().toString());
+  }
   debugVars.push_back("Program State: " + String(espData.program.state));
   
   // I2C device status
@@ -764,8 +769,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   Serial.println("Request URL: " + request->url());
   Serial.println("Serving settings page HTML...");
   
-  String html = "<!DOCTYPE html><html><head><title>ESP32 Settings</title>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  String html = "<!DOCTYPE html><html><head><title>ESP32-AIO Settings</title>";
+  html += "<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>";
   html += "<style>";
   html += "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }";
   html += ".container { max-width: 800px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }";
@@ -782,20 +787,42 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += ".status { margin-top: 20px; padding: 10px; border-radius: 5px; text-align: center; }";
   html += ".status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }";
   html += ".status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }";
+  html += ".network-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 6px; background: #fff; font-size: 0.875rem; }";
+  html += ".network-item .ssid { font-weight: bold; }";
+  html += ".network-item button { margin: 0; padding: 5px 12px; font-size: 0.8rem; }";
   html += "@media (max-width: 600px) { .form-group { flex-direction: column; align-items: flex-start; } .form-group label { min-width: auto; margin-bottom: 5px; } }";
   html += "</style></head><body>";
   
   html += "<div class='container'>";
   html += "<div class='header'><h1>ESP32-AIO Settings</h1></div>";
   
-  // Network Settings Section
+  // WiFi Mode Section
   html += "<div class='section'>";
-  html += "<div class='section-title'>Network Configuration</div>";
-  html += "<div class='form-group'><label>IP Address:</label><input type='text' id='ipAddress' placeholder='192.168.1.100'></div>";
-  html += "<div class='form-group'><label>WiFi SSID 1:</label><input type='text' id='ssid1' placeholder='Network Name'></div>";
-  html += "<div class='form-group'><label>WiFi Password 1:</label><input type='password' id='password1' placeholder='Network Password'></div>";
-  html += "<div class='form-group'><label>WiFi SSID 2:</label><input type='text' id='ssid2' placeholder='Backup Network'></div>";
-  html += "<div class='form-group'><label>WiFi Password 2:</label><input type='password' id='password2' placeholder='Backup Password'></div>";
+  html += "<div class='section-title'>WiFi Mode</div>";
+  html += "<div class='form-group'><label>Mode:</label><select id='wifi_mode'>";
+  html += "<option value='0'>AP Only (Access Point)</option>";
+  html += "<option value='1'>AP + STA (connect to network while hosting AP)</option>";
+  html += "<option value='2'>STA Only (connect to network, no AP)</option>";
+  html += "</select></div>";
+  html += "</div>";
+
+  // Access Point Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>Access Point</div>";
+  html += "<div class='form-group'><label>AP SSID:</label><input type='text' id='ap_ssid' placeholder='ESP32_AIO'></div>";
+  html += "<div class='form-group'><label>AP Password:</label><input type='password' id='ap_pass' placeholder='1234567890'></div>";
+  html += "<div class='form-group'><label>AP IP Last Octet:</label><input type='number' id='ap_ip3' min='1' max='254' placeholder='1'></div>";
+  html += "</div>";
+
+  // STA Networks Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>WiFi Networks (STA)</div>";
+  html += "<p style='font-size:0.875rem;color:#555;margin-bottom:10px;'>Networks the module will connect to in AP+STA or STA Only modes. Up to 4 networks.</p>";
+  html += "<div id='networkList'><p style='color:#888;'>Loading...</p></div>";
+  html += "<div class='form-group' style='margin-top:14px;'><label>SSID:</label><input type='text' id='new_ssid' placeholder='Network SSID'></div>";
+  html += "<div class='form-group'><label>Password:</label><input type='password' id='new_pass' placeholder='Network Password'></div>";
+  html += "<button class='button' onclick='addNetwork()'>Add Network</button>";
+  html += "<p id='networkMsg' style='margin-top:8px;'></p>";
   html += "</div>";
   
   // Steering Settings Section
@@ -827,9 +854,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   
   // Action buttons
   html += "<div style='text-align: center; margin-top: 30px;'>";
-  html += "<button class='button' onclick='loadSettings()'>Load Current Settings</button>";
   html += "<button class='button' onclick='saveSettings()'>Save Settings</button>";
-  html += "<button class='button' onclick='resetToDefaults()'>Reset to Defaults</button>";
   html += "<button class='button danger' onclick='window.history.back()'>Back</button>";
   html += "</div>";
   
@@ -838,6 +863,20 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   
   // JavaScript
   html += "<script>";
+  html += "function escapeHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;'); }";
+  
+  html += "function renderNetworkList(networks) {";
+  html += "  const container = document.getElementById('networkList');";
+  html += "  container.innerHTML = '';";
+  html += "  if (!networks || networks.length === 0) { container.innerHTML = '<p style=\"color:#888;\">No networks configured.</p>'; return; }";
+  html += "  networks.forEach(function(net, idx) {";
+  html += "    const item = document.createElement('div');";
+  html += "    item.className = 'network-item';";
+  html += "    item.innerHTML = '<span class=\"ssid\">' + escapeHtml(net.ssid) + '</span><button class=\"button danger\" onclick=\"removeNetwork(' + idx + ', \\'' + escapeHtml(net.ssid).replace(/\\'/g,\"\\\\'\\'\") + \\'\\')\\\">' + 'Remove</button>';";
+  html += "    container.appendChild(item);";
+  html += "  });";
+  html += "}";
+
   html += "function showStatus(message, isError) {";
   html += "  const status = document.getElementById('status');";
   html += "  status.textContent = message;";
@@ -847,46 +886,42 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "}";
   
   html += "function loadSettings() {";
-  html += "  console.log('Loading settings from server...');";
   html += "  fetch('/getSettings')";
-  html += "    .then(response => {";
-  html += "      console.log('Settings response status:', response.status);";
-  html += "      if (!response.ok) throw new Error('Network response was not ok');";
-  html += "      return response.json();";
-  html += "    })";
+  html += "    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })";
   html += "    .then(data => {";
-  html += "      console.log('Settings data received:', data);";
-  html += "      document.getElementById('ipAddress').value = data.ip0 + '.' + data.ip1 + '.' + data.ip2 + '.' + data.ip3;";
-  html += "      document.getElementById('kp').value = data.kp;";
-  html += "      document.getElementById('highPWM').value = data.highPWM;";
-  html += "      document.getElementById('lowPWM').value = data.lowPWM;";
-  html += "      document.getElementById('minPWM').value = data.minPWM;";
-  html += "      document.getElementById('countsPerDeg').value = data.countsPerDeg;";
-  html += "      document.getElementById('wasOffset').value = data.wasOffset;";
-  html += "      document.getElementById('pidInputFilt').value = data.pidInputFilt;";
-  html += "      document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
-  html += "      document.getElementById('useADS').value = data.useADS;";
-  html += "      document.getElementById('gpsSource').value = data.gpsSource;";
-  html += "      document.getElementById('pandaMode').value = data.pandaMode;";
-  html += "      document.getElementById('wasSource').value = data.wasSource;";
-  html += "      document.getElementById('ledBrightness').value = data.ledBrightness;";
-  html += "      document.getElementById('adsAddress').value = data.adsAddress;";
-  html += "      document.getElementById('flipPitchRoll').value = data.flipPitchRoll;";
-  html += "      document.getElementById('invertRoll').value = data.invertRoll;";
-  html += "      document.getElementById('disableHeading').value = data.disableHeading;";
-  html += "      showStatus('Settings loaded successfully', false);";
+  html += "      if (data.wifi_mode !== undefined) document.getElementById('wifi_mode').value = String(data.wifi_mode);";
+  html += "      if (data.ap_ssid !== undefined) document.getElementById('ap_ssid').value = data.ap_ssid;";
+  html += "      if (data.ap_pass !== undefined) document.getElementById('ap_pass').value = data.ap_pass;";
+  html += "      if (data.ap_ip3  !== undefined) document.getElementById('ap_ip3').value  = data.ap_ip3;";
+  html += "      renderNetworkList(data.sta_networks || []);";
+  html += "      if (data.kp !== undefined) document.getElementById('kp').value = data.kp;";
+  html += "      if (data.highPWM !== undefined) document.getElementById('highPWM').value = data.highPWM;";
+  html += "      if (data.lowPWM !== undefined) document.getElementById('lowPWM').value = data.lowPWM;";
+  html += "      if (data.minPWM !== undefined) document.getElementById('minPWM').value = data.minPWM;";
+  html += "      if (data.countsPerDeg !== undefined) document.getElementById('countsPerDeg').value = data.countsPerDeg;";
+  html += "      if (data.wasOffset !== undefined) document.getElementById('wasOffset').value = data.wasOffset;";
+  html += "      if (data.pidInputFilt !== undefined) document.getElementById('pidInputFilt').value = data.pidInputFilt;";
+  html += "      if (data.pidOutputFilt !== undefined) document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
+  html += "      if (data.useADS !== undefined) document.getElementById('useADS').value = data.useADS;";
+  html += "      if (data.gpsSource !== undefined) document.getElementById('gpsSource').value = data.gpsSource;";
+  html += "      if (data.pandaMode !== undefined) document.getElementById('pandaMode').value = data.pandaMode;";
+  html += "      if (data.wasSource !== undefined) document.getElementById('wasSource').value = data.wasSource;";
+  html += "      if (data.ledBrightness !== undefined) document.getElementById('ledBrightness').value = data.ledBrightness;";
+  html += "      if (data.adsAddress !== undefined) document.getElementById('adsAddress').value = data.adsAddress;";
+  html += "      if (data.flipPitchRoll !== undefined) document.getElementById('flipPitchRoll').value = data.flipPitchRoll;";
+  html += "      if (data.invertRoll !== undefined) document.getElementById('invertRoll').value = data.invertRoll;";
+  html += "      if (data.disableHeading !== undefined) document.getElementById('disableHeading').value = data.disableHeading;";
+  html += "      showStatus('Settings loaded', false);";
   html += "    })";
-  html += "    .catch(error => { console.log('Settings load error:', error); showStatus('Failed to load settings: ' + error, true); });";
+  html += "    .catch(error => showStatus('Failed to load settings: ' + error, true));";
   html += "}";
   
   html += "function saveSettings() {";
-  html += "  const ipParts = document.getElementById('ipAddress').value.split('.');";
-  html += "  if (ipParts.length !== 4) { showStatus('Invalid IP address format', true); return; }";
   html += "  const formData = new FormData();";
-  html += "  formData.append('ip0', parseInt(ipParts[0]) || 192);";
-  html += "  formData.append('ip1', parseInt(ipParts[1]) || 168);";
-  html += "  formData.append('ip2', parseInt(ipParts[2]) || 1);";
-  html += "  formData.append('ip3', parseInt(ipParts[3]) || 100);";
+  html += "  formData.append('wifi_mode', document.getElementById('wifi_mode').value);";
+  html += "  formData.append('ap_ssid', document.getElementById('ap_ssid').value);";
+  html += "  formData.append('ap_pass', document.getElementById('ap_pass').value);";
+  html += "  formData.append('ap_ip3', document.getElementById('ap_ip3').value);";
   html += "  formData.append('kp', parseFloat(document.getElementById('kp').value) || 50);";
   html += "  formData.append('highPWM', parseInt(document.getElementById('highPWM').value) || 255);";
   html += "  formData.append('lowPWM', parseInt(document.getElementById('lowPWM').value) || 10);";
@@ -903,34 +938,34 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('flipPitchRoll', document.getElementById('flipPitchRoll').value);";
   html += "  formData.append('invertRoll', document.getElementById('invertRoll').value);";
   html += "  formData.append('disableHeading', document.getElementById('disableHeading').value);";
-  html += "  fetch('/saveSettings', {";
-  html += "    method: 'POST',";
-  html += "    body: formData";
-  html += "  })";
-  html += "    .then(response => response.text())";
+  html += "  fetch('/saveSettings', { method: 'POST', body: formData })";
+  html += "    .then(r => r.text())";
   html += "    .then(data => showStatus(data, false))";
   html += "    .catch(error => showStatus('Failed to save settings: ' + error, true));";
   html += "}";
-  
-  html += "function resetToDefaults() {";
-  html += "  if (confirm('Reset all settings to defaults? This will require a reboot.')) {";
-  html += "    document.getElementById('ipAddress').value = '192.168.1.100';";
-  html += "    document.getElementById('kp').value = '50';";
-  html += "    document.getElementById('highPWM').value = '255';";
-  html += "    document.getElementById('lowPWM').value = '10';";
-  html += "    document.getElementById('minPWM').value = '5';";
-  html += "    document.getElementById('countsPerDeg').value = '10';";
-  html += "    document.getElementById('wasOffset').value = '0';";
-  html += "    document.getElementById('pidInputFilt').value = '0.1';";
-  html += "    document.getElementById('pidOutputFilt').value = '0.1';";
-  html += "    document.getElementById('useADS').value = '1';";
-  html += "    document.getElementById('gpsSource').value = '0';";
-  html += "    document.getElementById('pandaMode').value = '1';";
-  html += "    document.getElementById('wasSource').value = '0';";
-  html += "    document.getElementById('ledBrightness').value = '100';";
-  html += "    document.getElementById('adsAddress').value = '0x48';";
-  html += "    showStatus('Default values loaded - click Save to apply', false);";
-  html += "  }";
+
+  html += "function addNetwork() {";
+  html += "  const ssid = document.getElementById('new_ssid').value.trim();";
+  html += "  const pass = document.getElementById('new_pass').value;";
+  html += "  const msgEl = document.getElementById('networkMsg');";
+  html += "  if (!ssid) { msgEl.textContent = 'SSID cannot be empty.'; msgEl.style.color = 'red'; return; }";
+  html += "  const formData = new URLSearchParams();";
+  html += "  formData.append('ssid', ssid); formData.append('pass', pass);";
+  html += "  fetch('/addNetwork', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: formData.toString() })";
+  html += "    .then(r => r.text())";
+  html += "    .then(msg => { msgEl.textContent = msg; msgEl.style.color = msg.includes('added') ? 'green' : 'red'; document.getElementById('new_ssid').value = ''; document.getElementById('new_pass').value = ''; })";
+  html += "    .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });";
+  html += "}";
+
+  html += "function removeNetwork(idx, ssid) {";
+  html += "  const msgEl = document.getElementById('networkMsg');";
+  html += "  if (!confirm('Remove network \"' + ssid + '\"?')) return;";
+  html += "  const formData = new URLSearchParams();";
+  html += "  formData.append('index', idx);";
+  html += "  fetch('/removeNetwork', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: formData.toString() })";
+  html += "    .then(r => r.text())";
+  html += "    .then(msg => { msgEl.textContent = msg; msgEl.style.color = msg.includes('removed') ? 'green' : 'red'; })";
+  html += "    .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });";
   html += "}";
   
   html += "window.onload = loadSettings;";
@@ -945,17 +980,22 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
 // Get current settings as JSON
 void handleGetSettings(AsyncWebServerRequest *request) {
   Serial.println("=== GET SETTINGS REQUEST ===");
-  Serial.println("Client IP: " + request->client()->remoteIP().toString());
-  Serial.println("Preparing settings JSON response...");
   
   JsonDocument doc;
   
-  // Network settings
-  doc["ip0"] = espData.wifi.ips[0];
-  doc["ip1"] = espData.wifi.ips[1];
-  doc["ip2"] = espData.wifi.ips[2];
-  doc["ip3"] = espData.wifi.ips[3];
-  
+  // WiFi settings
+  doc["wifi_mode"] = espData.wifiMode;
+  doc["ap_ssid"]   = espData.apCfg.ssid;
+  doc["ap_pass"]   = espData.apCfg.password;
+  doc["ap_ch"]     = espData.apCfg.channel;
+  doc["ap_ip3"]    = espData.apCfg.ips[3];
+  JsonArray networks = doc.createNestedArray("sta_networks");
+  for (int i = 0; i < espData.staCfg.count; i++) {
+    JsonObject net = networks.createNestedObject();
+    net["ssid"] = espData.staCfg.ssids[i];
+    net["pass"] = espData.staCfg.passwords[i];
+  }
+
   // Steering settings
   doc["kp"] = espData.steer.gainP;
   doc["highPWM"] = espData.steer.highPWM;
@@ -971,7 +1011,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["gpsSource"] = espData.gps.externalGPS ? 1 : 0;
   doc["wasSource"] = espData.steer.wirelessWAS ? 1 : 0;
   doc["ledBrightness"] = espData.program.ledBrht;
-  doc["adsAddress"] = "0x48"; // Default, could be made configurable
+  doc["adsAddress"] = "0x48";
   doc["pandaMode"] = espData.gps.ntripPandaMode ? 1 : 0;
   doc["flipPitchRoll"] = espData.gps.flipPitchRoll ? 1 : 0;
   doc["invertRoll"] = espData.gps.invertRoll ? 1 : 0;
@@ -979,17 +1019,6 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   
   String response;
   serializeJson(doc, response);
-  
-  Serial.println("Settings JSON prepared:");
-  Serial.println("  Network: " + String(espData.wifi.ips[0]) + "." + String(espData.wifi.ips[1]) + "." + String(espData.wifi.ips[2]) + "." + String(espData.wifi.ips[3]));
-  Serial.println("  Kp: " + String(espData.steer.gainP));
-  Serial.println("  High PWM: " + String(espData.steer.highPWM));
-  Serial.println("  Low PWM: " + String(espData.steer.lowPWM));
-  Serial.println("  Min PWM: " + String(espData.steer.minPWM));
-  Serial.println("  Use ADS: " + String(espData.steer.useADS ? "true" : "false"));
-  Serial.println("  PANDA Mode: " + String(espData.gps.ntripPandaMode ? "Enabled" : "Disabled"));
-  Serial.println("JSON Response size: " + String(response.length()) + " bytes");
-  
   request->send(200, "application/json", response);
   Serial.println("Settings JSON sent successfully");
 }
@@ -997,73 +1026,57 @@ void handleGetSettings(AsyncWebServerRequest *request) {
 // Save settings from JSON POST
 void handleSaveSettings(AsyncWebServerRequest *request) {
   Serial.println("=== SAVE SETTINGS REQUEST ===");
-  Serial.println("Client IP: " + request->client()->remoteIP().toString());
-  Serial.println("Request Method: " + String(request->methodToString()));
-  Serial.println("Number of parameters: " + String(request->params()));
-  
-  // Log all received parameters
-  for (int i = 0; i < request->params(); i++) {
-    const AsyncWebParameter* p = request->getParam(i);
-    Serial.println("Parameter [" + String(i) + "]: " + p->name() + " = " + p->value());
+  bool doReboot = false;
+
+  // WiFi / AP settings (require reboot)
+  if (request->hasParam("ap_ssid", true)) {
+    String v = request->getParam("ap_ssid", true)->value();
+    if (v.length() > 0 && v.length() < 64) {
+      espData.preferences.putString("ap_ssid", v);
+      doReboot = true;
+    }
   }
-  
-  // This will be called when the request has parameters
-  // We'll use a simpler approach with URL parameters for now
-  
-  Serial.println("Processing network settings...");
-  // Update network settings if provided
-  if (request->hasParam("ip0", true)) {
-    int oldValue = espData.wifi.ips[0];
-    espData.wifi.ips[0] = request->getParam("ip0", true)->value().toInt();
-    Serial.println("  IP0: " + String(oldValue) + " -> " + String(espData.wifi.ips[0]));
+  if (request->hasParam("ap_pass", true)) {
+    String v = request->getParam("ap_pass", true)->value();
+    if (v.length() > 0 && v.length() < 64) {
+      espData.preferences.putString("ap_pass", v);
+      doReboot = true;
+    }
   }
-  if (request->hasParam("ip1", true)) {
-    int oldValue = espData.wifi.ips[1];
-    espData.wifi.ips[1] = request->getParam("ip1", true)->value().toInt();
-    Serial.println("  IP1: " + String(oldValue) + " -> " + String(espData.wifi.ips[1]));
+  if (request->hasParam("ap_ip3", true)) {
+    int ip3 = request->getParam("ap_ip3", true)->value().toInt();
+    if (ip3 >= 1 && ip3 <= 254) {
+      espData.preferences.putUChar("ap_ip3", ip3);
+      doReboot = true;
+    }
   }
-  if (request->hasParam("ip2", true)) {
-    int oldValue = espData.wifi.ips[2];
-    espData.wifi.ips[2] = request->getParam("ip2", true)->value().toInt();
-    Serial.println("  IP2: " + String(oldValue) + " -> " + String(espData.wifi.ips[2]));
+  if (request->hasParam("wifi_mode", true)) {
+    int mode = request->getParam("wifi_mode", true)->value().toInt();
+    if (mode >= 0 && mode <= 2) {
+      espData.preferences.putInt("wifi_mode", mode);
+      doReboot = true;
+    }
   }
-  if (request->hasParam("ip3", true)) {
-    int oldValue = espData.wifi.ips[3];
-    espData.wifi.ips[3] = request->getParam("ip3", true)->value().toInt();
-    Serial.println("  IP3: " + String(oldValue) + " -> " + String(espData.wifi.ips[3]));
-  }
-  
-  Serial.println("Processing steering settings...");
-  // Update steering settings if provided
+
+  // Steering settings
   if (request->hasParam("kp", true)) {
-    float oldValue = espData.steer.gainP;
     espData.steer.gainP = request->getParam("kp", true)->value().toFloat();
-    Serial.println("  Kp: " + String(oldValue) + " -> " + String(espData.steer.gainP));
   }
   if (request->hasParam("highPWM", true)) {
-    int oldValue = espData.steer.highPWM;
     espData.steer.highPWM = request->getParam("highPWM", true)->value().toInt();
-    Serial.println("  High PWM: " + String(oldValue) + " -> " + String(espData.steer.highPWM));
   }
   if (request->hasParam("lowPWM", true)) {
-    int oldValue = espData.steer.lowPWM;
     espData.steer.lowPWM = request->getParam("lowPWM", true)->value().toInt();
-    Serial.println("  Low PWM: " + String(oldValue) + " -> " + String(espData.steer.lowPWM));
   }
   if (request->hasParam("minPWM", true)) {
-    int oldValue = espData.steer.minPWM;
     espData.steer.minPWM = request->getParam("minPWM", true)->value().toInt();
-    Serial.println("  Min PWM: " + String(oldValue) + " -> " + String(espData.steer.minPWM));
   }
   if (request->hasParam("countsPerDeg", true)) {
-    float oldValue = espData.steer.countsPerDeg;
     espData.steer.countsPerDeg = request->getParam("countsPerDeg", true)->value().toFloat();
-    Serial.println("  Counts Per Deg: " + String(oldValue) + " -> " + String(espData.steer.countsPerDeg));
   }
   if (request->hasParam("wasOffset", true)) {
-    int oldValue = espData.steer.steerOffset;
     espData.steer.steerOffset = request->getParam("wasOffset", true)->value().toInt();
-    Serial.println("  WAS Offset: " + String(oldValue) + " -> " + String(espData.steer.steerOffset));
+  }
   }
   if (request->hasParam("pidInputFilt", true)) {
     float oldValue = espData.steer.pidInputFilt;
@@ -1071,71 +1084,114 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
     Serial.println("  PID Input Filter: " + String(oldValue) + " -> " + String(espData.steer.pidInputFilt));
   }
   if (request->hasParam("pidOutputFilt", true)) {
-    float oldValue = espData.steer.pidOutputFilt;
     espData.steer.pidOutputFilt = request->getParam("pidOutputFilt", true)->value().toFloat();
-    Serial.println("  PID Output Filter: " + String(oldValue) + " -> " + String(espData.steer.pidOutputFilt));
   }
   if (request->hasParam("useADS", true)) {
-    bool oldValue = espData.steer.useADS;
-    String rawValue = request->getParam("useADS", true)->value();
-    espData.steer.useADS = rawValue.toInt();
-    Serial.println("  Use ADS raw value: '" + rawValue + "'");
-    Serial.println("  Use ADS: " + String(oldValue ? "true" : "false") + " -> " + String(espData.steer.useADS ? "true" : "false"));
+    espData.steer.useADS = request->getParam("useADS", true)->value().toInt();
   }
   
-  Serial.println("Processing system settings...");
-  // Update system settings if provided
+  // System settings
   if (request->hasParam("gpsSource", true)) {
-    bool oldValue = espData.gps.externalGPS;
     espData.gps.externalGPS = request->getParam("gpsSource", true)->value().toInt();
-    Serial.println("  GPS Source: " + String(oldValue ? "Wireless" : "On-board") + " -> " + String(espData.gps.externalGPS ? "Wireless" : "On-board"));
   }
   if (request->hasParam("wasSource", true)) {
-    bool oldValue = espData.steer.wirelessWAS;
     espData.steer.wirelessWAS = request->getParam("wasSource", true)->value().toInt();
-    Serial.println("  WAS Source: " + String(oldValue ? "Wireless" : "Wired") + " -> " + String(espData.steer.wirelessWAS ? "Wireless" : "Wired"));
   }
   if (request->hasParam("ledBrightness", true)) {
-    int oldValue = espData.program.ledBrht;
     espData.program.ledBrht = request->getParam("ledBrightness", true)->value().toInt();
-    Serial.println("  LED Brightness: " + String(oldValue) + " -> " + String(espData.program.ledBrht));
-    // Apply the new brightness immediately
     myLED.updateBrightness();
-    Serial.println("  LED brightness updated immediately");
   }
   if (request->hasParam("pandaMode", true)) {
-    bool oldValue = espData.gps.ntripPandaMode;
     espData.gps.ntripPandaMode = request->getParam("pandaMode", true)->value().toInt();
-    Serial.println("  PANDA Mode: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.ntripPandaMode ? "Enabled" : "Disabled"));
   }
   if (request->hasParam("flipPitchRoll", true)) {
-    bool oldValue = espData.gps.flipPitchRoll;
     espData.gps.flipPitchRoll = request->getParam("flipPitchRoll", true)->value().toInt();
-    Serial.println("  Flip Pitch/Roll: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.flipPitchRoll ? "Enabled" : "Disabled"));
   }
   if (request->hasParam("invertRoll", true)) {
-    bool oldValue = espData.gps.invertRoll;
     espData.gps.invertRoll = request->getParam("invertRoll", true)->value().toInt();
-    Serial.println("  Invert Roll: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.invertRoll ? "Enabled" : "Disabled"));
   }
   if (request->hasParam("disableHeading", true)) {
-    bool oldValue = espData.gps.disableHeading;
     espData.gps.disableHeading = request->getParam("disableHeading", true)->value().toInt();
-    Serial.println("  Disable Heading: " + String(oldValue ? "Enabled" : "Disabled") + " -> " + String(espData.gps.disableHeading ? "Enabled" : "Disabled"));
   }
   
-  Serial.println("Attempting to save configuration to NVS...");
-  // Save to preferences
   bool saveResult = espData.saveConfig();
-  
   if (saveResult) {
-    Serial.println("Configuration saved successfully to NVS");
-    request->send(200, "text/plain", "Settings saved successfully! Some changes may require a reboot.");
+    String msg = doReboot ? "Settings saved. Rebooting..." : "Settings saved successfully!";
+    request->send(200, "text/plain", msg);
+    if (doReboot) { delay(500); ESP.restart(); }
   } else {
-    Serial.println("ERROR: Failed to save configuration to NVS");
     request->send(500, "text/plain", "Failed to save settings to memory");
   }
   Serial.println("=== SAVE SETTINGS COMPLETE ===");
+}
+
+void handleAddNetwork(AsyncWebServerRequest *request) {
+  if (!request->hasParam("ssid", true)) {
+    request->send(400, "text/plain", "Missing ssid");
+    return;
+  }
+  String ssid = request->getParam("ssid", true)->value();
+  String pass = request->hasParam("pass", true) ? request->getParam("pass", true)->value() : "";
+  ssid.trim();
+  if (ssid.length() == 0 || ssid.length() >= 64) {
+    request->send(400, "text/plain", "SSID must be 1–63 characters");
+    return;
+  }
+  if (pass.length() >= 64) {
+    request->send(400, "text/plain", "Password must be fewer than 64 characters");
+    return;
+  }
+  int count = espData.preferences.getInt("sta_count", 0);
+  if (count >= ESPdata::STAConfig::MAX_NETWORKS) {
+    request->send(400, "text/plain", "Maximum number of networks reached");
+    return;
+  }
+  for (int i = 0; i < count; i++) {
+    String keySSID = "sta_ssid_" + String(i);
+    if (espData.preferences.getString(keySSID.c_str(), "") == ssid) {
+      request->send(400, "text/plain", "Network already exists");
+      return;
+    }
+  }
+  String keySSID = "sta_ssid_" + String(count);
+  String keyPass = "sta_pass_" + String(count);
+  espData.preferences.putString(keySSID.c_str(), ssid);
+  espData.preferences.putString(keyPass.c_str(), pass);
+  espData.preferences.putInt("sta_count", count + 1);
+  request->send(200, "text/plain", "Network added. Rebooting...");
+  delay(500);
+  ESP.restart();
+}
+
+void handleRemoveNetwork(AsyncWebServerRequest *request) {
+  if (!request->hasParam("index", true)) {
+    request->send(400, "text/plain", "Missing index");
+    return;
+  }
+  int idx   = request->getParam("index", true)->value().toInt();
+  int count = espData.preferences.getInt("sta_count", 0);
+  if (idx < 0 || idx >= count) {
+    request->send(400, "text/plain", "Invalid index");
+    return;
+  }
+  for (int i = idx; i < count - 1; i++) {
+    String keySSID_src = "sta_ssid_" + String(i + 1);
+    String keyPass_src = "sta_pass_" + String(i + 1);
+    String keySSID_dst = "sta_ssid_" + String(i);
+    String keyPass_dst = "sta_pass_" + String(i);
+    espData.preferences.putString(keySSID_dst.c_str(),
+        espData.preferences.getString(keySSID_src.c_str(), ""));
+    espData.preferences.putString(keyPass_dst.c_str(),
+        espData.preferences.getString(keyPass_src.c_str(), ""));
+  }
+  String keySSID_last = "sta_ssid_" + String(count - 1);
+  String keyPass_last = "sta_pass_" + String(count - 1);
+  espData.preferences.remove(keySSID_last.c_str());
+  espData.preferences.remove(keyPass_last.c_str());
+  espData.preferences.putInt("sta_count", count - 1);
+  request->send(200, "text/plain", "Network removed. Rebooting...");
+  delay(500);
+  ESP.restart();
 }
 
 // File download handler
@@ -1613,6 +1669,8 @@ void recoveryBoot() {
   server.on("/settings", HTTP_GET, handleSettingsPage);
   server.on("/getSettings", HTTP_GET, handleGetSettings);
   server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+  server.on("/addNetwork",    HTTP_POST, handleAddNetwork);
+  server.on("/removeNetwork", HTTP_POST, handleRemoveNetwork);
   Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings");
   server.on("/getFiles", HTTP_GET, handleFileList);
   server.on("/download", HTTP_GET, handleFileDownload);
@@ -1703,67 +1761,14 @@ void normalboot(){
   Serial.println("starting wifi");
   logStartupState("WiFi", "Starting Connection", "");
   
-  if (!FORCE_AP_MODE) {
-  uint32_t wifiStart = millis();
-  while (WiFi.status() != WL_CONNECTED){
-    espData.wifi.state = espWifi.connect();
-    /** @brief Check for WiFi connection, if times out, create AP */
-    if (millis()-wifiStart > 120000){
-      Serial.println("Wifi connection timed out");
-      Serial.println("Switching to AP mode");
-      logStartupState("WiFi", "Connection Timeout", "Switching to AP mode after 120s");
-      espData.wifi.state = espWifi.makeAP();
-      break;
-    }
+  espWifi.startAP();
+  if (espData.wifiMode != 0 && espData.staCfg.count > 0) {
+      espWifi.connectSTA();
   }
-} else {
-    Serial.println("FORCE_AP_MODE is enabled - Starting in AP mode");
-    logStartupState("WiFi", "Forced AP Mode", "FORCE_AP_MODE is true");
-    espData.wifi.state = espWifi.makeAP();
-  }
-  // espData.wifi.state = espWifi.makeAP();
+  espWifi.startMonitor();
   i2cManager.setEthLED(LEDPattern::ON);
-  // espConfig.wifiCfg.state = espWifi.makeAP();
-  Serial.println("Wifi State: " + String(espData.wifi.state));
-  String wifiDetails = "State: " + String(espData.wifi.state);
-  logStartupState("WiFi", espData.wifi.state == 1 ? "Connected" : "AP Mode", wifiDetails.c_str());
-  
-  // ADD NETWORK READINESS CHECK
-  Serial.println("=== NETWORK INITIALIZATION DEBUG ===");
-  Serial.println("WiFi Status: " + String(WiFi.status()));
-  Serial.println("WiFi Mode: " + String(WiFi.getMode()));
-  Serial.println("IP Address: " + WiFi.localIP().toString());
-  Serial.println("Gateway: " + WiFi.gatewayIP().toString());
-  Serial.println("DNS: " + WiFi.dnsIP().toString());
-  
-  // Verify WiFi is actually connected before proceeding
-  if (WiFi.status() != WL_CONNECTED || WiFi.localIP() == IPAddress(0,0,0,0)) {
-    Serial.println("ERROR: WiFi not properly connected! Attempting to fix...");
-    
-    // Try to reconnect or switch to AP mode
-    if (espData.wifi.state == 1) {
-      Serial.println("Forcing AP mode due to invalid network state");
-      espData.wifi.state = espWifi.makeAP();
-      delay(3000); // Give AP mode time to start
-    }
-    
-    // Check again after fix attempt
-    Serial.println("After fix attempt:");
-    Serial.println("WiFi Status: " + String(WiFi.status()));
-    Serial.println("WiFi Mode: " + String(WiFi.getMode()));
-    Serial.println("IP Address: " + WiFi.localIP().toString());
-  }
-  
-  // Wait for network stack to stabilize
-  Serial.println("Waiting for network stack to stabilize...");
-  delay(3000); // Increased delay for stability
-  
-  // Final verification before starting UDP
-  String networkDetails = "WiFi Status: " + String(WiFi.status()) + ", IP: " + WiFi.localIP().toString();
-  logStartupState("Network", "Verifying", networkDetails.c_str());
-  Serial.println("Final network check before UDP:");
-  Serial.println("WiFi Status: " + String(WiFi.status()));
-  Serial.println("IP Address: " + WiFi.localIP().toString());
+  Serial.println("Wifi started. AP IP: " + WiFi.softAPIP().toString());
+  logStartupState("WiFi", "Started", ("Mode: " + String(espData.wifiMode)).c_str());
   
   // START UDP SERVICES FIRST - before other components try to use them
   Serial.println("=== STARTING UDP SERVICES ===");
@@ -1853,6 +1858,8 @@ void normalboot(){
         server.on("/settings", HTTP_GET, handleSettingsPage);
         server.on("/getSettings", HTTP_GET, handleGetSettings);
         server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+        server.on("/addNetwork",    HTTP_POST, handleAddNetwork);
+        server.on("/removeNetwork", HTTP_POST, handleRemoveNetwork);
         Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings");
         server.on("/getFiles", HTTP_GET, handleFileList);
         // Route to download files

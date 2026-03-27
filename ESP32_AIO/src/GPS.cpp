@@ -22,7 +22,7 @@
  * @see GPS.h for class interface definition
  * @see ESPudp.h for NTRIP client functionality
  */
-#define SENDEXTRAGPSDATA false
+#define SENDEXTRAGPSDATA true
 
 
 #include "GPS.h"
@@ -323,13 +323,23 @@ void ESPGPS::parseNMEASentence(const char* sentence)
         parseGGA(sentence);
         espData->gps.ggaMessageCount++;
         
+        // Debug: Show mode and decision
+        static int ggaDebugCount = 0;
+        if (++ggaDebugCount >= 50) {
+            ggaDebugCount = 0;
+            Serial.printf("GGA #%d - Mode: %s, WiFi: %d, espUdp: %p\n", 
+                         espData->gps.ggaMessageCount,
+                         espData->gps.ntripPandaMode ? "PANDA" : "RAW",
+                         espData->wifi.state,
+                         espUdp);
+        }
+        
         // Check mode: PANDA generation or raw forwarding
         if (espData->gps.ntripPandaMode) {
             // PANDA mode: build and send PANDA sentence (only for GGA)
-            // Serial.println("GGA received - generating PANDA sentence");
             buildPandaSentence();
         } else {
-            // Raw forwarding mode: send original NMEA sentence
+            // Raw forwarding mode: send original NMEA sentence (works in all WiFi modes)
             if (espUdp && SENDEXTRAGPSDATA) {
                 espUdp->sendUDPgps(sentence);
             }
@@ -341,9 +351,8 @@ void ESPGPS::parseNMEASentence(const char* sentence)
         espData->gps.vtgMessageCount++;
         
         // In PANDA mode, VTG data is used in GGA-triggered PANDA messages
-        // In raw mode, forward the VTG sentence
+        // In raw mode, forward the VTG sentence (works in all WiFi modes)
         if (!espData->gps.ntripPandaMode) {
-            // Raw forwarding mode: send original NMEA sentence
             if (espUdp && SENDEXTRAGPSDATA) {
                 espUdp->sendUDPgps(sentence);
             }
@@ -498,6 +507,13 @@ void ESPGPS::init(ESPudp* espUdp){
     
     if (!espData->gps.externalGPS){
         Serial.println("Trying to start UM980");
+        Serial.printf("GPS Serial Configuration:\n");
+        Serial.printf("  RX Pin: %d (ESP32 receives FROM GPS TX)\n", espData->pins.GPS_RX);
+        Serial.printf("  TX Pin: %d (ESP32 sends TO GPS RX)\n", espData->pins.GPS_TX);
+        Serial.printf("  Baud Rate: 460800\n");
+        Serial.printf("  Serial Port: UART1\n");
+        Serial.println("NOTE: If no data is received, try swapping RX/TX pins in settings");
+        
         uint32_t gpsStart = millis();
         uint8_t gpsTryCnt = 0;
         bool gpsConnected = false;
@@ -560,6 +576,34 @@ void ESPGPS::init(ESPudp* espUdp){
         {
             espData->gps.state = 2;
             Serial.println("UM980 failed to respond. Check ports and baud rates.");
+            Serial.println("\n=== GPS TROUBLESHOOTING ===");
+            Serial.println("Testing serial port for ANY data at 460800 baud...");
+            
+            // Try to read any data for 2 seconds
+            uint32_t testStart = millis();
+            int bytesReceived = 0;
+            while (millis() - testStart < 2000) {
+                if (gpsSerial->available()) {
+                    char c = gpsSerial->read();
+                    Serial.print(c);
+                    bytesReceived++;
+                }
+                delay(10);
+            }
+            
+            if (bytesReceived > 0) {
+                Serial.printf("\nReceived %d bytes but UM980 library failed to parse\n", bytesReceived);
+                Serial.println("GPS may be outputting at different baud rate or wrong format");
+            } else {
+                Serial.println("\nNO DATA RECEIVED - Possible issues:");
+                Serial.println("  1. RX/TX pins may be swapped");
+                Serial.println("  2. GPS not outputting data (check if NMEA output is enabled)");
+                Serial.println("  3. Wrong baud rate (try 115200, 230400, or 921600)");
+                Serial.println("  4. Physical connection issue");
+                Serial.println("\nTo swap pins: Use settings page to swap GPS_RX and GPS_TX values");
+            }
+            Serial.println("========================\n");
+            
             uint32_t gpsEnd = millis();
             Serial.print("GPS initialization time: ");
             Serial.print(gpsEnd - gpsStart);
@@ -813,30 +857,31 @@ void ESPGPS::buildPandaSentence()
     //     Serial.println(espData->gps.nmea);
     // }
     
-    // Send via UDP if WiFi is connected
-    if (espData->wifi.state == 1)
-    {
-        // if (pandaOutputCounter == 1) { // Only show sending message when we show the sentence
-        //     Serial.println("Sending PANDA via UDP");
-        //     int len = strlen(espData->gps.nmea);
-        //     Serial.print("PANDA Length: ");
-        //     Serial.println(len);
-        // }
-        espUdp->sendUDPgps(espData->gps.nmea);
-        espData->gps.pandaMessageCount++; // Increment PANDA message counter
-        uint32_t currentTime = millis();
-        if (espData->gps.pandaMessageCount == 1) {
-            espData->gps.firstPandaTime = currentTime; // Record first message timestamp
-        }
-        espData->gps.lastPandaTime = currentTime; // Record timestamp
-    } else {
-        // Serial.println("WiFi not connected - PANDA not sent");
+    // Send via UDP (works in both connected and AP mode)
+    static int pandaDebugCount = 0;
+    if (++pandaDebugCount >= 50) {
+        pandaDebugCount = 0;
+        Serial.printf("Sending PANDA #%d via UDP (len=%d, WiFi state=%d)\n", 
+                     espData->gps.pandaMessageCount + 1,
+                     strlen(espData->gps.nmea),
+                     espData->wifi.state);
     }
+    espUdp->sendUDPgps(espData->gps.nmea);
+    espData->gps.pandaMessageCount++; // Increment PANDA message counter
+    uint32_t currentTime = millis();
+    if (espData->gps.pandaMessageCount == 1) {
+        espData->gps.firstPandaTime = currentTime; // Record first message timestamp
+        Serial.println("First PANDA message sent!");
+    }
+    espData->gps.lastPandaTime = currentTime; // Record timestamp
 }void ESPGPS::continuousLoop(){
     uint32_t lastImuCall = 0;
     uint32_t loopCount = 0;
+    uint32_t lastDataCheck = 0;
     
-    // Serial.println("GPS task started - using NMEAParser library");
+    Serial.println("GPS task started - entering main loop");
+    Serial.printf("GPS Serial Port: RX=%d, TX=%d, Baud=460800\n", 
+                  espData->pins.GPS_RX, espData->pins.GPS_TX);
     
     // No buffer allocation needed for NMEAParser approach
     
@@ -844,6 +889,32 @@ void ESPGPS::buildPandaSentence()
     
     while (true){
         loopCount++;
+        
+        // Periodically report GPS serial status
+        if (millis() - lastDataCheck > 5000) {
+            lastDataCheck = millis();
+            int available = gpsSerial->available();
+            if (available > 0) {
+                Serial.printf("GPS Loop Check: Serial available=%d, Reading data...\n", available);
+                // Read and display some bytes for debugging
+                Serial.print("Raw data sample: ");
+                int samplesToRead = min(available, 50);
+                for (int i = 0; i < samplesToRead; i++) {
+                    char c = gpsSerial->read();
+                    if (c >= 32 && c <= 126) {
+                        Serial.print(c);
+                    } else {
+                        Serial.printf("[0x%02X]", c);
+                    }
+                }
+                Serial.println();
+            } else {
+                Serial.printf("GPS Loop Check: Serial available=%d, Loops=%lu, GGA count=%d, PANDA count=%d\n", 
+                             available, loopCount, espData->gps.ggaMessageCount, espData->gps.pandaMessageCount);
+                Serial.printf("  Pin Check: RX=%d should be connected to GPS TX pin\n", espData->pins.GPS_RX);
+                Serial.printf("  Pin Check: TX=%d should be connected to GPS RX pin\n", espData->pins.GPS_TX);
+            }
+        }
         
         // Memory safety check every 1000 loops
         if (loopCount % 1000 == 0) {
@@ -860,10 +931,17 @@ void ESPGPS::buildPandaSentence()
         const int maxBytes = 64; // Conservative limit
         static char nmeaBuffer[200]; // Buffer for building complete sentences
         static int bufferIndex = 0;
+        static uint32_t totalBytesRead = 0;
         
         while(gpsSerial->available() && bytesProcessed < maxBytes){
             char c = gpsSerial->read();
             bytesProcessed++;
+            totalBytesRead++;
+            
+            // Report every 1000 bytes received
+            if (totalBytesRead % 1000 == 0) {
+                Serial.printf("GPS: Received %lu bytes total\n", totalBytesRead);
+            }
             
             // Build complete NMEA sentences character by character
             if (bufferIndex < sizeof(nmeaBuffer) - 1) {
@@ -875,8 +953,12 @@ void ESPGPS::buildPandaSentence()
                     
                     // Print raw NMEA string to serial terminal
                     if (bufferIndex > 6) { // Minimum NMEA sentence length
-                        // Serial.print("RAW NMEA: ");
-                        // Serial.print(nmeaBuffer);
+                        static int nmeaDebugCount = 0;
+                        if (++nmeaDebugCount >= 100) {
+                            nmeaDebugCount = 0;
+                            Serial.print("RAW NMEA Sample: ");
+                            Serial.print(nmeaBuffer);
+                        }
                         parseNMEASentence(nmeaBuffer);
                     }
                     

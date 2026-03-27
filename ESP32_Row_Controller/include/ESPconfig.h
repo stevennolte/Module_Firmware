@@ -19,7 +19,7 @@ public:
         public:
             uint8_t LED_PIN = 48;
             // Main power relay control (turns on after boot)
-            uint8_t POWER_RELAY_PIN = 14;
+            uint8_t POWER_RELAY_PIN = 12;
             // 12 row unit MOSFET output pins
             uint8_t rowPins[NUM_ROWS] = {11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4};
             // Digital input: toolbar lifted sensor (HIGH = toolbar up, LOW = toolbar down)
@@ -45,19 +45,49 @@ public:
     };
     ProgramData progData;
 
-    class WifiConfig {
+    // AP (access point) settings
+    class APConfig {
         public:
             char ssid[64];
             char password[64];
-            uint8_t ips[4];
-            uint8_t state;
-            uint8_t apMode;
-            WifiConfig() {
-                strncpy(ssid, "NOLTE_FARM", sizeof(ssid));
-                strncpy(password, "DontLoseMoney89", sizeof(password));
+            uint8_t ips[4];    // AP IP address
+            uint8_t channel;   // WiFi channel (1–13)
+            uint8_t maxClients;
+            APConfig() {
+                strncpy(ssid, NAME, sizeof(ssid) - 1);
+                ssid[sizeof(ssid) - 1] = '\0';
+                strncpy(password, "1234567890", sizeof(password) - 1);
+                password[sizeof(password) - 1] = '\0';
+                ips[0] = 192; ips[1] = 168; ips[2] = 1; ips[3] = 5;
+                channel    = 6;
+                maxClients = 8;
             }
     };
-    WifiConfig wifiCfg;
+    APConfig apCfg;
+
+    // STA (station / upstream) settings – supports up to MAX_NETWORKS networks
+    class STAConfig {
+        public:
+            static const int MAX_NETWORKS = 4;
+            char ssids[MAX_NETWORKS][64];
+            char passwords[MAX_NETWORKS][64];
+            uint8_t count;     // number of configured networks
+            uint8_t state;     // 0 = not connected, 1 = connected
+            int8_t  activeIdx; // index of currently connected network (-1 = none)
+            STAConfig() {
+                for (int i = 0; i < MAX_NETWORKS; i++) {
+                    memset(ssids[i], 0, sizeof(ssids[i]));
+                    memset(passwords[i], 0, sizeof(passwords[i]));
+                }
+                count     = 0;
+                state     = 0;
+                activeIdx = -1;
+            }
+    };
+    STAConfig staCfg;
+
+    // WiFi operating mode: 0 = AP only, 1 = AP+STA, 2 = STA only
+    uint8_t wifiMode;
 
     class OTAConfig {
         public:
@@ -88,7 +118,7 @@ public:
     };
     SectionData sectionData;
 
-    ESPconfig();
+    ESPconfig() : progCfg(), progData(), apCfg(), staCfg(), wifiMode(0), otaCfg() {}
 };
 
 #endif

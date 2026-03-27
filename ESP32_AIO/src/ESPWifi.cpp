@@ -1,162 +1,144 @@
 #include "ESPWifi.h"
 #include "WiFi.h"
 #include "Version.h"
+#include "esp_wifi.h"
 
-
-ESPWifi::ESPWifi(ESPdata* vars){
+ESPWifi::ESPWifi(ESPdata* vars) {
     espData = vars;
 }
 
-uint8_t ESPWifi::connect(){
-    // Ensure WiFi is in station mode and disconnected before attempting connection
-    WiFi.mode(WIFI_STA);
-    WiFi.setHostname(NAME);
-    WiFi.disconnect();
-    delay(100);
-    
-    Serial.println("Scanning for networks...");
-    uint8_t numNetworks = WiFi.scanNetworks();
-    Serial.print("Found ");
-    Serial.print(numNetworks);
-    Serial.println(" networks");
-    
-    // Print all found networks for debugging
-    for (int i = 0; i < numNetworks; i++){
-        Serial.print("  ");
-        Serial.print(i);
-        Serial.print(": ");
-        Serial.print(WiFi.SSID(i));
-        Serial.print(" (");
-        Serial.print(WiFi.RSSI(i));
-        Serial.print(" dBm) ");
-        Serial.println(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "Open" : "Encrypted");
+void ESPWifi::startAP() {
+    IPAddress apIP(espData->apCfg.ips[0], espData->apCfg.ips[1],
+                   espData->apCfg.ips[2], espData->apCfg.ips[3]);
+    IPAddress subnet(255, 255, 255, 0);
+
+    // Set WiFi mode based on wifiMode setting:
+    // 0 = AP only, 1 = AP+STA, 2 = STA only
+    if (espData->wifiMode == 2) {
+        WiFi.mode(WIFI_STA);
+    } else if (espData->wifiMode == 1) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_AP);
     }
-    
-    for (int i = 0; i < numNetworks; i++){
-        for (int j = 0; j < 4; j++){
-            // Serial.println(espData->wifiCfg.ssids[j]);
-            if (WiFi.SSID(i) == espData->wifi.ssids[j]){
-                Serial.print("Found configured network: ");
-                Serial.println(espData->wifi.ssids[j]);
-                Serial.print("Attempting connection with password: ");
-                Serial.println(espData->wifi.passwords[j]);
-                
-                WiFi.begin(espData->wifi.ssids[j], espData->wifi.passwords[j]);
-                int attempts = 0;
-                while(WiFi.status() != WL_CONNECTED && attempts < 100){
-                    Serial.print(".");
-                    delay(100);
-                    attempts++;
-                }
-                Serial.println();
-                
-                // Check if actually connected
-                wl_status_t status = WiFi.status();
-                Serial.print("WiFi status: ");
-                Serial.print(status);
-                Serial.print(" - ");
-                switch(status) {
-                    case WL_CONNECTED: Serial.println("Connected"); break;
-                    case WL_NO_SSID_AVAIL: Serial.println("SSID not available"); break;
-                    case WL_CONNECT_FAILED: Serial.println("Connection Failed (wrong password or encryption)"); break;
-                    case WL_DISCONNECTED: Serial.println("Disconnected"); break;
-                    default: Serial.println("Unknown status"); break;
-                }
-                
-                if (status == WL_CONNECTED) {
-                    Serial.print("Connected! IP: ");
-                    Serial.println(WiFi.localIP().toString());
-                    
-                    // Save the network information for future use
-                    IPAddress ip = WiFi.localIP();
-                    espData->wifi.ips[0] = ip[0];
-                    espData->wifi.ips[1] = ip[1];
-                    espData->wifi.ips[2] = ip[2];
-                    espData->wifi.ips[3] = ip[3];
-                    espData->saveConfig();
-                    
-                    MDNS.begin(NAME);
-                    startMonitor();
-                    return 1;
-                } else {
-                    Serial.println("Connection failed");
-                    Serial.print("Signal strength: ");
-                    Serial.print(WiFi.RSSI());
-                    Serial.println(" dBm");
-                    WiFi.disconnect();
-                    delay(1000);  // Wait before trying next network
-                    // Continue to try next network
-                }
+
+    // Disable power saving for lowest possible latency
+    esp_wifi_set_ps(WIFI_PS_NONE);
+
+    if (espData->wifiMode != 2) {
+        // Start AP unless in STA-only mode
+        WiFi.softAP(espData->apCfg.ssid,
+                    espData->apCfg.password,
+                    espData->apCfg.channel,
+                    0,  // ssid_hidden = 0 (visible)
+                    espData->apCfg.maxClients);
+        delay(100);
+        WiFi.softAPConfig(apIP, apIP, subnet);
+
+        // Update legacy wifi.ips with AP IP for display code
+        espData->wifi.ips[0] = espData->apCfg.ips[0];
+        espData->wifi.ips[1] = espData->apCfg.ips[1];
+        espData->wifi.ips[2] = espData->apCfg.ips[2];
+        espData->wifi.ips[3] = espData->apCfg.ips[3];
+
+        Serial.printf("AP started: SSID=%s  IP=%s  ch=%d  maxClients=%d\n",
+                      espData->apCfg.ssid,
+                      apIP.toString().c_str(),
+                      espData->apCfg.channel,
+                      espData->apCfg.maxClients);
+    }
+
+    MDNS.begin(NAME);
+    Serial.printf("mDNS: %s.local\n", NAME);
+    espData->wifi.state = 3;  // AP mode active
+}
+
+void ESPWifi::connectSTA() {
+    if (espData->wifiMode == 0 || espData->staCfg.count == 0) {
+        return;
+    }
+
+    Serial.printf("STA: scanning for %d configured network(s)...\n", espData->staCfg.count);
+
+    // Scan available networks and find the first configured one
+    int found = WiFi.scanNetworks();
+    int bestIdx = -1;
+    for (int si = 0; si < found && bestIdx < 0; si++) {
+        String scannedSSID = WiFi.SSID(si);
+        for (int ci = 0; ci < espData->staCfg.count; ci++) {
+            if (scannedSSID == espData->staCfg.ssids[ci]) {
+                bestIdx = ci;
+                break;
             }
         }
     }
-    return 2;
-}
+    WiFi.scanDelete();
 
-uint8_t ESPWifi::makeAP(){
-    IPAddress local_IP(espData->wifi.ips[0],espData->wifi.ips[1],espData->wifi.ips[2],espData->wifi.ips[3]);
-    IPAddress gateway(espData->wifi.ips[0],espData->wifi.ips[1],espData->wifi.ips[2],1);
-    IPAddress subnet(255,255,255,0);
+    if (bestIdx < 0) {
+        // No matching network visible – fall back to the first configured entry
+        bestIdx = 0;
+    }
+
+    Serial.printf("STA: connecting to %s ...\n", espData->staCfg.ssids[bestIdx]);
+    espData->staCfg.activeIdx = bestIdx;
+
     WiFi.setHostname(NAME);
-    WiFi.mode(WIFI_AP_STA);   
-    WiFi.softAP(NAME, "1234567890");
-    delay(100);
-    WiFi.softAPConfig(local_IP, local_IP, subnet);
-    MDNS.begin(NAME);
-    // startMonitor();
-    return 1;
+    WiFi.begin(espData->staCfg.ssids[bestIdx], espData->staCfg.passwords[bestIdx]);
 }
 
-void ESPWifi::startMonitor(){
+void ESPWifi::startMonitor() {
     xTaskCreate(
-        taskHandler,   // Task function
-        "TaskB",       // Name of the task
-        4096,          // Stack size (in words)
-        this,          // Pass the current instance as the task parameter
-        1,             // Priority of the task
-        NULL           // Task handle (not needed)
+        taskHandler,
+        "WifiMonitor",
+        4096,
+        this,
+        1,
+        NULL
     );
 }
 
-void ESPWifi::taskHandler(void *param){
+void ESPWifi::taskHandler(void *param) {
     ESPWifi* instance = (ESPWifi*)param;
     instance->continuousLoop();
 }
 
-void ESPWifi::continuousLoop(){
-    while (true){
-        espData->wifi.moduleIP = WiFi.localIP();
-        switch(espData->wifi.state){
-            case 0:
-                break;
-            case 1:
-            if (WiFi.status() != WL_CONNECTED) {
-                // Serial.print(millis());
-                Serial.println("Reconnecting to WiFi...");
-                WiFi.disconnect();
-                WiFi.reconnect();
-              }
-                break;
-            case 2:
-                break;
-            case 3:
-                if(espData->wifi.apMode==0){
-                    // scanNetworks();
-                }    
-            // scanNetworks();
-                break;
-            default:
-                break;
+void ESPWifi::continuousLoop() {
+    bool mdnsStarted = false;
+    while (true) {
+        if (espData->wifiMode != 0 && espData->staCfg.count > 0) {
+            if (WiFi.status() == WL_CONNECTED) {
+                if (!mdnsStarted) {
+                    mdnsStarted = true;
+                    espData->staCfg.state = 1;
+                    espData->wifi.state = 1;
+                    // Update legacy wifi.ips with STA IP
+                    IPAddress ip = WiFi.localIP();
+                    espData->wifi.moduleIP = ip;
+                    espData->wifi.ips[0] = ip[0];
+                    espData->wifi.ips[1] = ip[1];
+                    espData->wifi.ips[2] = ip[2];
+                    espData->wifi.ips[3] = ip[3];
+                    Serial.printf("STA connected. IP: %s\n", ip.toString().c_str());
+                }
+            } else {
+                if (mdnsStarted) {
+                    mdnsStarted = false;
+                    espData->staCfg.state = 0;
+                    espData->wifi.state = 3;  // back to AP only
+                    // Restore AP IP in wifi.ips for display
+                    espData->wifi.ips[0] = espData->apCfg.ips[0];
+                    espData->wifi.ips[1] = espData->apCfg.ips[1];
+                    espData->wifi.ips[2] = espData->apCfg.ips[2];
+                    espData->wifi.ips[3] = espData->apCfg.ips[3];
+                    Serial.println("STA disconnected – reconnecting...");
+                }
+                connectSTA();
+            }
         }
-        
-        vTaskDelay(5000/portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
-    
 }
 
-void ESPWifi::scanNetworks(){
-    int numNetworks = WiFi.scanNetworks();
-    for (int i = 0; i < numNetworks; i++){
-        Serial.println(WiFi.SSID(i));
-    }
+int ESPWifi::getConnectedClients() const {
+    return (int)WiFi.softAPgetStationNum();
 }

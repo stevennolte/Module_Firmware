@@ -412,10 +412,7 @@
 
       if (!mod.online) {
         setMsg(name, 'Module is offline – check network/power.', 'error');
-        const fwBtn = document.getElementById('btn-update-fw-' + name);
-        const fsBtnEl = document.getElementById('btn-update-fs-' + name);
-        if (fwBtn) fwBtn.disabled = true;
-        if (fsBtnEl) fsBtnEl.disabled = true;
+        document.getElementById('btn-update-' + name).disabled = true;
       } else {
         setMsg(name, 'Module online. Checking GitHub for latest firmware…', 'info');
         refreshLatestFirmware(name, mod.current_version);
@@ -436,14 +433,13 @@
       const rel = await res.json();
       document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
 
-      // Show filesystem indicator and toggle filesystem update button
+      // Show filesystem indicator
       const fsEl = document.getElementById('gh-fs-' + name);
-      const fsBtnEl = document.getElementById('btn-update-fs-' + name);
       if (fsEl) {
         fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
       }
 
-      const fwBtn = document.getElementById('btn-update-fw-' + name);
+      const updateBtn = document.getElementById('btn-update-' + name);
       if (rel.version && currentVersion) {
         if (rel.version !== currentVersion) {
           fwBtn.disabled = false;
@@ -451,31 +447,16 @@
           setMsg(name,
             `Update available: ${currentVersion} → ${rel.version}`,
             'info');
-        } else {
-          fwBtn.disabled = true;
-          if (fsBtnEl) fsBtnEl.disabled = true;
-          setMsg(name, `Firmware is up to date (v${currentVersion}).`, 'success');
-        }
-      } else {
-        // Keep the buttons disabled until we have reliable version data on both sides
-        fwBtn.disabled = true;
-        if (fsBtnEl) fsBtnEl.disabled = true;
-        setMsg(name, `GitHub firmware: ${rel.version || 'unknown'} – version check incomplete.`, 'info');
-      }
-    } catch (e) {
-      document.getElementById('gh-ver-' + name).textContent = 'Error';
-      setMsg(name, 'Failed to fetch GitHub release info.', 'error');
-    }
-  }
+   
 
   // ── Refresh GitHub Version ─────────────────────────────────────────────
   async function refreshGitHubVersion(name) {
     const btn = document.getElementById('btn-gh-refresh-' + name);
     btn.disabled = true;
     btn.style.opacity = '0.5';
-
+    
     setMsg(name, 'Refreshing latest version from GitHub…', 'info');
-
+    
     try {
       const res = await fetch('/api/module/' + name + '/refresh-github-version', { method: 'POST' });
       if (!res.ok) {
@@ -485,18 +466,17 @@
       }
       const rel = await res.json();
       document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
-
-      // Update filesystem indicator and toggle filesystem update button
+      
+      // Update filesystem indicator
       const fsEl = document.getElementById('gh-fs-' + name);
-      const fsBtnEl = document.getElementById('btn-update-fs-' + name);
       if (fsEl) {
         fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
       }
 
       // Refresh module status to update comparison
       const currentVersion = document.getElementById('dev-ver-' + name).textContent;
-      const fwBtn = document.getElementById('btn-update-fw-' + name);
       if (rel.version && currentVersion && currentVersion !== '—') {
+        const updateBtn = document.getElementById('btn-update-' + name);
         if (rel.version !== currentVersion) {
           fwBtn.disabled = false;
           if (fsBtnEl) fsBtnEl.disabled = !rel.fs_download_url;
@@ -504,8 +484,7 @@
             `✓ Refreshed from GitHub. Update available: ${currentVersion} → ${rel.version}`,
             'info');
         } else {
-          fwBtn.disabled = true;
-          if (fsBtnEl) fsBtnEl.disabled = true;
+          updateBtn.disabled = true;
           setMsg(name, `✓ Refreshed from GitHub. Firmware is up to date (v${currentVersion}).`, 'success');
         }
       } else {
@@ -517,6 +496,19 @@
     } finally {
       btn.disabled = false;
       btn.style.opacity = '1';
+    }
+  }     } else {
+          updateBtn.disabled = true;
+          setMsg(name, `Firmware is up to date (v${currentVersion}).`, 'success');
+        }
+      } else {
+        // Keep the button disabled until we have reliable version data on both sides
+        updateBtn.disabled = true;
+        setMsg(name, `GitHub firmware: ${rel.version || 'unknown'} – version check incomplete.`, 'info');
+      }
+    } catch (e) {
+      document.getElementById('gh-ver-' + name).textContent = 'Error';
+      setMsg(name, 'Failed to fetch GitHub release info.', 'error');
     }
   }
 
@@ -547,39 +539,18 @@
   }
 
   // ── OTA Push ───────────────────────────────────────────────────────────
-  async function pushFirmwareUpdate(name) {
-    const btn = document.getElementById('btn-update-fw-' + name);
+  async function pushUpdate(name) {
+    const btn = document.getElementById('btn-update-' + name);
     btn.disabled = true;
-    setMsg(name, 'Downloading firmware from GitHub and pushing to module…', 'info');
+    setMsg(name, 'Downloading from GitHub and pushing to module (filesystem + firmware)…', 'info');
 
     try {
-      const res  = await fetch('/api/module/' + name + '/update-firmware', { method: 'POST' });
+      const res  = await fetch('/api/module/' + name + '/update', { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
+        const fsNote = data.filesystem_updated ? ' (web interface + firmware updated)' : '';
         setMsg(name,
-          `✓ Firmware v${data.firmware_version} pushed successfully. Module is rebooting…`,
-          'success');
-      } else {
-        setMsg(name, 'Error: ' + (data.error || data.message || 'Unknown error'), 'error');
-        btn.disabled = false;
-      }
-    } catch (e) {
-      setMsg(name, 'Network error: ' + e, 'error');
-      btn.disabled = false;
-    }
-  }
-
-  async function pushFilesystemUpdate(name) {
-    const btn = document.getElementById('btn-update-fs-' + name);
-    btn.disabled = true;
-    setMsg(name, 'Downloading filesystem image from GitHub and pushing to module…', 'info');
-
-    try {
-      const res  = await fetch('/api/module/' + name + '/update-filesystem', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.status === 'ok') {
-        setMsg(name,
-          `✓ Filesystem image pushed successfully. Module is rebooting…`,
+          `✓ Firmware v${data.firmware_version} pushed successfully${fsNote}. Module is rebooting…`,
           'success');
       } else {
         setMsg(name, 'Error: ' + (data.error || data.message || 'Unknown error'), 'error');

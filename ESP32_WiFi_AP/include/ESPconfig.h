@@ -55,23 +55,31 @@ public:
     };
     APConfig apCfg;
 
-    // STA (station / upstream) settings – optional
+    // STA (station / upstream) settings – supports up to MAX_NETWORKS networks
     class STAConfig {
     public:
-        char ssid[64];
-        char password[64];
+        static const int MAX_NETWORKS = 4;
+        char ssids[MAX_NETWORKS][64];
+        char passwords[MAX_NETWORKS][64];
         uint8_t ips[4];    // STA IP (0.0.0.0 = DHCP)
-        bool enabled;
+        uint8_t count;     // number of configured networks
         uint8_t state;     // 0 = not connected, 1 = connected
+        int8_t  activeIdx; // index of currently connected network (-1 = none)
         STAConfig() {
-            memset(ssid, 0, sizeof(ssid));
-            memset(password, 0, sizeof(password));
+            for (int i = 0; i < MAX_NETWORKS; i++) {
+                memset(ssids[i], 0, sizeof(ssids[i]));
+                memset(passwords[i], 0, sizeof(passwords[i]));
+            }
             ips[0] = 0; ips[1] = 0; ips[2] = 0; ips[3] = 0;
-            enabled = false;
-            state   = 0;
+            count     = 0;
+            state     = 0;
+            activeIdx = -1;
         }
     };
     STAConfig staCfg;
+
+    // WiFi operating mode: 0 = AP only, 1 = AP+STA (bridge), 2 = STA only
+    uint8_t wifiMode;
 
     // UDP relay statistics (updated at runtime)
     class UDPStats {

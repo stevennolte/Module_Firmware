@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 GPS Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 16px; }
+    header { background: #1a6b2f; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.3rem; }
+    header .sub { font-size: 0.8rem; opacity: 0.85; }
+    nav { margin-bottom: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 8px 16px; font-size: 0.85rem; font-weight: bold; background: #1a6b2f; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0f4520; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 18px; }
+    .card h2 { font-size: 0.95rem; color: #555; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .lbl { color: #777; }
+    .stat-row .val { font-weight: bold; color: #1a6b2f; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: bold; }
+    .badge-ok  { background: #d4edda; color: #155724; }
+    .badge-warn{ background: #fff3cd; color: #856404; }
+    .badge-err { background: #f8d7da; color: #721c24; }
+    .badge-off { background: #e2e3e5; color: #666; }
+    .panda-box { font-family: monospace; font-size: 0.78rem; background: #f8f9fa; border-radius: 6px; padding: 8px; word-break: break-all; margin-top: 8px; min-height: 32px; color: #333; }
+    .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; color: white; transition: background 0.2s; }
+    .btn-green { background: #1a6b2f; } .btn-green:hover { background: #0f4520; }
+    .btn-red   { background: #c0392b; } .btn-red:hover   { background: #922b21; }
+    .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
+    .toggle-container { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+    #lastUpdate { font-size: 0.75rem; color: #aaa; text-align: right; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GPS Module &ndash; ESP32-S3</h1>
+    <div class="sub">NOLTE_FARM Access Point &nbsp;|&nbsp; PANDA sentence generator</div>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Status</a>
+  <a href="#" onclick="reboot()">Reboot</a>
+  <a href="#" onclick="document.getElementById('fwForm').style.display='block'">OTA Update</a>
+</nav>
+
+<!-- OTA upload (hidden by default) -->
+<div id="fwForm" class="card" style="display:none; margin-bottom:16px;">
+  <h2>Firmware / Filesystem Update</h2>
+  <p style="font-size:0.85rem;color:#666;margin:8px 0;">Firmware file must start with <strong>ESP32_GPS</strong>.</p>
+  <form method="POST" action="/update"    enctype="multipart/form-data" style="margin-bottom:8px;">
+    <input type="file" name="update" accept=".bin"> <button class="btn btn-green" type="submit">Flash Firmware</button>
+  </form>
+  <form method="POST" action="/updatefs"  enctype="multipart/form-data">
+    <input type="file" name="update" accept=".bin"> <button class="btn btn-green" type="submit">Flash Filesystem</button>
+  </form>
+</div>
+
+<div class="grid">
+
+  <!-- System card -->
+  <div class="card">
+    <h2>System</h2>
+    <div class="stat-row"><span class="lbl">Program</span>    <span class="val" id="sysName">--</span></div>
+    <div class="stat-row"><span class="lbl">Version</span>    <span class="val" id="sysVer">--</span></div>
+    <div class="stat-row"><span class="lbl">Uptime</span>     <span class="val" id="sysUp">--</span></div>
+    <div class="stat-row"><span class="lbl">Free Heap</span>  <span class="val" id="sysHeap">--</span></div>
+    <div class="stat-row"><span class="lbl">AP SSID</span>    <span class="val" id="apSsid">--</span></div>
+    <div class="stat-row"><span class="lbl">AP IP</span>      <span class="val" id="apIp">--</span></div>
+    <div class="stat-row"><span class="lbl">Clients</span>    <span class="val" id="apCli">--</span></div>
+  </div>
+
+  <!-- GPS card -->
+  <div class="card">
+    <h2>GPS (UM980)</h2>
+    <div class="stat-row"><span class="lbl">Status</span>     <span id="gpsBadge" class="badge badge-off">--</span></div>
+    <div class="stat-row"><span class="lbl">Fix Quality</span><span class="val" id="gpsFix">--</span></div>
+    <div class="stat-row"><span class="lbl">Satellites</span> <span class="val" id="gpsSats">--</span></div>
+    <div class="stat-row"><span class="lbl">Latitude</span>   <span class="val" id="gpsLat">--</span></div>
+    <div class="stat-row"><span class="lbl">Longitude</span>  <span class="val" id="gpsLon">--</span></div>
+    <div class="stat-row"><span class="lbl">Altitude</span>   <span class="val" id="gpsAlt">--</span></div>
+    <div class="stat-row"><span class="lbl">Speed</span>      <span class="val" id="gpsSpd">--</span></div>
+    <div class="stat-row"><span class="lbl">HDOP</span>       <span class="val" id="gpsHdop">--</span></div>
+    <div class="stat-row"><span class="lbl">GGA msgs</span>   <span class="val" id="gpsGga">--</span></div>
+  </div>
+
+  <!-- IMU card -->
+  <div class="card">
+    <h2>IMU (BNO08x)</h2>
+    <div class="stat-row"><span class="lbl">Status</span>     <span id="imuBadge" class="badge badge-off">--</span></div>
+    <div class="stat-row"><span class="lbl">Heading</span>    <span class="val" id="imuHdg">--</span></div>
+    <div class="stat-row"><span class="lbl">Roll</span>       <span class="val" id="imuRoll">--</span></div>
+    <div class="stat-row"><span class="lbl">Pitch</span>      <span class="val" id="imuPitch">--</span></div>
+    <div class="stat-row"><span class="lbl">Yaw Rate</span>   <span class="val" id="imuYaw">--</span></div>
+  </div>
+
+  <!-- PANDA / NTRIP card -->
+  <div class="card">
+    <h2>PANDA &amp; NTRIP</h2>
+    <div class="stat-row"><span class="lbl">PANDA sent</span>    <span class="val" id="pandaCnt">--</span></div>
+    <div class="stat-row"><span class="lbl">PANDA rate</span>    <span class="val" id="pandaHz">--</span></div>
+    <div class="stat-row"><span class="lbl">NTRIP pkts</span>    <span class="val" id="ntripCnt">--</span></div>
+    <div class="stat-row"><span class="lbl">NTRIP bytes</span>   <span class="val" id="ntripByt">--</span></div>
+    <div class="toggle-container">
+      <span class="lbl">PANDA Broadcast</span>
+      <button id="fwdBtn" class="btn btn-sm btn-green" onclick="toggleGpsForwarding()">ON</button>
+    </div>
+    <h2 style="margin-top:12px;">Last PANDA sentence</h2>
+    <div class="panda-box" id="pandaRaw">waiting for data…</div>
+  </div>
+
+</div>
+
+<div id="lastUpdate">Last update: --</div>
+
+<script>
+  const FIX_LABELS = ['No fix','GPS fix','DGPS fix','PPS fix','RTK Fixed','RTK Float','Estimated','Manual','Simulation'];
+
+  function badgeClass(state) {
+    if (state === 'OK')     return 'badge-ok';
+    if (state === 'FAILED') return 'badge-err';
+    return 'badge-warn';
+  }
+
+  function txt(id, val) { document.getElementById(id).textContent = val; }
+  function badge(id, state) {
+    const el = document.getElementById(id);
+    el.textContent = state;
+    el.className   = 'badge ' + badgeClass(state);
+  }
+
+  function parseImu(raw) {
+    const n = parseInt(raw, 10);
+    return isNaN(n) ? '--' : (n / 10).toFixed(1) + '°';
+  }
+
+  function updateGpsForwardingButton(enabled) {
+    const btn = document.getElementById('fwdBtn');
+    if (enabled) {
+      btn.textContent = 'ON';
+      btn.className = 'btn btn-sm btn-green';
+    } else {
+      btn.textContent = 'OFF';
+      btn.className = 'btn btn-sm btn-red';
+    }
+  }
+
+  function loadGpsForwarding() {
+    fetch('/getGpsForwarding')
+      .then(r => r.json())
+      .then(data => updateGpsForwardingButton(data.enabled))
+      .catch(e => console.warn('panda broadcast fetch error', e));
+  }
+
+  function toggleGpsForwarding() {
+    const btn = document.getElementById('fwdBtn');
+    const newState = btn.textContent === 'OFF';
+    fetch('/setGpsForwarding?enable=' + (newState ? '1' : '0'))
+      .then(r => r.json())
+      .then(data => updateGpsForwardingButton(data.enabled))
+      .catch(e => console.warn('panda broadcast toggle error', e));
+  }
+
+  function load() {
+    fetch('/getDebugVars')
+      .then(r => r.json())
+      .then(data => {
+        const m = {};
+        data.forEach(line => {
+          const i = line.indexOf(': ');
+          if (i > 0) m[line.slice(0, i).trim()] = line.slice(i + 2).trim();
+        });
+
+        txt('sysName', m['Program']   || '--');
+        txt('sysVer',  m['Version']   || '--');
+        txt('sysUp',   m['Uptime [s]'] ? m['Uptime [s]'] + ' s' : '--');
+        txt('sysHeap', m['Free Heap'] || '--');
+        txt('apSsid',  m['AP SSID']   || '--');
+        txt('apIp',    m['AP IP']     || '--');
+        txt('apCli',   m['AP Clients']|| '--');
+
+        // GPS
+        const gpsState = m['GPS State'] || 'INIT';
+        badge('gpsBadge', gpsState);
+        const fq = parseInt(m['Fix Quality'] || '0', 10);
+        txt('gpsFix', (FIX_LABELS[fq] || fq) + ' (' + fq + ')');
+        txt('gpsSats', m['Satellites']  || '--');
+        txt('gpsLat',  m['Latitude']    || '--');
+        txt('gpsLon',  m['Longitude']   || '--');
+        txt('gpsAlt',  m['Altitude']    || '--');
+        txt('gpsSpd',  m['Speed']       || '--');
+        txt('gpsHdop', m['HDOP']        || '--');
+        txt('gpsGga',  m['GGA count']   || '--');
+
+        // IMU
+        badge('imuBadge', m['IMU State'] || 'INIT');
+        txt('imuHdg',   parseImu(m['Heading (×10)']  || ''));
+        txt('imuRoll',  parseImu(m['Roll (×10)']      || ''));
+        txt('imuPitch', parseImu(m['Pitch (×10)']     || ''));
+        txt('imuYaw',   parseImu(m['Yaw rate (×10)']  || ''));
+
+        // PANDA / NTRIP
+        txt('pandaCnt', m['PANDA sent']  || '0');
+        txt('pandaHz',  m['PANDA rate']  || 'N/A');
+        txt('ntripCnt', m['NTRIP packets']|| '0');
+        txt('ntripByt', m['NTRIP bytes'] || '0');
+        const raw = m['Last PANDA'] || '';
+        document.getElementById('pandaRaw').textContent = raw || 'waiting…';
+
+        txt('lastUpdate', 'Last update: ' + new Date().toLocaleTimeString());
+      })
+      .catch(e => console.warn('fetch error', e));
+  }
+
+  function reboot() {
+    if (confirm('Reboot the ESP32 GPS module?')) {
+      fetch('/reboot').then(() => alert('Rebooting…'));
+    }
+  }
+
+  setInterval(load, 1000);
+  setInterval(loadGpsForwarding, 2000);
+  window.onload = function() {
+    load();
+    loadGpsForwarding();
+  };
+</script>
+</body>
+</html>
