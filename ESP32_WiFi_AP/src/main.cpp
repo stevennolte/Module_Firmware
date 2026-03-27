@@ -96,7 +96,8 @@ void updateDebugVars() {
                                         String(apCfg.ips[3]));
     debugVars.push_back("AP Channel: " + String(apCfg.channel));
     debugVars.push_back("Connected Clients: " + String(espWifi.getConnectedClients()));
-    debugVars.push_back("STA Enabled: "   + String(staCfg.enabled ? "YES" : "NO"));
+    debugVars.push_back("STA Enabled: "   + String(staCfg.count > 0 && espConfig.wifiMode != 0 ? "YES" : "NO"));
+    debugVars.push_back("STA Networks: "  + String(staCfg.count));
     debugVars.push_back("STA Connected: " + String(staCfg.state == 1 ? "YES" : "NO"));
     if (staCfg.state == 1) {
         debugVars.push_back("STA IP: " + WiFi.localIP().toString());
@@ -119,41 +120,123 @@ void handleDebugVars(AsyncWebServerRequest* request) {
 
 // ── Settings handlers ────────────────────────────────────────────────────
 
+void handleGetSettings(AsyncWebServerRequest* request) {
+    DynamicJsonDocument doc(1024);
+    doc["wifi_mode"] = espConfig.wifiMode;
+    doc["ap_ssid"]   = espConfig.apCfg.ssid;
+    doc["ap_pass"]   = espConfig.apCfg.password;
+    doc["ap_ch"]     = espConfig.apCfg.channel;
+    doc["ap_ip3"]    = espConfig.apCfg.ips[3];
+    JsonArray networks = doc.createNestedArray("sta_networks");
+    for (int i = 0; i < espConfig.staCfg.count; i++) {
+        JsonObject net = networks.createNestedObject();
+        net["ssid"] = espConfig.staCfg.ssids[i];
+        net["pass"] = espConfig.staCfg.passwords[i];
+    }
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+}
+
 void handleSaveSettings(AsyncWebServerRequest* request) {
     bool doReboot = false;
     if (request->hasParam("ap_ssid", true)) {
-        espConfig.preferences.putString("ap_ssid", request->getParam("ap_ssid", true)->value());
-        doReboot = true;
+        String v = request->getParam("ap_ssid", true)->value();
+        if (v.length() > 0 && v.length() < 64) { espConfig.preferences.putString("ap_ssid", v); doReboot = true; }
     }
     if (request->hasParam("ap_pass", true)) {
-        espConfig.preferences.putString("ap_pass", request->getParam("ap_pass", true)->value());
-        doReboot = true;
+        String v = request->getParam("ap_pass", true)->value();
+        if (v.length() > 0 && v.length() < 64) { espConfig.preferences.putString("ap_pass", v); doReboot = true; }
     }
     if (request->hasParam("ap_ch", true)) {
         int ch = request->getParam("ap_ch", true)->value().toInt();
-        if (ch >= 1 && ch <= 13) espConfig.preferences.putInt("ap_ch", ch);
-        doReboot = true;
+        if (ch >= 1 && ch <= 13) { espConfig.preferences.putInt("ap_ch", ch); doReboot = true; }
     }
     if (request->hasParam("ap_ip3", true)) {
         int ip3 = request->getParam("ap_ip3", true)->value().toInt();
-        if (ip3 >= 1 && ip3 <= 254) espConfig.preferences.putInt("ap_ip3", ip3);
-        doReboot = true;
+        if (ip3 >= 1 && ip3 <= 254) { espConfig.preferences.putInt("ap_ip3", ip3); doReboot = true; }
     }
-    if (request->hasParam("sta_en", true)) {
-        bool en = (request->getParam("sta_en", true)->value() == "1");
-        espConfig.preferences.putBool("sta_en", en);
-        doReboot = true;
-    }
-    if (request->hasParam("sta_ssid", true)) {
-        espConfig.preferences.putString("sta_ssid", request->getParam("sta_ssid", true)->value());
-        doReboot = true;
-    }
-    if (request->hasParam("sta_pass", true)) {
-        espConfig.preferences.putString("sta_pass", request->getParam("sta_pass", true)->value());
-        doReboot = true;
+    if (request->hasParam("wifi_mode", true)) {
+        int mode = request->getParam("wifi_mode", true)->value().toInt();
+        if (mode >= 0 && mode <= 2) {
+            espConfig.preferences.putInt("wifi_mode", mode);
+            doReboot = true;
+        }
     }
     request->send(200, "text/plain", doReboot ? "Settings saved. Rebooting..." : "No changes.");
     if (doReboot) { delay(500); ESP.restart(); }
+}
+
+void handleAddNetwork(AsyncWebServerRequest* request) {
+    if (!request->hasParam("ssid", true)) {
+        request->send(400, "text/plain", "Missing ssid");
+        return;
+    }
+    String ssid = request->getParam("ssid", true)->value();
+    String pass = request->hasParam("pass", true) ? request->getParam("pass", true)->value() : "";
+    ssid.trim();
+    if (ssid.length() == 0 || ssid.length() >= 64) {
+        request->send(400, "text/plain", "SSID must be 1–63 characters");
+        return;
+    }
+    if (pass.length() >= 64) {
+        request->send(400, "text/plain", "Password must be fewer than 64 characters");
+        return;
+    }
+    int count = espConfig.preferences.getInt("sta_count", 0);
+    if (count >= ESPconfig::STAConfig::MAX_NETWORKS) {
+        request->send(400, "text/plain", "Maximum number of networks reached");
+        return;
+    }
+    // Check for duplicate
+    for (int i = 0; i < count; i++) {
+        String keySSID = "sta_ssid_" + String(i);
+        if (espConfig.preferences.getString(keySSID.c_str(), "") == ssid) {
+            request->send(400, "text/plain", "Network already exists");
+            return;
+        }
+    }
+    String keySSID = "sta_ssid_" + String(count);
+    String keyPass = "sta_pass_" + String(count);
+    espConfig.preferences.putString(keySSID.c_str(), ssid);
+    espConfig.preferences.putString(keyPass.c_str(), pass);
+    espConfig.preferences.putInt("sta_count", count + 1);
+    request->send(200, "text/plain", "Network added. Rebooting...");
+    delay(500);
+    ESP.restart();
+}
+
+void handleRemoveNetwork(AsyncWebServerRequest* request) {
+    if (!request->hasParam("index", true)) {
+        request->send(400, "text/plain", "Missing index");
+        return;
+    }
+    int idx   = request->getParam("index", true)->value().toInt();
+    int count = espConfig.preferences.getInt("sta_count", 0);
+    if (idx < 0 || idx >= count) {
+        request->send(400, "text/plain", "Invalid index");
+        return;
+    }
+    // Shift remaining entries down
+    for (int i = idx; i < count - 1; i++) {
+        String keySSID_src = "sta_ssid_" + String(i + 1);
+        String keyPass_src = "sta_pass_" + String(i + 1);
+        String keySSID_dst = "sta_ssid_" + String(i);
+        String keyPass_dst = "sta_pass_" + String(i);
+        espConfig.preferences.putString(keySSID_dst.c_str(),
+            espConfig.preferences.getString(keySSID_src.c_str(), ""));
+        espConfig.preferences.putString(keyPass_dst.c_str(),
+            espConfig.preferences.getString(keyPass_src.c_str(), ""));
+    }
+    // Clear the last slot
+    String keySSID_last = "sta_ssid_" + String(count - 1);
+    String keyPass_last = "sta_pass_" + String(count - 1);
+    espConfig.preferences.remove(keySSID_last.c_str());
+    espConfig.preferences.remove(keyPass_last.c_str());
+    espConfig.preferences.putInt("sta_count", count - 1);
+    request->send(200, "text/plain", "Network removed. Rebooting...");
+    delay(500);
+    ESP.restart();
 }
 
 void handleReboot(AsyncWebServerRequest* request) {
@@ -225,7 +308,7 @@ void setup() {
     espWifi.startAP();
 
     // Optionally connect to upstream STA network
-    if (staCfg.enabled) {
+    if (espConfig.wifiMode != 0 && staCfg.count > 0) {
         espWifi.connectSTA();
     }
 
@@ -246,10 +329,13 @@ void setup() {
     });
 
     server.on("/getDebugVars",  HTTP_GET, handleDebugVars);
+    server.on("/getSettings",   HTTP_GET, handleGetSettings);
     server.on("/getFiles",      HTTP_GET, handleFileList);
     server.on("/download",      HTTP_GET, handleFileDownload);
     server.on("/reboot",        HTTP_GET, handleReboot);
     server.on("/saveSettings",  HTTP_POST, handleSaveSettings);
+    server.on("/addNetwork",    HTTP_POST, handleAddNetwork);
+    server.on("/removeNetwork", HTTP_POST, handleRemoveNetwork);
 
     server.on("/upload", HTTP_POST,
               [](AsyncWebServerRequest* r) {},

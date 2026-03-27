@@ -12,8 +12,15 @@ void ESPWifi::startAP() {
                    espConfig->apCfg.ips[2], espConfig->apCfg.ips[3]);
     IPAddress subnet(255, 255, 255, 0);
 
-    // Use AP_STA so the STA interface is also available if needed
-    WiFi.mode(WIFI_AP_STA);
+    // Set WiFi mode based on wifiMode setting:
+    // 0 = AP only, 1 = AP+STA, 2 = STA only
+    if (espConfig->wifiMode == 2) {
+        WiFi.mode(WIFI_STA);
+    } else if (espConfig->wifiMode == 1) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_AP);
+    }
 
     // Disable power saving for lowest possible latency
     esp_wifi_set_ps(WIFI_PS_NONE);
@@ -21,30 +28,55 @@ void ESPWifi::startAP() {
     // Maximum transmit power for best range and reliability
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
-    WiFi.softAP(espConfig->apCfg.ssid,
-                espConfig->apCfg.password,
-                espConfig->apCfg.channel,
-                0,  // ssid_hidden = 0 (visible)
-                espConfig->apCfg.maxClients);
-    delay(100);
-    WiFi.softAPConfig(apIP, apIP, subnet);
+    if (espConfig->wifiMode != 2) {
+        // Start AP unless in STA-only mode
+        WiFi.softAP(espConfig->apCfg.ssid,
+                    espConfig->apCfg.password,
+                    espConfig->apCfg.channel,
+                    0,  // ssid_hidden = 0 (visible)
+                    espConfig->apCfg.maxClients);
+        delay(100);
+        WiFi.softAPConfig(apIP, apIP, subnet);
 
-    Serial.printf("AP started: SSID=%s  IP=%s  ch=%d  maxClients=%d\n",
-                  espConfig->apCfg.ssid,
-                  apIP.toString().c_str(),
-                  espConfig->apCfg.channel,
-                  espConfig->apCfg.maxClients);
+        Serial.printf("AP started: SSID=%s  IP=%s  ch=%d  maxClients=%d\n",
+                      espConfig->apCfg.ssid,
+                      apIP.toString().c_str(),
+                      espConfig->apCfg.channel,
+                      espConfig->apCfg.maxClients);
+    }
 
     MDNS.begin(NAME);
     Serial.printf("mDNS: %s.local\n", NAME);
 }
 
 void ESPWifi::connectSTA() {
-    if (!espConfig->staCfg.enabled || strlen(espConfig->staCfg.ssid) == 0) {
+    if (espConfig->wifiMode == 0 || espConfig->staCfg.count == 0) {
         return;
     }
 
-    Serial.printf("STA: connecting to %s ...\n", espConfig->staCfg.ssid);
+    Serial.printf("STA: scanning for %d configured network(s)...\n", espConfig->staCfg.count);
+
+    // Scan available networks and find the first configured one
+    int found = WiFi.scanNetworks();
+    int bestIdx = -1;
+    for (int si = 0; si < found && bestIdx < 0; si++) {
+        String scannedSSID = WiFi.SSID(si);
+        for (int ci = 0; ci < espConfig->staCfg.count; ci++) {
+            if (scannedSSID == espConfig->staCfg.ssids[ci]) {
+                bestIdx = ci;
+                break;
+            }
+        }
+    }
+    WiFi.scanDelete();
+
+    if (bestIdx < 0) {
+        // No matching network visible – fall back to the first configured entry
+        bestIdx = 0;
+    }
+
+    Serial.printf("STA: connecting to %s ...\n", espConfig->staCfg.ssids[bestIdx]);
+    espConfig->staCfg.activeIdx = bestIdx;
 
     // Static IP if configured, otherwise DHCP
     bool useStatic = (espConfig->staCfg.ips[0] != 0);
@@ -60,7 +92,7 @@ void ESPWifi::connectSTA() {
     }
 
     WiFi.setHostname(NAME);
-    WiFi.begin(espConfig->staCfg.ssid, espConfig->staCfg.password);
+    WiFi.begin(espConfig->staCfg.ssids[bestIdx], espConfig->staCfg.passwords[bestIdx]);
 }
 
 void ESPWifi::startMonitor() {
@@ -74,7 +106,7 @@ void ESPWifi::taskHandler(void* param) {
 void ESPWifi::continuousLoop() {
     bool mdnsStarted = false;
     while (true) {
-        if (espConfig->staCfg.enabled) {
+        if (espConfig->wifiMode != 0 && espConfig->staCfg.count > 0) {
             if (WiFi.status() == WL_CONNECTED) {
                 if (!mdnsStarted) {
                     mdnsStarted = true;

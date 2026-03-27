@@ -12,63 +12,122 @@
     nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
     nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
     nav a:hover { background: #0d47a1; }
-    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
-    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; max-width: 520px; }
     h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
-    h3 { font-size: 0.95rem; margin: 8px 0; color: #333; }
-    button, input[type="submit"] { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: #1565c0; color: white; transition: background 0.2s; }
-    button:hover, input[type="submit"]:hover { background: #0d47a1; }
-    button:disabled { background: #90a4ae; cursor: not-allowed; }
-    .stop-btn { background: #f44336; }
-    .stop-btn:hover { background: #c62828; }
-    .btn { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
-    .btn-primary { background: #1565c0; color: white; }
-    .btn-primary:hover { background: #0d47a1; }
-    .btn-danger { background: #f44336; color: white; }
-    .btn-danger:hover { background: #c62828; }
-    .btn-warn { background: #ff9800; color: white; }
-    .btn-warn:hover { background: #e65100; }
-    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
-    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-    input[type="text"], input[type="password"], input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
-    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
-    form { margin-top: 12px; }
-    ul { background: #f8f9fa; border-radius: 6px; padding: 12px 12px 12px 36px; margin: 8px 0; }
-    li { margin: 4px 0; font-size: 0.875rem; }
-    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-    input:checked + .slider { background-color: #4CAF50; }
-    input:checked + .slider:before { transform: translateX(26px); }
     label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.875rem; }
-    input[type="text"], input[type="password"] { width: 100%; margin-top: 4px; }
-    .card { max-width: 520px; }
-    #statusMsg { margin-top: 10px; color: #333; font-size: 0.875rem; }
+    input[type="text"], input[type="password"], input[type="number"] {
+      width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 0.9rem; margin-top: 4px;
+    }
+    select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; margin-top: 4px; }
+    button { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: #1565c0; color: white; transition: background 0.2s; margin-top: 14px; }
+    button:hover { background: #0d47a1; }
+    button.danger { background: #c62828; }
+    button.danger:hover { background: #b71c1c; }
+    #statusMsg, #networkMsg, #fwStatus { margin-top: 10px; color: #333; font-size: 0.875rem; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    small { color: #666; font-size: 0.8rem; }
+    .network-list { margin-top: 12px; }
+    .network-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 6px; background: #f9f9f9; font-size: 0.875rem; }
+    .network-item .ssid { font-weight: bold; }
+    .network-item button { margin-top: 0; padding: 5px 12px; font-size: 0.8rem; }
   </style>
   <script>
+    function loadSettings() {
+      fetch('/getSettings')
+        .then(r => r.json())
+        .then(data => {
+          const wifiModeEl = document.getElementById('wifi_mode');
+          if (wifiModeEl) wifiModeEl.value = String(data.wifi_mode !== undefined ? data.wifi_mode : 0);
+          if (data.ap_ssid !== undefined) document.getElementById('ap_ssid').value = data.ap_ssid;
+          if (data.ap_pass !== undefined) document.getElementById('ap_pass').value = data.ap_pass;
+          if (data.ap_ch   !== undefined) document.getElementById('ap_ch').value   = data.ap_ch;
+          if (data.ap_ip3  !== undefined) document.getElementById('ap_ip3').value  = data.ap_ip3;
+          renderNetworkList(data.sta_networks || []);
+        })
+        .catch(e => console.error('Failed to load settings:', e));
+    }
+
+    function renderNetworkList(networks) {
+      const container = document.getElementById('networkList');
+      container.innerHTML = '';
+      if (networks.length === 0) {
+        container.innerHTML = '<p style="color:#888;font-size:0.875rem;">No networks configured.</p>';
+        return;
+      }
+      networks.forEach(function(net, idx) {
+        const item = document.createElement('div');
+        item.className = 'network-item';
+        item.innerHTML =
+          '<span class="ssid">' + escapeHtml(net.ssid) + '</span>' +
+          '<button class="danger" onclick="removeNetwork(' + idx + ', \'' + escapeHtml(net.ssid).replace(/'/g, "\\'") + '\')">Remove</button>';
+        container.appendChild(item);
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     function saveSettings() {
-      const ssid = document.getElementById('ssid').value;
-      const password = document.getElementById('password').value;
-      const ip3 = document.getElementById('ip3').value;
+      const fields = ['ap_ssid', 'ap_pass', 'ap_ch', 'ap_ip3', 'wifi_mode'];
       const formData = new URLSearchParams();
-      formData.append('ssid', ssid);
-      formData.append('password', password);
-      formData.append('ip3', ip3);
+      fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) formData.append(id, el.value);
+      });
       fetch('/saveSettings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString()
       })
         .then(r => r.text())
-        .then(msg => {
-          document.getElementById('statusMsg').textContent = msg;
-        })
+        .then(msg => { document.getElementById('statusMsg').textContent = msg; })
         .catch(e => console.error(e));
     }
 
-    // Firmware update: fetch module name for filename validation
-    function fetchFwModuleName() {
+    function addNetwork() {
+      const ssid = document.getElementById('new_ssid').value.trim();
+      const pass = document.getElementById('new_pass').value;
+      const msgEl = document.getElementById('networkMsg');
+      if (!ssid) { msgEl.textContent = 'SSID cannot be empty.'; msgEl.style.color = 'red'; return; }
+      const formData = new URLSearchParams();
+      formData.append('ssid', ssid);
+      formData.append('pass', pass);
+      fetch('/addNetwork', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      })
+        .then(r => r.text())
+        .then(msg => {
+          msgEl.textContent = msg;
+          msgEl.style.color = msg.includes('added') ? 'green' : 'red';
+          document.getElementById('new_ssid').value = '';
+          document.getElementById('new_pass').value = '';
+        })
+        .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });
+    }
+
+    function removeNetwork(idx, ssid) {
+      const msgEl = document.getElementById('networkMsg');
+      if (!confirm('Remove network "' + ssid + '"?')) return;
+      const formData = new URLSearchParams();
+      formData.append('index', idx);
+      fetch('/removeNetwork', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      })
+        .then(r => r.text())
+        .then(msg => {
+          msgEl.textContent = msg;
+          msgEl.style.color = msg.includes('removed') ? 'green' : 'red';
+        })
+        .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });
+    }
+
+    function fetchModuleName() {
       fetch('/getDebugVars')
         .then(r => r.json())
         .then(data => {
@@ -76,7 +135,7 @@
             if (item.startsWith('Program: ')) {
               const name = item.replace('Program: ', '').trim();
               const hint = document.getElementById('fwModuleHint');
-              if (hint) hint.textContent = 'Expected file: ' + name + '.bin';
+              if (hint) hint.textContent = 'Expected file: ' + name + '_*.bin';
               const inp = document.getElementById('fwFile');
               if (inp) inp.dataset.moduleName = name;
               break;
@@ -88,12 +147,8 @@
 
     function uploadFirmware() {
       const fileInput = document.getElementById('fwFile');
-      const statusEl = document.getElementById('fwStatus');
-      if (!fileInput.files.length) {
-        statusEl.textContent = 'Please select a firmware file.';
-        statusEl.style.color = 'red';
-        return;
-      }
+      const statusEl  = document.getElementById('fwStatus');
+      if (!fileInput.files.length) { statusEl.textContent = 'Please select a firmware file.'; statusEl.style.color = 'red'; return; }
       const file = fileInput.files[0];
       const moduleName = fileInput.dataset.moduleName || '';
       if (moduleName && !file.name.startsWith(moduleName)) {
@@ -109,15 +164,12 @@
         .then(r => r.text())
         .then(msg => {
           statusEl.textContent = msg;
-          statusEl.style.color = msg.includes('complete') || msg.includes('Rebooting') ? 'green' : 'red';
+          statusEl.style.color = (msg.includes('complete') || msg.includes('Rebooting')) ? 'green' : 'red';
         })
-        .catch(err => {
-          statusEl.textContent = 'Upload error: ' + err;
-          statusEl.style.color = 'red';
-        });
+        .catch(err => { statusEl.textContent = 'Upload error: ' + err; statusEl.style.color = 'red'; });
     }
 
-    window.onload = fetchFwModuleName;
+    window.onload = function() { loadSettings(); fetchModuleName(); };
   </script>
 </head>
 <body>
@@ -129,20 +181,49 @@
   </nav>
 
   <div class="card">
-    <h2>Network</h2>
-    <p style="font-size:0.875rem; color:#555; margin-bottom:8px;">
-      Changes take effect after reboot.<br>
-      Default AP SSID: <strong>ESP32_Row_Controller</strong><br>
-      Default AP Password: <strong>1234567890</strong>
-    </p>
-    <label>WiFi SSID</label>
-    <input type="text" id="ssid" placeholder="Your network SSID">
-    <label>WiFi Password</label>
-    <input type="password" id="password" placeholder="Your network password">
-    <label>Device IP (last octet, e.g. 5 &rarr; 192.168.1.5)</label>
-    <input type="text" id="ip3" placeholder="5">
-    <button style="margin-top:14px;" onclick="saveSettings()">Save &amp; Reboot</button>
+    <h2>WiFi Mode</h2>
+    <small>Controls how the module uses WiFi. Changes take effect after reboot.</small>
+    <label>Mode</label>
+    <select id="wifi_mode">
+      <option value="0">AP Only (Access Point)</option>
+      <option value="1">AP + STA (connect to network while hosting AP)</option>
+      <option value="2">STA Only (connect to network, no AP)</option>
+    </select>
+    <button onclick="saveSettings()">Save &amp; Reboot</button>
     <p id="statusMsg"></p>
+  </div>
+
+  <div class="card">
+    <h2>Access Point</h2>
+    <small>Changes take effect after reboot.</small>
+
+    <label>AP SSID</label>
+    <input type="text" id="ap_ssid" placeholder="ESP32_Row_Controller">
+
+    <label>AP Password <small>(min 8 chars)</small></label>
+    <input type="password" id="ap_pass" placeholder="1234567890">
+
+    <label>WiFi Channel (1–13)</label>
+    <input type="number" id="ap_ch" min="1" max="13" placeholder="6">
+
+    <label>AP IP Last Octet <small>(e.g. 5 → 192.168.1.5)</small></label>
+    <input type="number" id="ap_ip3" min="1" max="254" placeholder="5">
+  </div>
+
+  <div class="card">
+    <h2>WiFi Networks <small>– STA connections</small></h2>
+    <small>Networks the module will try to connect to (used in AP+STA and STA Only modes). Up to 4 networks. The module scans for available networks and connects to the first match.</small>
+
+    <div class="network-list" id="networkList">
+      <p style="color:#888;font-size:0.875rem;">Loading...</p>
+    </div>
+
+    <label style="margin-top:16px;">Add Network</label>
+    <input type="text" id="new_ssid" placeholder="Network SSID">
+    <label>Password</label>
+    <input type="password" id="new_pass" placeholder="Network password">
+    <button onclick="addNetwork()">Add Network</button>
+    <p id="networkMsg"></p>
   </div>
 
   <div class="card">

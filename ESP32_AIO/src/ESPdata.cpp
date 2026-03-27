@@ -154,10 +154,51 @@ uint8_t ESPdata::loadConfig(){
     }
     program.state = preferences.getUChar("state", 0);
     program.bootMode = preferences.getUChar("bootMode", 0);
-    wifi.ips[0] = preferences.getUChar("ip0", 192);
-    wifi.ips[1] = preferences.getUChar("ip1", 168);
-    wifi.ips[2] = preferences.getUChar("ip2", 5);
-    wifi.ips[3] = preferences.getUChar("ip3", 11);
+
+    // AP settings – migrate from old ip0-ip3 keys if needed
+    if (!preferences.isKey("ap_ip0") && preferences.isKey("ip0")) {
+        preferences.putUChar("ap_ip0", preferences.getUChar("ip0", 192));
+        preferences.putUChar("ap_ip1", preferences.getUChar("ip1", 168));
+        preferences.putUChar("ap_ip2", preferences.getUChar("ip2", 5));
+        preferences.putUChar("ap_ip3", preferences.getUChar("ip3", 1));
+    }
+    apCfg.ips[0] = preferences.getUChar("ap_ip0", 192);
+    apCfg.ips[1] = preferences.getUChar("ap_ip1", 168);
+    apCfg.ips[2] = preferences.getUChar("ap_ip2", 5);
+    apCfg.ips[3] = preferences.getUChar("ap_ip3", 1);
+    apCfg.channel    = (uint8_t)preferences.getInt("ap_ch",  6);
+    apCfg.maxClients = (uint8_t)preferences.getInt("ap_max", 8);
+    {
+        String apSSID = preferences.getString("ap_ssid", NAME);
+        String apPass = preferences.getString("ap_pass", "1234567890");
+        strncpy(apCfg.ssid,     apSSID.c_str(), sizeof(apCfg.ssid) - 1);
+        strncpy(apCfg.password, apPass.c_str(),  sizeof(apCfg.password) - 1);
+        apCfg.ssid[sizeof(apCfg.ssid) - 1]         = '\0';
+        apCfg.password[sizeof(apCfg.password) - 1] = '\0';
+    }
+
+    // WiFi operating mode (0=AP only, 1=AP+STA, 2=STA only)
+    wifiMode = (uint8_t)preferences.getInt("wifi_mode", 0);
+
+    // STA network list
+    staCfg.count = (uint8_t)preferences.getInt("sta_count", 0);
+    if (staCfg.count > STAConfig::MAX_NETWORKS) staCfg.count = STAConfig::MAX_NETWORKS;
+    for (int i = 0; i < staCfg.count; i++) {
+        String keySSID = "sta_ssid_" + String(i);
+        String keyPass = "sta_pass_" + String(i);
+        String s = preferences.getString(keySSID.c_str(), "");
+        String p = preferences.getString(keyPass.c_str(), "");
+        strncpy(staCfg.ssids[i],     s.c_str(), sizeof(staCfg.ssids[i]) - 1);
+        strncpy(staCfg.passwords[i], p.c_str(), sizeof(staCfg.passwords[i]) - 1);
+        staCfg.ssids[i][sizeof(staCfg.ssids[i]) - 1]         = '\0';
+        staCfg.passwords[i][sizeof(staCfg.passwords[i]) - 1] = '\0';
+    }
+
+    // Populate legacy wifi.ips from apCfg for display/debug code
+    wifi.ips[0] = apCfg.ips[0];
+    wifi.ips[1] = apCfg.ips[1];
+    wifi.ips[2] = apCfg.ips[2];
+    wifi.ips[3] = apCfg.ips[3];
     program.mcpState = preferences.getUChar("mcpState", 0);
     program.twoWireState = preferences.getUChar("twoWireState", 0);
     program.adsState = preferences.getUChar("adsState", 0);
@@ -265,10 +306,11 @@ uint8_t ESPdata::saveConfig(){
     preferences.putUChar("bootMode", program.bootMode);
     preferences.putULong("bootcount", program.bootcount);
     preferences.putUChar("state", program.state);
-    preferences.putUChar("ip0", wifi.ips[0]);
-    preferences.putUChar("ip1", wifi.ips[1]);
-    preferences.putUChar("ip2", wifi.ips[2]);
-    preferences.putUChar("ip3", wifi.ips[3]);
+    preferences.putUChar("ap_ip0", apCfg.ips[0]);
+    preferences.putUChar("ap_ip1", apCfg.ips[1]);
+    preferences.putUChar("ap_ip2", apCfg.ips[2]);
+    preferences.putUChar("ap_ip3", apCfg.ips[3]);
+    preferences.putInt("wifi_mode", wifiMode);
     preferences.putUChar("ledBrightness", program.ledBrht);
     preferences.putFloat("wasZero", steer.wasZeroAngle);
     preferences.putString("name", program.name);
@@ -304,10 +346,10 @@ uint8_t ESPdata::saveConfig(){
 }
 
 uint8_t ESPdata::updateIP() {
-    preferences.putUChar("ip0", wifi.ips[0]);
-    preferences.putUChar("ip1", wifi.ips[1]);
-    preferences.putUChar("ip2", wifi.ips[2]);
-    preferences.putUChar("ip3", wifi.ips[3]);
+    preferences.putUChar("ap_ip0", apCfg.ips[0]);
+    preferences.putUChar("ap_ip1", apCfg.ips[1]);
+    preferences.putUChar("ap_ip2", apCfg.ips[2]);
+    preferences.putUChar("ap_ip3", apCfg.ips[3]);
     Serial.println(F("Successfully updated IP address in Preferences"));
     return 1;
 }
