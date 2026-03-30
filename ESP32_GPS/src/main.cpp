@@ -33,6 +33,7 @@
 #include "Adafruit_BNO08x_RVC.h"
 #include "SparkFun_Unicore_GNSS_Arduino_Library.h"
 #include "Version.h"
+#include <NimBLEDevice.h>
 
 // ── Pin definitions ────────────────────────────────────────────────────────
 
@@ -71,6 +72,18 @@
 #define PORT_GPS    9999
 /// NTRIP corrections input port
 #define PORT_NTRIP  2233
+
+// ── BLE Nordic UART Service (NUS) ─────────────────────────────────────────
+
+/// BLE device / advertised name
+#define BLE_DEVICE_NAME  "ESP32_GPS"
+
+/// Nordic UART Service UUID
+#define BLE_NUS_SERVICE_UUID  "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+/// NUS RX characteristic UUID – phone writes commands here
+#define BLE_NUS_RX_UUID       "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+/// NUS TX characteristic UUID – ESP32 notifies / sends data here
+#define BLE_NUS_TX_UUID       "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 // ── GPS / IMU data ─────────────────────────────────────────────────────────
 
@@ -153,6 +166,11 @@ AsyncWebServer server(80);
 AsyncUDP       udpGPS;             ///< Port 9999 – PANDA broadcast
 AsyncUDP       udpAIO;             ///< Port 8888 – AgIO comms
 AsyncUDP       udpNtrip;           ///< Port 2233 – NTRIP forwarding
+
+// ── BLE globals ────────────────────────────────────────────────────────────
+
+static NimBLECharacteristic* pBleTxChar = nullptr; ///< NUS TX (notify to phone)
+static bool                  bleConnected = false;  ///< True when a BLE client is connected
 
 // ── Shared debug variables ─────────────────────────────────────────────────
 
@@ -743,6 +761,213 @@ static void startWiFiAP() {
 
 // ── Web server helpers ─────────────────────────────────────────────────────
 
+// Forward declaration (defined later in this file)
+static void updateDebugVars();
+
+/**
+ * @brief Send a string to the connected BLE client via NUS TX notifications.
+ *
+ * @details Splits the message into chunks of up to 20 bytes so it fits within
+ *          the default BLE ATT MTU.  Each chunk is sent as a separate notify.
+ *          No-op when no client is connected.
+ *
+ * @param msg  The string to send.
+ */
+static void bleSend(const String& msg) {
+    if (!bleConnected || !pBleTxChar) return;
+    const size_t chunkSize = 20;
+    for (size_t i = 0; i < msg.length(); i += chunkSize) {
+        String chunk = msg.substring(i, i + chunkSize);
+        pBleTxChar->setValue(chunk.c_str());
+        pBleTxChar->notify();
+        delay(10);   // give the BLE stack time to transmit
+    }
+}
+
+/**
+ * @brief Handle a BLE command received from the connected Android client.
+ *
+ * @details Supported commands (case-insensitive):
+ *   - STATUS              – dump all debug variables (one per line)
+ *   - GET <setting>       – return the current value of a setting
+ *   - SET <setting> <val> – change a setting (val: 1 / 0 / true / false)
+ *   - HELP                – list available commands and settings
+ *   - REBOOT              – restart the ESP32
+ *
+ *   Settings:
+ *     pandaBroadcast  – enable/disable PANDA UDP broadcast
+ *     invertRoll      – negate the IMU roll value
+ *     flipPitchRoll   – swap IMU pitch and roll axes
+ *     disableHeading  – send 0 in the PANDA heading field
+ *
+ * @param cmd  Null-terminated command string (leading/trailing whitespace
+ *             should be removed by the caller).
+ */
+static void handleBLECommand(const char* cmd) {
+    String s(cmd);
+    s.trim();
+
+    // ── HELP ────────────────────────────────────────────────────────────
+    if (s.equalsIgnoreCase("HELP")) {
+        bleSend("Commands:\r\n");
+        bleSend(" STATUS\r\n");
+        bleSend(" GET <setting>\r\n");
+        bleSend(" SET <setting> <0|1>\r\n");
+        bleSend(" REBOOT\r\n");
+        bleSend("Settings:\r\n");
+        bleSend(" pandaBroadcast\r\n");
+        bleSend(" invertRoll\r\n");
+        bleSend(" flipPitchRoll\r\n");
+        bleSend(" disableHeading\r\n");
+        return;
+    }
+
+    // ── STATUS ──────────────────────────────────────────────────────────
+    if (s.equalsIgnoreCase("STATUS")) {
+        updateDebugVars();
+        for (const auto& v : debugVars) {
+            bleSend(v + "\r\n");
+        }
+        return;
+    }
+
+    // ── REBOOT ──────────────────────────────────────────────────────────
+    if (s.equalsIgnoreCase("REBOOT")) {
+        bleSend("Rebooting...\r\n");
+        delay(200);
+        ESP.restart();
+        return;
+    }
+
+    // ── GET / SET ────────────────────────────────────────────────────────
+    int spaceIdx = s.indexOf(' ');
+    if (spaceIdx < 0) {
+        bleSend("ERR: unknown command. Send HELP\r\n");
+        return;
+    }
+
+    String verb    = s.substring(0, spaceIdx);
+    String rest    = s.substring(spaceIdx + 1);
+    rest.trim();
+
+    auto boolStr = [](bool v) -> const char* { return v ? "1" : "0"; };
+    auto parseBool = [](const String& v) -> bool {
+        return v == "1" || v.equalsIgnoreCase("true") || v.equalsIgnoreCase("on");
+    };
+
+    if (verb.equalsIgnoreCase("GET")) {
+        if      (rest.equalsIgnoreCase("pandaBroadcast"))  bleSend("pandaBroadcast=" + String(boolStr(gpsState.enablePandaBroadcast)) + "\r\n");
+        else if (rest.equalsIgnoreCase("invertRoll"))       bleSend("invertRoll="      + String(boolStr(gpsState.invertRoll))           + "\r\n");
+        else if (rest.equalsIgnoreCase("flipPitchRoll"))    bleSend("flipPitchRoll="   + String(boolStr(gpsState.flipPitchRoll))        + "\r\n");
+        else if (rest.equalsIgnoreCase("disableHeading"))   bleSend("disableHeading="  + String(boolStr(gpsState.disableHeading))       + "\r\n");
+        else    bleSend("ERR: unknown setting '" + rest + "'\r\n");
+        return;
+    }
+
+    if (verb.equalsIgnoreCase("SET")) {
+        int sp2 = rest.indexOf(' ');
+        if (sp2 < 0) { bleSend("ERR: SET needs <setting> <value>\r\n"); return; }
+        String setting = rest.substring(0, sp2);
+        String value   = rest.substring(sp2 + 1);
+        setting.trim(); value.trim();
+
+        if      (setting.equalsIgnoreCase("pandaBroadcast")) { gpsState.enablePandaBroadcast = parseBool(value); }
+        else if (setting.equalsIgnoreCase("invertRoll"))      { gpsState.invertRoll           = parseBool(value); }
+        else if (setting.equalsIgnoreCase("flipPitchRoll"))   { gpsState.flipPitchRoll        = parseBool(value); }
+        else if (setting.equalsIgnoreCase("disableHeading"))  { gpsState.disableHeading       = parseBool(value); }
+        else    { bleSend("ERR: unknown setting '" + setting + "'\r\n"); return; }
+
+        bleSend("OK: " + setting + "=" + value + "\r\n");
+        Serial.printf("[BLE] SET %s=%s\n", setting.c_str(), value.c_str());
+        return;
+    }
+
+    bleSend("ERR: unknown verb '" + verb + "'. Send HELP\r\n");
+}
+
+/**
+ * @brief NimBLE server connection / disconnection callbacks.
+ */
+class BLEServerCallbacks : public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* pServer) override {
+        bleConnected = true;
+        Serial.println("[BLE] Client connected");
+    }
+    void onDisconnect(NimBLEServer* pServer) override {
+        bleConnected = false;
+        Serial.println("[BLE] Client disconnected – restarting advertising");
+        pServer->startAdvertising();
+    }
+};
+
+/**
+ * @brief NimBLE NUS RX characteristic write callback.
+ *
+ * @details Triggered when the Android client writes a command to the RX
+ *          characteristic.  The value is extracted, null-terminated, and
+ *          dispatched to handleBLECommand().
+ */
+class BLERxCallbacks : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* pChar) override {
+        std::string val = pChar->getValue();
+        if (val.empty()) return;
+
+        // Copy to a mutable buffer and strip trailing CR/LF
+        char buf[256];
+        size_t len = val.length() < sizeof(buf) - 1 ? val.length() : sizeof(buf) - 1;
+        memcpy(buf, val.data(), len);
+        buf[len] = '\0';
+        while (len > 0 && (buf[len - 1] == '\r' || buf[len - 1] == '\n')) {
+            buf[--len] = '\0';
+        }
+
+        Serial.printf("[BLE] RX: %s\n", buf);
+        handleBLECommand(buf);
+    }
+};
+
+/**
+ * @brief Initialise the BLE stack and advertise the Nordic UART Service.
+ *
+ * @details Creates a BLE server with the NUS service UUID, registers the
+ *          TX (notify) and RX (write) characteristics, and starts advertising
+ *          so Android apps (e.g. nRF Connect, Serial Bluetooth Terminal) can
+ *          discover and connect to the module.
+ */
+static void initBLE() {
+    NimBLEDevice::init(BLE_DEVICE_NAME);
+    NimBLEDevice::setPower(ESP_PWR_LVL_P9);    // maximum TX power
+
+    NimBLEServer* pServer = NimBLEDevice::createServer();
+    static BLEServerCallbacks serverCbs;
+    pServer->setCallbacks(&serverCbs);
+
+    NimBLEService* pService = pServer->createService(BLE_NUS_SERVICE_UUID);
+
+    // TX characteristic – ESP32 notifies the phone with data
+    pBleTxChar = pService->createCharacteristic(
+        BLE_NUS_TX_UUID,
+        NIMBLE_PROPERTY::NOTIFY
+    );
+
+    // RX characteristic – phone writes commands here
+    NimBLECharacteristic* pRxChar = pService->createCharacteristic(
+        BLE_NUS_RX_UUID,
+        NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
+    );
+    static BLERxCallbacks rxCbs;
+    pRxChar->setCallbacks(&rxCbs);
+
+    pService->start();
+
+    NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(BLE_NUS_SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+    pAdvertising->start();
+
+    Serial.println("BLE NUS advertising as \"" BLE_DEVICE_NAME "\"");
+}
+
 static void updateDebugVars() {
     debugVars.clear();
     debugVars.push_back("Program: "  + String(NAME));
@@ -782,6 +1007,11 @@ static void updateDebugVars() {
     debugVars.push_back("PANDA broadcast: " + String(gpsState.enablePandaBroadcast ? "ON" : "OFF"));
     debugVars.push_back("NTRIP packets: " + String((unsigned long)gpsState.ntripCount));
     debugVars.push_back("NTRIP bytes: "   + String((uint32_t)gpsState.ntripBytes));
+    debugVars.push_back("--- BLE ---");
+    debugVars.push_back("BLE connected: " + String(bleConnected ? "YES" : "NO"));
+    debugVars.push_back("Invert Roll: "    + String(gpsState.invertRoll     ? "ON" : "OFF"));
+    debugVars.push_back("Flip Pitch/Roll: "+ String(gpsState.flipPitchRoll  ? "ON" : "OFF"));
+    debugVars.push_back("Disable Heading: "+ String(gpsState.disableHeading ? "ON" : "OFF"));
 }
 
 static void handleDebugVars(AsyncWebServerRequest* req) {
@@ -975,6 +1205,9 @@ void setup() {
 
     server.begin();
     Serial.println("Web server started on http://" + WiFi.softAPIP().toString());
+
+    // ── BLE ───────────────────────────────────────────────────────────────
+    initBLE();
 
     // ── GPS FreeRTOS task (Core 1) ────────────────────────────────────────
     xTaskCreatePinnedToCore(gpsTask, "GPS_Task", 16384, nullptr, 3, nullptr, 1);
