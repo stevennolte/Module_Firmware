@@ -114,6 +114,21 @@
     <div class="panda-box" id="pandaRaw">waiting for data…</div>
   </div>
 
+  <!-- BLE card -->
+  <div class="card">
+    <h2>Bluetooth BLE</h2>
+    <div class="stat-row"><span class="lbl">Status</span>        <span id="bleBadge" class="badge badge-off">--</span></div>
+    <div class="stat-row"><span class="lbl">Device name</span>   <span class="val">ESP32_GPS</span></div>
+    <div class="stat-row"><span class="lbl">Service</span>       <span class="val" style="font-size:0.72rem">Nordic UART (NUS)</span></div>
+    <div class="stat-row"><span class="lbl">Invert Roll</span>   <span class="val" id="bleInvRoll">--</span></div>
+    <div class="stat-row"><span class="lbl">Flip Pitch/Roll</span><span class="val" id="bleFlipPR">--</span></div>
+    <div class="stat-row"><span class="lbl">Disable Heading</span><span class="val" id="bleDsHdg">--</span></div>
+    <p style="font-size:0.75rem;color:#777;margin-top:10px;">
+      Use <strong>nRF Connect</strong> or <strong>Serial Bluetooth Terminal</strong> on Android.<br>
+      Send <code>HELP</code> for available commands.
+    </p>
+  </div>
+
 </div>
 
 <div id="lastUpdate">Last update: --</div>
@@ -211,6 +226,15 @@
         txt('ntripByt', m['NTRIP bytes'] || '0');
         const raw = m['Last PANDA'] || '';
         document.getElementById('pandaRaw').textContent = raw || 'waiting…';
+
+        // BLE
+        const bleConn = m['BLE connected'] || 'NO';
+        const bleBadgeEl = document.getElementById('bleBadge');
+        bleBadgeEl.textContent = bleConn === 'YES' ? 'Connected' : 'Advertising';
+        bleBadgeEl.className   = 'badge ' + (bleConn === 'YES' ? 'badge-ok' : 'badge-off');
+        txt('bleInvRoll', m['Invert Roll']      || '--');
+        txt('bleFlipPR',  m['Flip Pitch/Roll']  || '--');
+        txt('bleDsHdg',   m['Disable Heading']  || '--');
 
         txt('lastUpdate', 'Last update: ' + new Date().toLocaleTimeString());
       })
