@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS Map - ESP32 GPS Module</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; display: flex; flex-direction: column; height: 100vh; }
+    header { background: #1a6b2f; color: white; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.3rem; }
+    header .sub { font-size: 0.8rem; opacity: 0.85; }
+    nav { background: #0f4520; padding: 8px 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 6px 14px; font-size: 0.85rem; font-weight: bold; background: #1a6b2f; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0f4520; }
+    .controls { background: white; padding: 12px 20px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .controls .info { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; font-size: 0.85rem; }
+    .controls .info-item { display: flex; flex-direction: column; }
+    .controls .info-item .lbl { color: #777; font-size: 0.75rem; text-transform: uppercase; }
+    .controls .info-item .val { font-weight: bold; color: #1a6b2f; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; color: white; transition: background 0.2s; }
+    .btn-green { background: #1a6b2f; } .btn-green:hover { background: #0f4520; }
+    .btn-red   { background: #c0392b; } .btn-red:hover   { background: #922b21; }
+    .btn-blue  { background: #2980b9; } .btn-blue:hover  { background: #1f5f8b; }
+    #map { flex: 1; width: 100%; }
+    .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+    .badge-ok  { background: #d4edda; color: #155724; }
+    .badge-warn{ background: #fff3cd; color: #856404; }
+    .badge-err { background: #f8d7da; color: #721c24; }
+    .badge-off { background: #e2e3e5; color: #666; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GPS Position Map</h1>
+    <div class="sub">Real-time GPS tracking &amp; drift monitoring</div>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Status</a>
+  <a href="map.html">Map</a>
+</nav>
+
+<div class="controls">
+  <div class="info">
+    <div class="info-item">
+      <span class="lbl">Fix Quality</span>
+      <span class="val" id="fixQuality">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Position</span>
+      <span class="val" id="position">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Altitude</span>
+      <span class="val" id="altitude">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Satellites</span>
+      <span class="val" id="sats">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">HDOP</span>
+      <span class="val" id="hdop">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Heading</span>
+      <span class="val" id="heading">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Speed</span>
+      <span class="val" id="speed">--</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Trail Points</span>
+      <span class="val" id="trailCount">0</span>
+    </div>
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <button class="btn btn-green" onclick="toggleTracking()" id="trackBtn">Start Tracking</button>
+    <button class="btn btn-blue" onclick="centerMap()">Re-center</button>
+    <button class="btn btn-red" onclick="clearTrail()">Clear Trail</button>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+  const FIX_LABELS = ['No fix','GPS fix','DGPS fix','PPS fix','RTK Fixed','RTK Float','Estimated','Manual','Simulation'];
+  
+  // Initialize map
+  const map = L.map('map').setView([0, 0], 18);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 22
+  }).addTo(map);
+
+  // Map markers and trail
+  let currentMarker = null;
+  let trailPolyline = null;
+  let trailPoints = [];
+  let tracking = false;
+  let lastLat = 0;
+  let lastLon = 0;
+  let mapCentered = false;
+
+  // Custom icon for current position
+  const posIcon = L.divIcon({
+    className: 'pos-marker',
+    html: '<div style="background:#1a6b2f;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(0,0,0,0.4);"></div>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11]
+  });
+
+  function toggleTracking() {
+    tracking = !tracking;
+    const btn = document.getElementById('trackBtn');
+    if (tracking) {
+      btn.textContent = 'Stop Tracking';
+      btn.className = 'btn btn-red';
+    } else {
+      btn.textContent = 'Start Tracking';
+      btn.className = 'btn btn-green';
+    }
+  }
+
+  function clearTrail() {
+    trailPoints = [];
+    if (trailPolyline) {
+      map.removeLayer(trailPolyline);
+      trailPolyline = null;
+    }
+    document.getElementById('trailCount').textContent = '0';
+  }
+
+  function centerMap() {
+    if (lastLat !== 0 && lastLon !== 0) {
+      map.setView([lastLat, lastLon], 18);
+    }
+  }
+
+  function updateMap(data) {
+    // Only update if we have a valid GPS position
+    if (!data.valid || !data.lat || !data.lon || (data.lat === 0 && data.lon === 0)) {
+      return; // No valid GPS fix or invalid coordinates
+    }
+
+    // Additional sanity check for coordinate ranges
+    if (data.lat < -90 || data.lat > 90 || data.lon < -180 || data.lon > 180) {
+      console.warn('Invalid coordinates received:', data.lat, data.lon);
+      return;
+    }
+
+    lastLat = data.lat;
+    lastLon = data.lon;
+
+    // Update info display
+    const fixQual = data.fixQuality || 0;
+    document.getElementById('fixQuality').textContent = (FIX_LABELS[fixQual] || fixQual) + ' (' + fixQual + ')';
+    document.getElementById('position').textContent = data.lat.toFixed(7) + ', ' + data.lon.toFixed(7);
+    document.getElementById('altitude').textContent = data.alt ? data.alt.toFixed(2) + ' m' : '--';
+    document.getElementById('sats').textContent = data.sats || '--';
+    document.getElementById('hdop').textContent = data.hdop ? data.hdop.toFixed(2) : '--';
+    document.getElementById('heading').textContent = data.heading ? data.heading.toFixed(1) + '°' : '--';
+    document.getElementById('speed').textContent = data.speed ? data.speed.toFixed(1) + ' kn' : '--';
+
+    // Update or create current position marker
+    if (!currentMarker) {
+      currentMarker = L.marker([data.lat, data.lon], {icon: posIcon}).addTo(map);
+      currentMarker.bindPopup('<b>Current Position</b><br>Fix: ' + (FIX_LABELS[fixQual] || fixQual));
+    } else {
+      currentMarker.setLatLng([data.lat, data.lon]);
+      currentMarker.setPopupContent('<b>Current Position</b><br>Fix: ' + (FIX_LABELS[fixQual] || fixQual));
+    }
+
+    // Auto-center map on first valid position
+    if (!mapCentered) {
+      map.setView([data.lat, data.lon], 18);
+      mapCentered = true;
+    }
+
+    // Add to trail if tracking
+    if (tracking) {
+      // Only add point if position changed significantly (> 1cm)
+      const lastPt = trailPoints.length > 0 ? trailPoints[trailPoints.length - 1] : null;
+      if (!lastPt || Math.abs(lastPt[0] - data.lat) > 0.0000001 || Math.abs(lastPt[1] - data.lon) > 0.0000001) {
+        trailPoints.push([data.lat, data.lon]);
+        
+        // Update trail polyline
+        if (trailPolyline) {
+          map.removeLayer(trailPolyline);
+        }
+        trailPolyline = L.polyline(trailPoints, {
+          color: '#c0392b',
+          weight: 3,
+          opacity: 0.7
+        }).addTo(map);
+
+        // Add small circle at each point
+        L.circleMarker([data.lat, data.lon], {
+          radius: 2,
+          color: '#c0392b',
+          fillColor: '#c0392b',
+          fillOpacity: 0.8
+        }).addTo(map);
+
+        document.getElementById('trailCount').textContent = trailPoints.length;
+      }
+    }
+  }
+
+  function loadGpsPos() {
+    fetch('/getGpsPos')
+      .then(r => r.json())
+      .then(data => updateMap(data))
+      .catch(e => console.warn('GPS position fetch error', e));
+  }
+
+  // Poll GPS position every 500ms
+  setInterval(loadGpsPos, 500);
+  loadGpsPos();
+</script>
+
+</body>
+</html>

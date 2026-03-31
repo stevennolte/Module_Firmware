@@ -45,6 +45,7 @@
 
 <nav>
   <a href="index.html">Status</a>
+  <a href="map.html">Map</a>
   <a href="#" onclick="reboot()">Reboot</a>
   <a href="#" onclick="document.getElementById('fwForm').style.display='block'">OTA Update</a>
 </nav>
@@ -107,11 +108,29 @@
     <div class="stat-row"><span class="lbl">NTRIP pkts</span>    <span class="val" id="ntripCnt">--</span></div>
     <div class="stat-row"><span class="lbl">NTRIP bytes</span>   <span class="val" id="ntripByt">--</span></div>
     <div class="toggle-container">
-      <span class="lbl">PANDA Broadcast</span>
+      <span class="lbl">GPS Broadcast</span>
       <button id="fwdBtn" class="btn btn-sm btn-green" onclick="toggleGpsForwarding()">ON</button>
+    </div>
+    <div class="toggle-container">
+      <span class="lbl">Message Format</span>
+      <button id="fmtBtn" class="btn btn-sm btn-green" onclick="toggleMessageFormat()">PANDA</button>
     </div>
     <h2 style="margin-top:12px;">Last PANDA sentence</h2>
     <div class="panda-box" id="pandaRaw">waiting for data…</div>
+  </div>
+
+  <!-- GPS Logging card -->
+  <div class="card">
+    <h2>GPS Data Logging</h2>
+    <div class="stat-row"><span class="lbl">Log file size</span> <span class="val" id="logSize">--</span></div>
+    <div class="toggle-container">
+      <span class="lbl">Logging Active</span>
+      <button id="logBtn" class="btn btn-sm btn-green" onclick="toggleGpsLogging()">OFF</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-green btn-sm" onclick="downloadGpsLog()">Download CSV</button>
+      <button class="btn btn-red btn-sm" onclick="clearGpsLog()">Clear Log</button>
+    </div>
   </div>
 
 </div>
@@ -164,6 +183,80 @@
       .then(r => r.json())
       .then(data => updateGpsForwardingButton(data.enabled))
       .catch(e => console.warn('panda broadcast toggle error', e));
+  }
+
+  function updateMessageFormatButton(useRaw) {
+    const btn = document.getElementById('fmtBtn');
+    if (useRaw) {
+      btn.textContent = 'RAW NMEA';
+      btn.className = 'btn btn-sm btn-green';
+    } else {
+      btn.textContent = 'PANDA';
+      btn.className = 'btn btn-sm btn-green';
+    }
+  }
+
+  function loadMessageFormat() {
+    fetch('/getMessageFormat')
+      .then(r => r.json())
+      .then(data => updateMessageFormatButton(data.useRawNMEA))
+      .catch(e => console.warn('message format fetch error', e));
+  }
+
+  function toggleMessageFormat() {
+    const btn = document.getElementById('fmtBtn');
+    const newState = btn.textContent === 'PANDA'; // If currently PANDA, switch to raw
+    fetch('/setMessageFormat?raw=' + (newState ? '1' : '0'))
+      .then(r => r.json())
+      .then(data => updateMessageFormatButton(data.useRawNMEA))
+      .catch(e => console.warn('message format toggle error', e));
+  }
+
+  function updateGpsLoggingButton(enabled) {
+    const btn = document.getElementById('logBtn');
+    if (enabled) {
+      btn.textContent = 'ON';
+      btn.className = 'btn btn-sm btn-green';
+    } else {
+      btn.textContent = 'OFF';
+      btn.className = 'btn btn-sm btn-red';
+    }
+  }
+
+  function loadGpsLogging() {
+    fetch('/getGpsLogging')
+      .then(r => r.json())
+      .then(data => {
+        updateGpsLoggingButton(data.enabled);
+        loadMessageFormat();  // Also load message format setting
+        const size = data.size || 0;
+        txt('logSize', size > 1024 ? (size / 1024).toFixed(1) + ' KB' : size + ' B');
+      })
+      .catch(e => console.warn('gps logging fetch error', e));
+  }
+
+  function toggleGpsLogging() {
+    const btn = document.getElementById('logBtn');
+    const newState = btn.textContent === 'OFF';
+    fetch('/setGpsLogging?enable=' + (newState ? '1' : '0'))
+      .then(r => r.json())
+      .then(data => updateGpsLoggingButton(data.enabled))
+      .catch(e => console.warn('gps logging toggle error', e));
+  }
+
+  function downloadGpsLog() {
+    window.location.href = '/downloadGpsLog';
+  }
+
+  function clearGpsLog() {
+    if (confirm('Clear GPS log file? This cannot be undone.')) {
+      fetch('/clearGpsLog')
+        .then(() => {
+          alert('Log file cleared');
+          loadGpsLogging();
+        })
+        .catch(e => console.warn('clear log error', e));
+    }
   }
 
   function load() {
@@ -225,9 +318,12 @@
 
   setInterval(load, 1000);
   setInterval(loadGpsForwarding, 2000);
+  setInterval(loadGpsLogging, 2000);
   window.onload = function() {
     load();
     loadGpsForwarding();
+    loadGpsLogging();
+    loadMessageFormat();
   };
 </script>
 </body>

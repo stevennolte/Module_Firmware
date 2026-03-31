@@ -2,14 +2,14 @@
  * @file main.cpp
  * @brief ESP32-S3 GPS / NTRIP / IMU Module
  *
- * @details This module runs on an ESP32-S3 DevKitC-1 N8R8 and provides the GPS,
+ * @details This module runs on an ESP32-S3 Xiao and provides the GPS,
  *          NTRIP corrections, IMU, and PANDA-sentence functions that the ESP32_AIO
  *          normally handles, but as a standalone, dedicated GPS module.
  *
  *          Key capabilities:
  *          - WiFi Access Point "NOLTE_FARM" (always active) plus optional STA uplink
- *          - UM980 GNSS receiver on UART1 (RX=GPIO13, TX=GPIO14) at 460800 baud
- *          - BNO08x IMU in RVC mode on UART2 (RX=GPIO12) at 115200 baud
+ *          - UM980 GNSS receiver on UART1 (RX=GPIO8, TX=GPIO7) at 460800 baud
+ *          - BNO08x IMU via I2C (SDA=GPIO6, SCL=GPIO5)
  *          - NTRIP RTCM corrections received on UDP port 2233 and forwarded to GPS UART
  *          - NMEA GGA / VTG parsing → PANDA sentence generation
  *          - PANDA sentences broadcast on UDP port 9999 to all AP clients
@@ -23,31 +23,37 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <Wire.h>
+#include <ESPmDNS.h>
 #include <AsyncUDP.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Update.h>
-#include "Adafruit_NeoPixel.h"
-#include "Adafruit_BNO08x_RVC.h"
+// #include "Adafruit_NeoPixel.h"  // Disabled - no NeoPixel on Xiao S3
+#include <Adafruit_BNO08x.h>
 #include "SparkFun_Unicore_GNSS_Arduino_Library.h"
 #include "Version.h"
 
 // ── Pin definitions ────────────────────────────────────────────────────────
 
-/// Built-in RGB NeoPixel on ESP32-S3-DevKitC-1
-#define LED_PIN       48
+/// Built-in RGB NeoPixel on ESP32-S3-DevKitC-1 (not present on Xiao)
+// #define LED_PIN       48  // Disabled - Xiao S3 has no NeoPixel
+
+/// Power Relay control
+#define POWER_RELAY_PIN  1
 
 /// GPS UART1 – receives NMEA from UM980 TX
-#define GPS_RX_PIN    13
+#define GPS_RX_PIN    7
 /// GPS UART1 – transmits commands / NTRIP to UM980 RX
-#define GPS_TX_PIN    14
+#define GPS_TX_PIN    8
 
-/// IMU UART2 – receives RVC frames from BNO08x TX
-#define BNO_RX_PIN    12
-/// IMU UART2 – TX not used but required by HardwareSerial.begin()
-#define BNO_TX_PIN    17
+/// IMU I2C pins
+#define BNO_SDA_PIN   3
+#define BNO_SCL_PIN   4
+/// BNO08x I2C address
+#define BNO08X_I2CADDR_DEFAULT 0x4A
 
 // ── WiFi / network constants ───────────────────────────────────────────────
 
@@ -55,6 +61,9 @@
 #define AP_PASSWORD   "DontLoseMoney89"
 #define AP_CHANNEL    6
 #define AP_MAX_CLIENTS 8
+
+#define STA_DEFAULT_SSID     "SSEI"
+#define STA_DEFAULT_PASSWORD "Nd14il!la"
 
 /// Static AP IP address (192.168.5.1)
 #define AP_IP_1  192
@@ -116,6 +125,8 @@ struct GPSState {
     bool     invertRoll      = true;  ///< Negate roll (dual-antenna default)
     bool     flipPitchRoll   = true;  ///< Swap pitch and roll axes
     volatile bool enablePandaBroadcast = true;  ///< Broadcast PANDA on UDP 9999
+    volatile bool useRawNMEA = false;           ///< Send raw NMEA instead of PANDA
+    volatile bool enableGpsLogging = false;     ///< Log GPS data to file
 
     // ── Statistics ──
     volatile uint32_t pandaCount  = 0;
@@ -125,6 +136,8 @@ struct GPSState {
     volatile uint32_t vtgCount    = 0;
     uint32_t firstPandaMs = 0;
     uint32_t lastPandaMs  = 0;
+    volatile uint32_t firstNtripMs = 0;
+    volatile uint32_t lastNtripMs  = 0;
 
     // ── Network subnet for broadcast (updated from AgIO PGN 201) ──
     /// First 3 octets are the subnet; broadcast address is always agioSubnet.255
@@ -142,12 +155,12 @@ static bool     yawInitialized   = false;
 // ── Hardware objects ───────────────────────────────────────────────────────
 
 HardwareSerial gpsSerial(1);       ///< UART1 – UM980 GPS receiver
-HardwareSerial bnoSerial(2);       ///< UART2 – BNO08x IMU (RVC mode)
 
 UM980             myGNSS;          ///< SparkFun UM980 driver
-Adafruit_BNO08x_RVC rvc;          ///< Adafruit BNO08x RVC driver
+Adafruit_BNO08x   bno08x(-1);      ///< Adafruit BNO08x I2C driver
+sh2_SensorValue_t sensorValue;     ///< BNO08x sensor value buffer
 
-Adafruit_NeoPixel pixel(1, LED_PIN, NEO_GRB + NEO_KHZ800);
+// Adafruit_NeoPixel pixel(1, LED_PIN, NEO_GRB + NEO_KHZ800);  // Disabled - no NeoPixel on Xiao
 
 AsyncWebServer server(80);
 AsyncUDP       udpGPS;             ///< Port 9999 – PANDA broadcast
@@ -158,14 +171,176 @@ AsyncUDP       udpNtrip;           ///< Port 2233 – NTRIP forwarding
 
 std::vector<String> debugVars;
 
+// ── Forward declarations ───────────────────────────────────────────────────
+
+static void sendIMUStatus();
+static void sendSubnetAnnouncement();
+
 // ── LED helpers ────────────────────────────────────────────────────────────
 
 static void setLED(uint8_t r, uint8_t g, uint8_t b) {
-    pixel.setPixelColor(0, pixel.Color(r, g, b));
-    pixel.show();
+    // Disabled - Xiao S3 has no built-in NeoPixel
+    // pixel.setPixelColor(0, pixel.Color(r, g, b));
+    // pixel.show();
 }
 
 // ── NMEA / PANDA helpers ───────────────────────────────────────────────────
+
+/**
+ * @brief Validate GPS coordinates to prevent sending bad data.
+ *
+ * @details Checks fix quality, coordinate format, and valid ranges.
+ * @return true if coordinates are valid and safe to broadcast
+ */
+static bool isGpsPositionValid() {
+    // Must have at least a GPS fix
+    int fixQuality = atoi(gpsState.fixQuality);
+    if (fixQuality < 1) return false;
+    
+    // Must have coordinate strings with minimum length
+    if (strlen(gpsState.latitude) < 4 || strlen(gpsState.longitude) < 4) return false;
+    if (strlen(gpsState.latNS) < 1 || strlen(gpsState.lonEW) < 1) return false;
+    
+    // Validate direction indicators
+    if (gpsState.latNS[0] != 'N' && gpsState.latNS[0] != 'S') return false;
+    if (gpsState.lonEW[0] != 'E' && gpsState.lonEW[0] != 'W') return false;
+    
+    // Validate lat/lon contain ONLY digits and decimal points (no letters)
+    for (size_t i = 0; i < strlen(gpsState.latitude); i++) {
+        if (!isdigit(gpsState.latitude[i]) && gpsState.latitude[i] != '.') {
+            Serial.printf("GPS: Invalid character '%c' in latitude\n", gpsState.latitude[i]);
+            return false;
+        }
+    }
+    for (size_t i = 0; i < strlen(gpsState.longitude); i++) {
+        if (!isdigit(gpsState.longitude[i]) && gpsState.longitude[i] != '.') {
+            Serial.printf("GPS: Invalid character '%c' in longitude\n", gpsState.longitude[i]);
+            return false;
+        }
+    }
+    
+    // Parse and validate latitude
+    double lat = atof(gpsState.latitude);
+    int deg = (int)(lat / 100);
+    double min = lat - (deg * 100);
+    double decLat = deg + (min / 60.0);
+    if (gpsState.latNS[0] == 'S') decLat = -decLat;
+    
+    // Parse and validate longitude
+    double lon = atof(gpsState.longitude);
+    deg = (int)(lon / 100);
+    min = lon - (deg * 100);
+    double decLon = deg + (min / 60.0);
+    if (gpsState.lonEW[0] == 'W') decLon = -decLon;
+    
+    // Check ranges and valid numbers
+    if (decLat < -90.0 || decLat > 90.0) return false;
+    if (decLon < -180.0 || decLon > 180.0) return false;
+    if (isnan(decLat) || isnan(decLon)) return false;
+    if (isinf(decLat) || isinf(decLon)) return false;
+    
+    return true;
+}
+
+/**
+ * @brief Log GPS position data to file.
+ *
+ * @details Appends CSV-formatted GPS data to /gpslog.csv with timestamp,
+ *          coordinates in decimal degrees, fix quality, and other metrics.
+ *          Creates local copies of strings to avoid race conditions.
+ */
+static void logGpsData() {
+    if (!gpsState.enableGpsLogging) return;
+    if (!isGpsPositionValid()) return;
+    
+    // Create local copies to avoid race conditions with NMEA parser
+    char lat[16], lon[16], latNS[2], lonEW[2];
+    char alt[12], fixQ[4], sats[4], hdop[8], speed[12], heading[8];
+    
+    strncpy(lat, gpsState.latitude, sizeof(lat) - 1);
+    strncpy(lon, gpsState.longitude, sizeof(lon) - 1);
+    strncpy(latNS, gpsState.latNS, sizeof(latNS) - 1);
+    strncpy(lonEW, gpsState.lonEW, sizeof(lonEW) - 1);
+    strncpy(alt, gpsState.altitude, sizeof(alt) - 1);
+    strncpy(fixQ, gpsState.fixQuality, sizeof(fixQ) - 1);
+    strncpy(sats, gpsState.numSats, sizeof(sats) - 1);
+    strncpy(hdop, gpsState.HDOP, sizeof(hdop) - 1);
+    strncpy(speed, gpsState.speedKnots, sizeof(speed) - 1);
+    strncpy(heading, gpsState.imuHeading, sizeof(heading) - 1);
+    
+    lat[sizeof(lat)-1] = '\0';
+    lon[sizeof(lon)-1] = '\0';
+    latNS[sizeof(latNS)-1] = '\0';
+    lonEW[sizeof(lonEW)-1] = '\0';
+    alt[sizeof(alt)-1] = '\0';
+    fixQ[sizeof(fixQ)-1] = '\0';
+    sats[sizeof(sats)-1] = '\0';
+    hdop[sizeof(hdop)-1] = '\0';
+    speed[sizeof(speed)-1] = '\0';
+    heading[sizeof(heading)-1] = '\0';
+    
+    // Validate NMEA format: latitude should be ddmm.mmmm (min 7 chars), longitude dddmm.mmmm (min 8 chars)
+    if (strlen(lat) < 7 || strlen(lon) < 8) return;
+    if (latNS[0] != 'N' && latNS[0] != 'S') return;
+    if (lonEW[0] != 'E' && lonEW[0] != 'W') return;
+    
+    // Validate all characters in lat/lon are digits or decimal point
+    for (size_t i = 0; i < strlen(lat); i++) {
+        if (!isdigit(lat[i]) && lat[i] != '.') return;
+    }
+    for (size_t i = 0; i < strlen(lon); i++) {
+        if (!isdigit(lon[i]) && lon[i] != '.') return;
+    }
+    
+    // Parse coordinates to decimal degrees using local copies
+    double latVal = atof(lat);
+    double lonVal = atof(lon);
+    
+    // Validate NMEA ranges: lat degrees 0-90, lon degrees 0-180
+    int latDeg = (int)(latVal / 100);
+    double latMin = latVal - (latDeg * 100);
+    int lonDeg = (int)(lonVal / 100);
+    double lonMin = lonVal - (lonDeg * 100);
+    
+    if (latDeg < 0 || latDeg > 90) return;
+    if (lonDeg < 0 || lonDeg > 180) return;
+    if (latMin < 0 || latMin >= 60) return;
+    if (lonMin < 0 || lonMin >= 60) return;
+    
+    double decLat = latDeg + (latMin / 60.0);
+    if (latNS[0] == 'S') decLat = -decLat;
+    
+    double decLon = lonDeg + (lonMin / 60.0);
+    if (lonEW[0] == 'W') decLon = -decLon;
+    
+    // Final validation of decimal degrees
+    if (decLat < -90.0 || decLat > 90.0 || decLon < -180.0 || decLon > 180.0) {
+        return; // Skip corrupted data
+    }
+    
+    // Open file in append mode
+    File logFile = LittleFS.open("/gpslog.csv", "a");
+    if (!logFile) {
+        Serial.println("Failed to open GPS log file");
+        return;
+    }
+    
+    // Write CSV line: timestamp,lat,lon,alt,fixQuality,sats,hdop,speed,heading
+    char line[256];
+    snprintf(line, sizeof(line), "%lu,%.7f,%.7f,%s,%s,%s,%s,%s,%s\n",
+             millis(),
+             decLat,
+             decLon,
+             alt,
+             fixQ,
+             sats,
+             hdop,
+             speed,
+             heading);
+    
+    logFile.print(line);
+    logFile.close();
+}
 
 /**
  * @brief Remove trailing CR, LF, and control characters from a C-string.
@@ -296,72 +471,84 @@ static void calculateChecksum() {
  *
  * @details Field order matches the AgOpenGPS PANDA specification:
  *          $PANDA,time,lat,N/S,lon,E/W,quality,sats,hdop,alt,dgpsAge,
- *                 speed,heading,roll,pitch,yawRate,*XX\\r\\n
+ *                 speed,heading,pitch,roll,yawRate,*XX\r\n
  */
 static void buildPandaSentence() {
     strcpy(gpsState.nmea, "$PANDA,");
 
-    auto append = [](const char* s) {
-        strncat(gpsState.nmea, s, sizeof(gpsState.nmea) - strlen(gpsState.nmea) - 1);
-    };
+    strcat(gpsState.nmea, gpsState.fixTime);
+    strcat(gpsState.nmea, ",");
 
-    if (*gpsState.fixTime)    append(gpsState.fixTime);    append(",");
-    if (*gpsState.latitude)   append(gpsState.latitude);   append(",");
-    if (*gpsState.latNS)      append(gpsState.latNS);      append(",");
-    if (*gpsState.longitude)  append(gpsState.longitude);  append(",");
-    if (*gpsState.lonEW)      append(gpsState.lonEW);      append(",");
-    if (*gpsState.fixQuality) append(gpsState.fixQuality); append(",");
-    if (*gpsState.numSats)    append(gpsState.numSats);    append(",");
-    if (*gpsState.HDOP)       append(gpsState.HDOP);       append(",");
-    if (*gpsState.altitude)   append(gpsState.altitude);   append(",");
+    strcat(gpsState.nmea, gpsState.latitude);
+    strcat(gpsState.nmea, ",");
 
-    append(gpsState.ageDGPS);  append(",");
+    strcat(gpsState.nmea, gpsState.latNS);
+    strcat(gpsState.nmea, ",");
 
-    if (*gpsState.speedKnots) append(gpsState.speedKnots); append(",");
+    strcat(gpsState.nmea, gpsState.longitude);
+    strcat(gpsState.nmea, ",");
 
-    // Heading
+    strcat(gpsState.nmea, gpsState.lonEW);
+    strcat(gpsState.nmea, ",");
+
+    strcat(gpsState.nmea, gpsState.fixQuality);
+    strcat(gpsState.nmea, ",");
+
+    strcat(gpsState.nmea, gpsState.numSats);
+    strcat(gpsState.nmea, ",");
+
+    strcat(gpsState.nmea, gpsState.HDOP);
+    strcat(gpsState.nmea, ",");
+
+    strcat(gpsState.nmea, gpsState.altitude);
+    strcat(gpsState.nmea, ",");
+
+    strcat(gpsState.nmea, gpsState.ageDGPS);
+    strcat(gpsState.nmea, ",");
+
+    strcat(gpsState.nmea, gpsState.speedKnots);
+    strcat(gpsState.nmea, ",");
+
+    // Heading field
     if (gpsState.disableHeading) {
-        append("0");
-    } else if (*gpsState.imuHeading) {
-        append(gpsState.imuHeading);
+        strcat(gpsState.nmea, "0");
+    } else {
+        strcat(gpsState.nmea, gpsState.imuHeading);
     }
-    append(",");
+    strcat(gpsState.nmea, ",");
 
-    if (*gpsState.imuRoll)    append(gpsState.imuRoll);    append(",");
-    if (*gpsState.imuPitch)   append(gpsState.imuPitch);   append(",");
-    if (*gpsState.imuYawRate) append(gpsState.imuYawRate); append(",");
+    // IMPORTANT: Order is pitch, roll (not roll, pitch!)
+    strcat(gpsState.nmea, gpsState.imuPitch);
+    strcat(gpsState.nmea, ",");
 
-    append("*");
+    strcat(gpsState.nmea, gpsState.imuRoll);
+    strcat(gpsState.nmea, ",");
 
-    // Guard against buffer overflow before checksum digits
-    if (strlen(gpsState.nmea) > sizeof(gpsState.nmea) - 5) {
-        // Truncate and re-add '*'
-        gpsState.nmea[sizeof(gpsState.nmea) - 5] = '*';
-        gpsState.nmea[sizeof(gpsState.nmea) - 4] = '\0';
-    }
+    strcat(gpsState.nmea, gpsState.imuYawRate);
+
+    strcat(gpsState.nmea, "*");
 
     calculateChecksum();
-    strncat(gpsState.nmea, "\r\n", sizeof(gpsState.nmea) - strlen(gpsState.nmea) - 1);
+    strcat(gpsState.nmea, "\r\n");
 }
 
 // ── IMU handler ────────────────────────────────────────────────────────────
 
 /**
- * @brief Read the latest BNO08x RVC frame and update gpsState IMU fields.
+ * @brief Read the latest BNO08x rotation vector and update gpsState IMU fields.
  *
  * @details Values are multiplied by 10 and stored as integer strings to match
  *          the AgOpenGPS PANDA specification.  Yaw rate is calculated from the
  *          difference between successive heading readings.
  *
- *          Called from the GPS task on every loop iteration so it drains the
- *          BNO08x serial buffer promptly.
+ *          Called from the GPS task on every loop iteration to poll for new data.
  */
 static void readIMU() {
     if (gpsState.imuState == 2) return;  // permanently failed
 
-    BNO08x_RVC_Data data;
-    if (!rvc.read(&data)) {
-        // No new frame available; check watchdog
+    // Poll for new sensor events
+    if (!bno08x.getSensorEvent(&sensorValue)) {
+        // No new data available; check watchdog
         if (gpsState.imuLastMsgMs > 0 &&
             millis() - gpsState.imuLastMsgMs > 2000) {
             gpsState.imuState = 2;
@@ -370,13 +557,26 @@ static void readIMU() {
         return;
     }
 
+    // We only process rotation vector reports
+    if (sensorValue.sensorId != SH2_ROTATION_VECTOR) {
+        return;
+    }
+
     gpsState.imuState     = 1;
     gpsState.imuLastMsgMs = millis();
 
-    // Apply orientation corrections
-    float pitch   = data.pitch;
-    float roll    = data.roll;
-    float heading = data.yaw;
+    // Convert quaternion to Euler angles
+    float qr = sensorValue.un.rotationVector.real;
+    float qi = sensorValue.un.rotationVector.i;
+    float qj = sensorValue.un.rotationVector.j;
+    float qk = sensorValue.un.rotationVector.k;
+
+    // Yaw (heading)
+    float heading = atan2(2.0f * (qr * qk + qi * qj), 1.0f - 2.0f * (qj * qj + qk * qk)) * 57.2958f;
+    // Pitch
+    float pitch = asin(2.0f * (qr * qj - qk * qi)) * 57.2958f;
+    // Roll
+    float roll = atan2(2.0f * (qr * qi + qj * qk), 1.0f - 2.0f * (qi * qi + qj * qj)) * 57.2958f;
 
     if (gpsState.flipPitchRoll) {
         float tmp = pitch; pitch = roll; roll = tmp;
@@ -435,7 +635,7 @@ static void gpsTask(void* param) {
     static char  buf[200];
     static int   idx      = 0;
     static uint32_t lastStatusMs = 0;
-    static uint32_t lastPandaSentMs = 0;  // Rate limiter for 10Hz
+    static uint32_t lastSubnetMs = 0;
 
     Serial.println("GPS task started on core " + String(xPortGetCoreID()));
 
@@ -461,27 +661,42 @@ static void gpsTask(void* param) {
                 if (idx > 6) {
                     parseNMEA(buf);
 
-                    // On GGA sentences: read latest IMU then build + send PANDA
+                    // On GGA sentences: read latest IMU then build + send PANDA (or forward raw NMEA)
                     if (strstr(buf, "GGA") != nullptr) {
                         uint32_t now = millis();
-                        // Rate limit: only send PANDA once every 95ms (allowing 10Hz with jitter)
-                        if (now - lastPandaSentMs >= 95) {
-                            readIMU();  // get the freshest IMU frame before PANDA
-                            buildPandaSentence();
+                        readIMU();  // get the freshest IMU frame before PANDA
+                        
+                        // Only build and send if GPS position is valid
+                        if (isGpsPositionValid()) {
+                            const char* messageToSend = nullptr;
+                            
+                            if (gpsState.useRawNMEA) {
+                                // Send raw NMEA sentence
+                                messageToSend = buf;
+                            } else {
+                                // Build and send PANDA sentence
+                                buildPandaSentence();
+                                messageToSend = gpsState.nmea;
+                            }
 
                             // Broadcast on the AP subnet (if enabled)
-                            if (gpsState.enablePandaBroadcast) {
+                            if (gpsState.enablePandaBroadcast && messageToSend) {
                                 IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
                                                 gpsState.agioSubnet[2], 255);
-                                udpGPS.writeTo((const uint8_t*)gpsState.nmea,
-                                               strlen(gpsState.nmea), bcast, PORT_GPS);
+                                udpGPS.writeTo((const uint8_t*)messageToSend,
+                                               strlen(messageToSend), bcast, PORT_GPS);
                                 taskYIELD();
                             }
 
                             gpsState.pandaCount++;
                             if (gpsState.pandaCount == 1) gpsState.firstPandaMs = now;
                             gpsState.lastPandaMs = now;
-                            lastPandaSentMs = now;
+
+                            // Send IMU status to AgIO (if IMU is active)
+                            sendIMUStatus();
+                            
+                            // Log GPS data if logging is enabled
+                            logGpsData();
                         }
                     }
                 }
@@ -489,6 +704,12 @@ static void gpsTask(void* param) {
                 idx = 0;
                 memset(buf, 0, sizeof(buf));
             }
+        }
+
+        // ── Periodic subnet announcement ──────────────────────────────────
+        if (millis() - lastSubnetMs >= 1000) {
+            lastSubnetMs = millis();
+            sendSubnetAnnouncement();
         }
 
         // ── Periodic status print ─────────────────────────────────────────
@@ -532,8 +753,11 @@ static void startUDPntrip() {
         // Write immediately to GPS UART for minimal latency
         size_t written = gpsSerial.write(data, len);
         if (written == len) {
+            uint32_t now = millis();
             gpsState.ntripCount++;
             gpsState.ntripBytes += len;
+            if (gpsState.ntripCount == 1) gpsState.firstNtripMs = now;
+            gpsState.lastNtripMs = now;
         }
 
         static uint32_t lastPrint = 0;
@@ -584,15 +808,14 @@ static void startUDPaio() {
                                 gpsState.agioSubnet[2], 255);
                 udpAIO.writeTo(reply, sizeof(reply), bcast, PORT_AGIO);
 
-                // If IMU is active, also send IMU-module hello (PGN 121)
-                if (gpsState.imuState == 1) {
-                    reply[2] = 79;
-                    reply[3] = 121;
-                    ck = 0;
-                    for (int i = 2; i < (int)reply[4] + 5; i++) ck += reply[i];
-                    reply[10] = ck;
-                    udpAIO.writeTo(reply, sizeof(reply), bcast, PORT_AGIO);
-                }
+                // Always send IMU-module hello (PGN 121) so AgIO knows module exists
+                // IMU active state is conveyed via PGN 211 data packets
+                reply[2] = 79;
+                reply[3] = 121;
+                ck = 0;
+                for (int i = 2; i < (int)reply[4] + 5; i++) ck += reply[i];
+                reply[10] = ck;
+                udpAIO.writeTo(reply, sizeof(reply), bcast, PORT_AGIO);
                 break;
             }
             case 201:
@@ -614,6 +837,91 @@ static void startUDPaio() {
         }
     });
     Serial.printf("AgIO listener ready on UDP port %d\n", PORT_AGIO);
+}
+
+/**
+ * @brief Send IMU subnet announcement to AgIO.
+ *
+ * @details Sends PGN 203 (0xCB) packet with IMU module's IP address and subnet.
+ *          Called periodically (~1 Hz) to maintain module presence in AgIO.
+ */
+static void sendSubnetAnnouncement() {
+    // Build subnet announcement packet: PGN 203 (0xCB), 7 bytes payload
+    // Packet format: [0x80][0x81][Src=79][PGN=203][Len=7][IP1][IP2][IP3][IP4][Sub1][Sub2][Sub3][CK]
+    uint8_t subnetPacket[13] = {};
+    subnetPacket[0] = 0x80;
+    subnetPacket[1] = 0x81;
+    subnetPacket[2] = 79;   // Source: IMU module ID
+    subnetPacket[3] = 203;  // PGN 203 (0xCB): Subnet announcement
+    subnetPacket[4] = 7;    // Payload length
+
+    // IP address (4 bytes)
+    subnetPacket[5] = gpsState.agioSubnet[0];
+    subnetPacket[6] = gpsState.agioSubnet[1];
+    subnetPacket[7] = gpsState.agioSubnet[2];
+    subnetPacket[8] = AP_IP_4;  // Our IMU module IP last octet
+
+    // Subnet (3 bytes)
+    subnetPacket[9] = gpsState.agioSubnet[0];
+    subnetPacket[10] = gpsState.agioSubnet[1];
+    subnetPacket[11] = gpsState.agioSubnet[2];
+
+    // Checksum
+    uint8_t ck = 0;
+    for (int i = 2; i < (int)subnetPacket[4] + 5; i++) ck += subnetPacket[i];
+    subnetPacket[12] = ck;
+
+    // Broadcast to AgIO
+    IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
+                    gpsState.agioSubnet[2], 255);
+    udpAIO.writeTo(subnetPacket, sizeof(subnetPacket), bcast, PORT_AGIO);
+}
+
+/**
+ * @brief Send IMU data packet to AgIO.
+ *
+ * @details Sends PGN 211 (0xD3) packet with roll, pitch, heading, and yaw rate.
+ *          Values are sent as int16 (degrees × 10 for angles, deg/s × 10 for rate).
+ *          Called at 10Hz when GPS broadcasts (works with both PANDA and raw NMEA modes).
+ *          In raw NMEA mode, this is the only way IMU data reaches AgOpenGPS.
+ */
+static void sendIMUStatus() {
+    if (gpsState.imuState != 1) return;  // Only send if IMU is working
+
+    // Parse current IMU values (stored as strings × 10)
+    int16_t roll    = atoi(gpsState.imuRoll);
+    int16_t pitch   = atoi(gpsState.imuPitch);
+    int16_t heading = atoi(gpsState.imuHeading);
+    int16_t yawRate = atoi(gpsState.imuYawRate);
+
+    // Build IMU data packet: PGN 211 (0xD3), 8 bytes payload
+    // Packet format: [0x80][0x81][Src=79][PGN=211][Len=8][Heading][Roll][Pitch][YawRate][CK]
+    uint8_t imuPacket[14] = {};
+    imuPacket[0] = 0x80;
+    imuPacket[1] = 0x81;
+    imuPacket[2] = 79;   // Source: IMU module ID
+    imuPacket[3] = 211;  // PGN 211 (0xD3): IMU data
+    imuPacket[4] = 8;    // Payload length
+
+    // Pack int16 values as little-endian: heading, roll, pitch, yaw rate
+    imuPacket[5] = heading & 0xFF;
+    imuPacket[6] = (heading >> 8) & 0xFF;
+    imuPacket[7] = roll & 0xFF;
+    imuPacket[8] = (roll >> 8) & 0xFF;
+    imuPacket[9] = pitch & 0xFF;
+    imuPacket[10] = (pitch >> 8) & 0xFF;
+    imuPacket[11] = yawRate & 0xFF;
+    imuPacket[12] = (yawRate >> 8) & 0xFF;
+
+    // Checksum
+    uint8_t ck = 0;
+    for (int i = 2; i < (int)imuPacket[4] + 5; i++) ck += imuPacket[i];
+    imuPacket[13] = ck;
+
+    // Broadcast to AgIO
+    IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
+                    gpsState.agioSubnet[2], 255);
+    udpAIO.writeTo(imuPacket, sizeof(imuPacket), bcast, PORT_AGIO);
 }
 
 // ── GPS hardware init ──────────────────────────────────────────────────────
@@ -664,38 +972,72 @@ static void initGPS() {
         gpsState.gpsState = 2;
         Serial.println("UM980 failed – raw NMEA forwarding only");
     } else {
+        // Enable all satellite systems (GPS, GLONASS, BeiDou, Galileo, QZSS)
+        myGNSS.sendCommand("CONFIG SIGNALGROUP 1");         delay(300);  // All constellations
+        
         // Standard AgOpenGPS UM980 configuration
         myGNSS.sendCommand("CONFIG RTK RELIABILITY 3 1");   delay(300);
         myGNSS.sendCommand("CONFIG SMOOTH RTKHEIGHT 0");    delay(300);
         myGNSS.sendCommand("CONFIG HEADING RELIABILITY 3"); delay(300);
         myGNSS.sendCommand("CONFIG HEADING VARIABLELENGTH");delay(300);
         myGNSS.sendCommand("CONFIG SMOOTH HEADING 0");      delay(300);
-        myGNSS.sendCommand("GNGGA 0.1");                    delay(300);
+        myGNSS.sendCommand("GNGGA 0.1");                    delay(300);  // GN = all GNSS systems
         myGNSS.sendCommand("GPVTG 0.1");                    delay(300);
-        Serial.println("UM980 configured for 10Hz output");
+        Serial.println("UM980 configured: All satellites enabled, 10Hz output");
     }
 }
 
 /**
- * @brief Initialise the BNO08x IMU in RVC mode.
+ * @brief Scan I2C bus and print all detected devices
+ */
+static void scanI2C() {
+    Serial.println("Scanning I2C bus...");
+    uint8_t count = 0;
+    
+    for (uint8_t addr = 1; addr < 127; addr++) {
+        Wire.beginTransmission(addr);
+        uint8_t error = Wire.endTransmission();
+        
+        if (error == 0) {
+            Serial.printf("  I2C device found at address 0x%02X\n", addr);
+            count++;
+        }
+    }
+    
+    if (count == 0) {
+        Serial.println("  No I2C devices found");
+    } else {
+        Serial.printf("  Found %d I2C device(s)\n", count);
+    }
+}
+
+/**
+ * @brief Initialise the BNO08x IMU via I2C.
  *
- * @details Starts UART2 at 115200 baud with a 3-second timeout task so a
- *          missing IMU does not block the boot sequence.
+ * @details Starts I2C on custom pins and enables rotation vector reports
+ *          at 100 Hz. Uses a 3-second timeout task so a missing IMU does
+ *          not block the boot sequence.
  */
 static void initIMU() {
-    Serial.printf("Starting IMU UART2  RX=%d TX=%d  115200 baud\n",
-                  BNO_RX_PIN, BNO_TX_PIN);
-    bnoSerial.begin(115200, SERIAL_8N1, BNO_RX_PIN, BNO_TX_PIN);
+    Serial.printf("Starting IMU I2C  SDA=%d SCL=%d\n",
+                  BNO_SDA_PIN, BNO_SCL_PIN);
+    Wire.begin(BNO_SDA_PIN, BNO_SCL_PIN);
+    
+    // Scan I2C bus to help diagnose connection issues
+    scanI2C();
 
     volatile bool done   = false;
     volatile bool result = false;
-    struct Params { Adafruit_BNO08x_RVC* r; HardwareSerial* s;
-                    volatile bool* d; volatile bool* ok; };
-    Params p = { &rvc, &bnoSerial, &done, &result };
+    struct Params { Adafruit_BNO08x* b; volatile bool* d; volatile bool* ok; };
+    Params p = { &bno08x, &done, &result };
 
     xTaskCreate([](void* arg) {
         auto* p = (Params*)arg;
-        *p->ok = p->r->begin(p->s);
+        *p->ok = p->b->begin_I2C(BNO08X_I2CADDR_DEFAULT);
+        if (*p->ok) {
+            // Enable rotation vector reports at ~100 Hz (10000 µs)
+            *p->ok = p->b->enableReport(SH2_ROTATION_VECTOR, 10000);
+        }
         *p->d  = true;
         vTaskDelete(nullptr);
     }, "IMUInit", 4096, &p, 1, nullptr);
@@ -707,7 +1049,7 @@ static void initIMU() {
     if (done && result) {
         gpsState.imuState    = 1;
         gpsState.imuLastMsgMs = millis();
-        Serial.println("BNO08x IMU started");
+        Serial.println("BNO08x IMU started (I2C)");
     } else {
         gpsState.imuState = 2;
         Serial.println("BNO08x not detected – IMU disabled");
@@ -717,6 +1059,39 @@ static void initIMU() {
 // ── WiFi ───────────────────────────────────────────────────────────────────
 
 /**
+ * @brief Try to connect to a WiFi network as STA. Returns true if successful.
+ */
+bool connectWiFiSTA(const char* ssid, const char* password, uint32_t timeoutMs = 10000) {
+    Serial.printf("Connecting to WiFi network: %s ...\n", ssid);
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true);
+    delay(200);
+    WiFi.begin(ssid, password);
+    uint32_t t0 = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) {
+        delay(250);
+        Serial.print(".");
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        IPAddress localIP = WiFi.localIP();
+        Serial.printf("\nWiFi STA connected! IP: %s\n", localIP.toString().c_str());
+        Serial.printf("STA MAC: %s\n", WiFi.macAddress().c_str());
+        
+        // Update broadcast subnet to match the connected network
+        gpsState.agioSubnet[0] = localIP[0];
+        gpsState.agioSubnet[1] = localIP[1];
+        gpsState.agioSubnet[2] = localIP[2];
+        Serial.printf("Broadcast subnet updated to: %d.%d.%d.255\n", 
+                      gpsState.agioSubnet[0], gpsState.agioSubnet[1], gpsState.agioSubnet[2]);
+        
+        return true;
+    } else {
+        Serial.println("\nWiFi STA connect failed");
+        return false;
+    }
+}
+
+/**
  * @brief Start the "NOLTE_FARM" WiFi access point.
  *
  * @details Uses WIFI_AP mode (AP-only) so the module is always reachable
@@ -724,16 +1099,61 @@ static void initIMU() {
  *          The AP IP is 192.168.5.1 / 255.255.255.0.
  */
 static void startWiFiAP() {
+    Serial.println("Starting WiFi AP...");
+    
+    // Ensure WiFi is fully reset
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(500);
+    
+    // Set WiFi to persistent mode (helps with some S3 modules)
+    WiFi.persistent(true);
+    
     IPAddress ip(AP_IP_1, AP_IP_2, AP_IP_3, AP_IP_4);
     IPAddress gw(AP_IP_1, AP_IP_2, AP_IP_3, AP_IP_4);
     IPAddress subnet(255, 255, 255, 0);
 
+    // Set mode to AP
     WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(ip, gw, subnet);
-    WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, 0, AP_MAX_CLIENTS);
-
-    Serial.printf("WiFi AP started  SSID=%s  IP=%s\n",
-                  AP_SSID, WiFi.softAPIP().toString().c_str());
+    delay(200);
+    
+    // Configure IP before starting AP
+    if (!WiFi.softAPConfig(ip, gw, subnet)) {
+        Serial.println("ERROR: AP config failed!");
+    }
+    
+    // Start AP - try with hidden=false (explicitly visible)
+    Serial.printf("Starting AP: %s on channel %d\n", AP_SSID, AP_CHANNEL);
+    bool apStarted = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, false, AP_MAX_CLIENTS);
+    
+    if (!apStarted) {
+        Serial.println("ERROR: Failed to start AP!");
+        // Try again on channel 1 as fallback
+        Serial.println("Retrying on channel 1...");
+        apStarted = WiFi.softAP(AP_SSID, AP_PASSWORD, 1, false, AP_MAX_CLIENTS);
+    }
+    
+    delay(500);
+    
+    // Disable power saving for better reliability
+    WiFi.setSleep(false);
+    
+    // Set maximum TX power
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    
+    // Verify AP is running
+    delay(1000);
+    wifi_mode_t mode = WiFi.getMode();
+    Serial.printf("Current WiFi mode: %d (2=AP, 3=STA+AP)\n", mode);
+    
+    if (WiFi.softAPgetStationNum() >= 0) {  // Check if AP functions are working
+        Serial.printf("WiFi AP ACTIVE - SSID=%s  IP=%s\n",
+                      AP_SSID, WiFi.softAPIP().toString().c_str());
+        Serial.printf("AP MAC: %s\n", WiFi.softAPmacAddress().c_str());
+        Serial.printf("AP is broadcasting and should be visible\n");
+    } else {
+        Serial.println("WARNING: AP may not be fully active!");
+    }
 
     // Initialise broadcast subnet to the AP subnet
     gpsState.agioSubnet[0] = AP_IP_1;
@@ -782,6 +1202,40 @@ static void updateDebugVars() {
     debugVars.push_back("PANDA broadcast: " + String(gpsState.enablePandaBroadcast ? "ON" : "OFF"));
     debugVars.push_back("NTRIP packets: " + String((unsigned long)gpsState.ntripCount));
     debugVars.push_back("NTRIP bytes: "   + String((uint32_t)gpsState.ntripBytes));
+    
+    if (gpsState.ntripCount > 0) {
+        // Average packet size
+        float avgSize = (float)gpsState.ntripBytes / (float)gpsState.ntripCount;
+        debugVars.push_back("Avg packet size: " + String(avgSize, 1) + " B");
+        
+        // Time since last packet
+        if (gpsState.lastNtripMs > 0) {
+            float secondsAgo = (millis() - gpsState.lastNtripMs) / 1000.0f;
+            debugVars.push_back("Last packet: " + String(secondsAgo, 1) + " s ago");
+        }
+        
+        // Data rate
+        if (gpsState.ntripCount > 1 && gpsState.firstNtripMs > 0) {
+            float elapsed = (millis() - gpsState.firstNtripMs) / 1000.0f;
+            if (elapsed > 0) {
+                float pktRate = (gpsState.ntripCount - 1) / elapsed;
+                float byteRate = gpsState.ntripBytes / elapsed;
+                debugVars.push_back("Packet rate: " + String(pktRate, 2) + " pkt/s");
+                
+                // Format byte rate nicely
+                if (byteRate >= 1024) {
+                    debugVars.push_back("Data rate: " + String(byteRate / 1024.0f, 2) + " KB/s");
+                } else {
+                    debugVars.push_back("Data rate: " + String(byteRate, 1) + " B/s");
+                }
+            }
+        }
+    } else {
+        debugVars.push_back("No NTRIP data received");
+    }
+    
+    debugVars.push_back("Broadcast subnet: " + String(gpsState.agioSubnet[0]) + "." + 
+                        String(gpsState.agioSubnet[1]) + "." + String(gpsState.agioSubnet[2]) + ".255");
 }
 
 static void handleDebugVars(AsyncWebServerRequest* req) {
@@ -789,6 +1243,62 @@ static void handleDebugVars(AsyncWebServerRequest* req) {
     JsonDocument doc;
     JsonArray arr = doc.to<JsonArray>();
     for (const auto& v : debugVars) arr.add(v);
+    String json;
+    serializeJson(doc, json);
+    req->send(200, "application/json", json);
+}
+
+/**
+ * @brief Serve GPS position data as JSON for map display.
+ *
+ * @details Converts NMEA lat/lon format (ddmm.mmmm) to decimal degrees.
+ *          Validates coordinates to prevent invalid positions on map.
+ */
+static void handleGpsPos(AsyncWebServerRequest* req) {
+    JsonDocument doc;
+    
+    int fixQuality = atoi(gpsState.fixQuality);
+    bool valid = false;
+    double decLat = 0.0;
+    double decLon = 0.0;
+    
+    // Only process if we have at least a GPS fix (quality >= 1)
+    if (fixQuality >= 1 && strlen(gpsState.latitude) > 4 && strlen(gpsState.longitude) > 4 &&
+        strlen(gpsState.latNS) > 0 && strlen(gpsState.lonEW) > 0) {
+        
+        // Parse latitude from NMEA format (ddmm.mmmm) to decimal degrees
+        double lat = atof(gpsState.latitude);
+        int deg = (int)(lat / 100);
+        double min = lat - (deg * 100);
+        decLat = deg + (min / 60.0);
+        if (gpsState.latNS[0] == 'S') decLat = -decLat;
+        
+        // Parse longitude from NMEA format (dddmm.mmmm) to decimal degrees
+        double lon = atof(gpsState.longitude);
+        deg = (int)(lon / 100);
+        min = lon - (deg * 100);
+        decLon = deg + (min / 60.0);
+        if (gpsState.lonEW[0] == 'W') decLon = -decLon;
+        
+        // Validate coordinates are within valid ranges
+        if (decLat >= -90.0 && decLat <= 90.0 && 
+            decLon >= -180.0 && decLon <= 180.0 &&
+            !isnan(decLat) && !isnan(decLon) &&
+            !isinf(decLat) && !isinf(decLon)) {
+            valid = true;
+        }
+    }
+    
+    doc["valid"] = valid;
+    doc["lat"] = valid ? decLat : 0.0;
+    doc["lon"] = valid ? decLon : 0.0;
+    doc["alt"] = atof(gpsState.altitude);
+    doc["fixQuality"] = fixQuality;
+    doc["sats"] = atoi(gpsState.numSats);
+    doc["hdop"] = atof(gpsState.HDOP);
+    doc["heading"] = strlen(gpsState.imuHeading) > 0 ? atoi(gpsState.imuHeading) / 10.0 : 0.0;
+    doc["speed"] = atof(gpsState.speedKnots);
+    
     String json;
     serializeJson(doc, json);
     req->send(200, "application/json", json);
@@ -892,12 +1402,20 @@ static void handleFileUpload(AsyncWebServerRequest* req, String filename,
 void setup() {
     // ── Serial (USB-CDC) ──────────────────────────────────────────────────
     Serial.begin(115200);
-    delay(1000);
+    delay(3000);
     Serial.printf("\n\n=== %s v%s booting ===\n", NAME, VERSION);
 
+    // ── Power Relay ───────────────────────────────────────────────────────
+    pinMode(POWER_RELAY_PIN, OUTPUT);
+    digitalWrite(POWER_RELAY_PIN, LOW);
+    Serial.println("Power relay LOW - waiting 1s...");
+    delay(1000);
+    digitalWrite(POWER_RELAY_PIN, HIGH);
+    Serial.println("Power relay HIGH");
+    delay(1000);
     // ── LED ───────────────────────────────────────────────────────────────
-    pixel.begin();
-    setLED(0, 0, 50);   // dim blue = booting
+    // pixel.begin();  // Disabled - no NeoPixel on Xiao
+    // setLED(0, 0, 50);   // dim blue = booting
 
     // ── File system ───────────────────────────────────────────────────────
     if (!LittleFS.begin(true)) {
@@ -906,8 +1424,26 @@ void setup() {
         Serial.println("LittleFS mounted");
     }
 
-    // ── WiFi AP ───────────────────────────────────────────────────────────
-    startWiFiAP();
+    // ── WiFi STA/Client ───────────────────────────────────────────────────
+    // Try connecting to WiFi network first (60 second timeout)
+    bool staConnected = connectWiFiSTA(STA_DEFAULT_SSID, STA_DEFAULT_PASSWORD, 60000);
+    
+    if (!staConnected) {
+        Serial.println("STA connection failed - starting AP mode");
+        startWiFiAP();
+    } else {
+        Serial.println("WiFi connected - AP mode not needed");
+    }
+
+    // ── mDNS ──────────────────────────────────────────────────────────────
+    if (MDNS.begin("esp32_gps")) {
+        Serial.println("mDNS responder started: esp32_gps.local");
+        MDNS.addService("http", "tcp", 80);
+        MDNS.addServiceTxt("http", "tcp", "version", VERSION);
+        MDNS.addServiceTxt("http", "tcp", "name", NAME);
+    } else {
+        Serial.println("Error starting mDNS");
+    }
 
     // ── GPS ───────────────────────────────────────────────────────────────
     initGPS();
@@ -928,7 +1464,11 @@ void setup() {
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest* r) {
         r->send(LittleFS, "/index.html", "text/html");
     });
+    server.on("/map.html", HTTP_GET, [](AsyncWebServerRequest* r) {
+        r->send(LittleFS, "/map.html", "text/html");
+    });
     server.on("/getDebugVars", HTTP_GET, handleDebugVars);
+    server.on("/getGpsPos",    HTTP_GET, handleGpsPos);
     server.on("/getFiles",     HTTP_GET, handleFileList);
     server.on("/reboot",       HTTP_GET, handleReboot);
 
@@ -953,6 +1493,87 @@ void setup() {
         r->send(200, "application/json", json);
     });
 
+    // Message format control (PANDA vs raw NMEA)
+    server.on("/getMessageFormat", HTTP_GET, [](AsyncWebServerRequest* r) {
+        JsonDocument doc;
+        doc["useRawNMEA"] = gpsState.useRawNMEA;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+    server.on("/setMessageFormat", HTTP_GET, [](AsyncWebServerRequest* r) {
+        if (r->hasParam("raw")) {
+            gpsState.useRawNMEA = r->getParam("raw")->value() == "1" || 
+                                  r->getParam("raw")->value() == "true";
+            Serial.printf("Message format: %s\n", gpsState.useRawNMEA ? "Raw NMEA" : "PANDA");
+        }
+        JsonDocument doc;
+        doc["useRawNMEA"] = gpsState.useRawNMEA;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+
+    // GPS logging control
+    server.on("/getGpsLogging", HTTP_GET, [](AsyncWebServerRequest* r) {
+        JsonDocument doc;
+        doc["enabled"] = gpsState.enableGpsLogging;
+        // Get log file size if it exists
+        if (LittleFS.exists("/gpslog.csv")) {
+            File f = LittleFS.open("/gpslog.csv", "r");
+            doc["size"] = f.size();
+            doc["lines"] = 0; // Could count but expensive
+            f.close();
+        } else {
+            doc["size"] = 0;
+            doc["lines"] = 0;
+        }
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+    
+    server.on("/setGpsLogging", HTTP_GET, [](AsyncWebServerRequest* r) {
+        if (r->hasParam("enable")) {
+            bool newState = r->getParam("enable")->value() == "1" || 
+                           r->getParam("enable")->value() == "true";
+            
+            // If enabling for first time, write CSV header
+            if (newState && !gpsState.enableGpsLogging && !LittleFS.exists("/gpslog.csv")) {
+                File logFile = LittleFS.open("/gpslog.csv", "w");
+                if (logFile) {
+                    logFile.println("timestamp_ms,latitude,longitude,altitude_m,fix_quality,satellites,hdop,speed_kn,heading_deg");
+                    logFile.close();
+                    Serial.println("GPS log file created with header");
+                }
+            }
+            
+            gpsState.enableGpsLogging = newState;
+            Serial.printf("GPS logging %s\n", gpsState.enableGpsLogging ? "enabled" : "disabled");
+        }
+        JsonDocument doc;
+        doc["enabled"] = gpsState.enableGpsLogging;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+    
+    server.on("/downloadGpsLog", HTTP_GET, [](AsyncWebServerRequest* r) {
+        if (LittleFS.exists("/gpslog.csv")) {
+            r->send(LittleFS, "/gpslog.csv", "text/csv", true); // true = download
+        } else {
+            r->send(404, "text/plain", "Log file not found");
+        }
+    });
+    
+    server.on("/clearGpsLog", HTTP_GET, [](AsyncWebServerRequest* r) {
+        if (LittleFS.exists("/gpslog.csv")) {
+            LittleFS.remove("/gpslog.csv");
+            Serial.println("GPS log file deleted");
+        }
+        r->send(200, "text/plain", "Log cleared");
+    });
+
     server.on("/update", HTTP_POST,
               [](AsyncWebServerRequest* r) {},
               handleFirmwareUpload);
@@ -974,22 +1595,34 @@ void setup() {
     });
 
     server.begin();
-    Serial.println("Web server started on http://" + WiFi.softAPIP().toString());
+    
+    // Print the correct IP based on WiFi mode
+    if (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED) {
+        Serial.println("Web server started on http://" + WiFi.localIP().toString());
+    } else {
+        Serial.println("Web server started on http://" + WiFi.softAPIP().toString());
+    }
 
     // ── GPS FreeRTOS task (Core 1) ────────────────────────────────────────
     xTaskCreatePinnedToCore(gpsTask, "GPS_Task", 16384, nullptr, 3, nullptr, 1);
 
     // ── Status LED: ready ─────────────────────────────────────────────────
-    setLED(0, 20, 0);   // dim green = running
+    // setLED(0, 20, 0);   // dim green = running
 
-    Serial.printf("Setup complete – AP: %s  IP: %s\n",
-                  AP_SSID, WiFi.softAPIP().toString().c_str());
+    // Print setup complete with correct mode and IP
+    if (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED) {
+        Serial.printf("Setup complete – STA Mode  IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        Serial.printf("Setup complete – AP: %s  IP: %s\n",
+                      AP_SSID, WiFi.softAPIP().toString().c_str());
+    }
 }
 
 // ── loop() ────────────────────────────────────────────────────────────────
 
 void loop() {
-    // Update LED based on GPS fix quality and client count
+    // Update LED based on GPS fix quality and client count (disabled - no NeoPixel on Xiao)
+    /*
     static uint32_t lastLedUpdate = 0;
     if (millis() - lastLedUpdate >= 500) {
         lastLedUpdate = millis();
@@ -1005,6 +1638,7 @@ void loop() {
             setLED(5, 5, 0);            // dim yellow: no clients, no fix
         }
     }
+    */
 
     static uint32_t lastDebug = 0;
     if (millis() - lastDebug >= 15000) {

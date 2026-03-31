@@ -3,7 +3,8 @@ import os
 Import("env", "projenv")
 
 version_path = r"./include/Version.h"
-bin_path = r"./.pio/build/esp32-s3-devkitc-1/firmware.bin"
+bin_path = r"./.pio/build/seeed_xiao_esp32s3/firmware.bin"
+fs_bin_path = r"./.pio/build/seeed_xiao_esp32s3/littlefs.bin"
 program = ""
 newVersion = ""
 
@@ -19,7 +20,7 @@ def getInfo():
     for line in lines:
         if line.startswith("#define NAME "):
             program = line.replace("#define NAME ", "").replace('"', "").strip()
-        if "#define VERSION" in line:
+        if line.startswith('#define VERSION "'):
             newVersion = line.replace("#define VERSION ", "").replace('"', "").strip()
     print(f"Program: {program}  Version: {newVersion}")
 
@@ -31,7 +32,7 @@ def increment_version():
     with open(version_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
     for i, line in enumerate(lines):
-        if "#define VERSION" in line:
+        if line.startswith('#define VERSION "'):
             old = line.replace("#define VERSION ", "").replace('"', "").strip()
             parts = old.split(".")
             if len(parts) != 3:
@@ -61,6 +62,16 @@ def copy_firmware(source, target, env):
     shutil.copy(bin_path, dest)
 
 
+def copy_filesystem(source, target, env):
+    """Copy the built filesystem binary to the project root as {NAME}_FS_{VERSION}.bin."""
+    if not os.path.exists(fs_bin_path):
+        print(f"Filesystem binary not found at {fs_bin_path}, skipping copy")
+        return
+    dest = f"./{program}_FS_{newVersion}.bin"
+    print(f"Copying filesystem to {dest}")
+    shutil.copy(fs_bin_path, dest)
+
+
 def upload_filesystem(source, target, env):
     """Build and upload filesystem before firmware upload."""
     print("")
@@ -76,11 +87,17 @@ def upload_filesystem(source, target, env):
 
 
 # ── Execution ──────────────────────────────────────────────────────────────
-getInfo()
+# For local builds, increment version immediately (before any build actions)
 if not IS_CI:
+    print("Local build detected - incrementing version...")
     increment_version()
+    getInfo()  # Re-read to show updated version
+else:
+    print("CI build detected - version will not be auto-incremented")
+    getInfo()
 
 env.AddPostAction("buildprog", copy_firmware)
+env.AddPostAction("buildfs", copy_filesystem)
 env.AddPreAction("upload", upload_filesystem)
 env.AddPostAction("upload", copy_firmware)
 
