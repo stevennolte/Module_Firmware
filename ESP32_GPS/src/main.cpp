@@ -35,6 +35,7 @@
 #include <Adafruit_BNO08x.h>
 #include "SparkFun_Unicore_GNSS_Arduino_Library.h"
 #include "Version.h"
+#include <algorithm>
 
 // ── Pin definitions ────────────────────────────────────────────────────────
 
@@ -146,6 +147,66 @@ struct GPSState {
     // ── IMU watchdog ──
     uint32_t imuLastMsgMs = 0;  ///< millis() of last valid IMU frame
 } gpsState;
+
+// ── WiFi network management ────────────────────────────────────────────────
+
+struct WifiNetwork {
+    String ssid;
+    String password;
+};
+
+std::vector<WifiNetwork> savedNetworks;
+
+/**
+ * @brief Write savedNetworks to /wifi_networks.json on LittleFS.
+ */
+static void saveWifiNetworks() {
+    JsonDocument doc;
+    JsonArray arr = doc["networks"].to<JsonArray>();
+    for (const auto& n : savedNetworks) {
+        JsonObject obj = arr.add<JsonObject>();
+        obj["ssid"]     = n.ssid;
+        obj["password"] = n.password;
+    }
+    File f = LittleFS.open("/wifi_networks.json", "w");
+    if (f) {
+        serializeJson(doc, f);
+        f.close();
+        Serial.printf("Saved %d WiFi network(s)\n", (int)savedNetworks.size());
+    } else {
+        Serial.println("Failed to save WiFi networks");
+    }
+}
+
+/**
+ * @brief Load WiFi networks from /wifi_networks.json.
+ *        Falls back to the compile-time default if the file is absent or invalid.
+ */
+static void loadWifiNetworks() {
+    savedNetworks.clear();
+    if (LittleFS.exists("/wifi_networks.json")) {
+        File f = LittleFS.open("/wifi_networks.json", "r");
+        if (f) {
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, f);
+            f.close();
+            if (!err && doc["networks"].is<JsonArray>()) {
+                for (JsonObject net : doc["networks"].as<JsonArray>()) {
+                    String ssid = net["ssid"] | "";
+                    String pw   = net["password"] | "";
+                    if (ssid.length() > 0) {
+                        savedNetworks.push_back({ssid, pw});
+                    }
+                }
+                Serial.printf("Loaded %d WiFi network(s)\n", (int)savedNetworks.size());
+                return;
+            }
+        }
+    }
+    // Default when no file exists
+    savedNetworks.push_back({STA_DEFAULT_SSID, STA_DEFAULT_PASSWORD});
+    Serial.println("No wifi_networks.json – using default network");
+}
 
 // Yaw-rate calculation helpers (used only inside GPS task)
 static float    prevYaw          = 0.0f;
@@ -1425,9 +1486,16 @@ void setup() {
     }
 
     // ── WiFi STA/Client ───────────────────────────────────────────────────
-    // Try connecting to WiFi network first (60 second timeout)
-    bool staConnected = connectWiFiSTA(STA_DEFAULT_SSID, STA_DEFAULT_PASSWORD, 60000);
-    
+    // Try each saved WiFi network (10 s per attempt) before falling back to AP
+    loadWifiNetworks();
+    bool staConnected = false;
+    for (const auto& net : savedNetworks) {
+        if (connectWiFiSTA(net.ssid.c_str(), net.password.c_str(), 10000)) {
+            staConnected = true;
+            break;
+        }
+    }
+
     if (!staConnected) {
         Serial.println("STA connection failed - starting AP mode");
         startWiFiAP();
@@ -1589,6 +1657,109 @@ void setup() {
         JsonDocument doc;
         doc["name"]    = NAME;
         doc["version"] = VERSION;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+
+    // ── Settings page ─────────────────────────────────────────────────────
+    server.on("/settings.html", HTTP_GET, [](AsyncWebServerRequest* r) {
+        r->send(LittleFS, "/settings.html", "text/html");
+    });
+
+    // Return saved SSIDs (no passwords)
+    server.on("/getWifiNetworks", HTTP_GET, [](AsyncWebServerRequest* r) {
+        JsonDocument doc;
+        JsonArray arr = doc["networks"].to<JsonArray>();
+        for (const auto& n : savedNetworks) arr.add(n.ssid);
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+
+    // Add a network (POST body: ssid=...&password=...)
+    server.on("/addWifiNetwork", HTTP_POST, [](AsyncWebServerRequest* r) {
+        String ssid = r->hasParam("ssid", true) ? r->getParam("ssid", true)->value() : "";
+        String pw   = r->hasParam("password", true) ? r->getParam("password", true)->value() : "";
+        JsonDocument doc;
+        if (ssid.length() == 0) {
+            doc["ok"]      = false;
+            doc["message"] = "SSID cannot be empty.";
+        } else {
+            // Update password if SSID already exists, otherwise append
+            bool updated = false;
+            for (auto& n : savedNetworks) {
+                if (n.ssid == ssid) { n.password = pw; updated = true; break; }
+            }
+            if (!updated) savedNetworks.push_back({ssid, pw});
+            saveWifiNetworks();
+            doc["ok"]      = true;
+            doc["message"] = updated ? "Password updated. Reboot to reconnect."
+                                     : "Network added. Reboot to connect.";
+        }
+        JsonArray arr = doc["networks"].to<JsonArray>();
+        for (const auto& n : savedNetworks) arr.add(n.ssid);
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+
+    // Remove a network (POST body: ssid=...)
+    server.on("/removeWifiNetwork", HTTP_POST, [](AsyncWebServerRequest* r) {
+        String ssid = r->hasParam("ssid", true) ? r->getParam("ssid", true)->value() : "";
+        JsonDocument doc;
+        if (ssid.length() == 0) {
+            doc["ok"]      = false;
+            doc["message"] = "SSID cannot be empty.";
+        } else {
+            auto before = savedNetworks.size();
+            savedNetworks.erase(
+                std::remove_if(savedNetworks.begin(), savedNetworks.end(),
+                    [ssid](const WifiNetwork& n) { return n.ssid == ssid; }),
+                savedNetworks.end());
+            if (savedNetworks.size() < before) {
+                saveWifiNetworks();
+                doc["ok"]      = true;
+                doc["message"] = "Network removed.";
+            } else {
+                doc["ok"]      = false;
+                doc["message"] = "Network not found.";
+            }
+        }
+        JsonArray arr = doc["networks"].to<JsonArray>();
+        for (const auto& n : savedNetworks) arr.add(n.ssid);
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+
+    // Trigger an async WiFi scan
+    server.on("/scanWifi", HTTP_GET, [](AsyncWebServerRequest* r) {
+        WiFi.scanNetworks(true);   // async=true: non-blocking scan
+        r->send(200, "application/json", "{\"status\":\"scanning\"}");
+    });
+
+    // Poll for scan results
+    server.on("/getScanResults", HTTP_GET, [](AsyncWebServerRequest* r) {
+        int n = WiFi.scanComplete();
+        if (n == WIFI_SCAN_RUNNING) {
+            r->send(200, "application/json", "{\"status\":\"scanning\",\"networks\":[]}");
+            return;
+        }
+        if (n < 0) {
+            r->send(200, "application/json", "{\"status\":\"idle\",\"networks\":[]}");
+            return;
+        }
+        JsonDocument doc;
+        doc["status"] = "done";
+        JsonArray arr = doc["networks"].to<JsonArray>();
+        for (int i = 0; i < n; i++) {
+            JsonObject obj = arr.add<JsonObject>();
+            obj["ssid"]      = WiFi.SSID(i);
+            obj["rssi"]      = WiFi.RSSI(i);
+            obj["encrypted"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+        }
+        WiFi.scanDelete();
         String json;
         serializeJson(doc, json);
         r->send(200, "application/json", json);

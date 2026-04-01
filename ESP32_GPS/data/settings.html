@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - ESP32 GPS Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 16px; }
+    header { background: #1a6b2f; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.3rem; }
+    header .sub { font-size: 0.8rem; opacity: 0.85; }
+    nav { margin-bottom: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 8px 16px; font-size: 0.85rem; font-weight: bold; background: #1a6b2f; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover, nav a.active { background: #0f4520; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 18px; }
+    .card h2 { font-size: 0.95rem; color: #555; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .lbl { color: #777; }
+    .stat-row .val { font-weight: bold; color: #1a6b2f; }
+    .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; color: white; transition: background 0.2s; }
+    .btn-green { background: #1a6b2f; } .btn-green:hover { background: #0f4520; }
+    .btn-red   { background: #c0392b; } .btn-red:hover   { background: #922b21; }
+    .btn-blue  { background: #2980b9; } .btn-blue:hover  { background: #1f618d; }
+    .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
+    .network-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; }
+    .network-row:last-child { border-bottom: none; }
+    .network-ssid { font-weight: bold; color: #222; word-break: break-all; flex: 1; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; font-weight: bold; }
+    .form-group input { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.88rem; }
+    .form-group input:focus { outline: none; border-color: #1a6b2f; }
+    .msg { margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.83rem; display: none; }
+    .msg-ok  { background: #d4edda; color: #155724; }
+    .msg-err { background: #f8d7da; color: #721c24; }
+    .scan-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.85rem; }
+    .scan-row:last-child { border-bottom: none; }
+    .scan-ssid { flex: 1; word-break: break-all; }
+    .scan-rssi { color: #888; font-size: 0.78rem; margin: 0 8px; white-space: nowrap; }
+    .scan-lock { color: #aaa; font-size: 0.78rem; margin-right: 8px; }
+    #scanStatus { font-size: 0.82rem; color: #888; margin-top: 8px; min-height: 20px; }
+    .empty-note { color: #aaa; font-size: 0.83rem; padding: 8px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GPS Module &ndash; ESP32-S3</h1>
+    <div class="sub">WiFi Settings</div>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Status</a>
+  <a href="map.html">Map</a>
+  <a href="settings.html" class="active">Settings</a>
+  <a href="#" onclick="reboot()">Reboot</a>
+</nav>
+
+<div class="grid">
+
+  <!-- WiFi Status card -->
+  <div class="card">
+    <h2>WiFi Status</h2>
+    <div class="stat-row"><span class="lbl">Mode</span>       <span class="val" id="wifiMode">--</span></div>
+    <div class="stat-row"><span class="lbl">Connected to</span><span class="val" id="wifiSsid">--</span></div>
+    <div class="stat-row"><span class="lbl">IP Address</span> <span class="val" id="wifiIp">--</span></div>
+    <div class="stat-row"><span class="lbl">AP SSID</span>    <span class="val" id="apSsid">--</span></div>
+    <div class="stat-row"><span class="lbl">AP IP</span>      <span class="val" id="apIp">--</span></div>
+    <p style="font-size:0.78rem;color:#888;margin-top:10px;">
+      After adding or removing a network, use the <strong>Reboot</strong> button to reconnect.
+    </p>
+  </div>
+
+  <!-- Saved Networks card -->
+  <div class="card">
+    <h2>Saved Networks</h2>
+    <div id="networkList"><span class="empty-note">Loading&hellip;</span></div>
+  </div>
+
+  <!-- Add Network card -->
+  <div class="card">
+    <h2>Add / Update Network</h2>
+    <div class="form-group">
+      <label for="newSsid">Network Name (SSID)</label>
+      <input type="text" id="newSsid" placeholder="e.g. MyFarmNetwork" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label for="newPass">Password</label>
+      <input type="password" id="newPass" placeholder="Leave blank for open networks" autocomplete="new-password">
+    </div>
+    <button class="btn btn-green" onclick="addNetwork()">Save Network</button>
+    <div id="addMsg" class="msg"></div>
+  </div>
+
+  <!-- Scan card -->
+  <div class="card">
+    <h2>Scan Nearby Networks</h2>
+    <button class="btn btn-blue btn-sm" onclick="startScan()">Scan</button>
+    <div id="scanStatus"></div>
+    <div id="scanList" style="margin-top:10px;"></div>
+  </div>
+
+</div>
+
+<script>
+  let scanPollTimer = null;
+
+  // ── WiFi status ──────────────────────────────────────────────────────────
+  function loadStatus() {
+    fetch('/getDebugVars')
+      .then(r => r.json())
+      .then(data => {
+        const m = {};
+        data.forEach(line => {
+          const i = line.indexOf(': ');
+          if (i > 0) m[line.slice(0, i).trim()] = line.slice(i + 2).trim();
+        });
+        document.getElementById('apSsid').textContent = m['AP SSID'] || '--';
+        document.getElementById('apIp').textContent   = m['AP IP']   || '--';
+
+        // Determine mode from IP presence
+        const apIp = m['AP IP'] || '';
+        const hasAp = apIp && apIp !== '0.0.0.0';
+        if (hasAp) {
+          document.getElementById('wifiMode').textContent  = 'Access Point';
+          document.getElementById('wifiSsid').textContent  = m['AP SSID'] || '--';
+          document.getElementById('wifiIp').textContent    = apIp;
+        } else {
+          document.getElementById('wifiMode').textContent  = 'Station (STA)';
+          document.getElementById('wifiSsid').textContent  = '--';
+          document.getElementById('wifiIp').textContent    = '--';
+        }
+      })
+      .catch(e => console.warn('status fetch error', e));
+  }
+
+  // ── Saved networks list ──────────────────────────────────────────────────
+  function renderNetworks(networks) {
+    const el = document.getElementById('networkList');
+    if (!networks || networks.length === 0) {
+      el.innerHTML = '<span class="empty-note">No saved networks.</span>';
+      return;
+    }
+    el.innerHTML = networks.map(ssid => `
+      <div class="network-row">
+        <span class="network-ssid">${escHtml(ssid)}</span>
+        <button class="btn btn-red btn-sm" onclick="removeNetwork(${JSON.stringify(ssid)})">Remove</button>
+      </div>`).join('');
+  }
+
+  function loadNetworks() {
+    fetch('/getWifiNetworks')
+      .then(r => r.json())
+      .then(data => renderNetworks(data.networks || []))
+      .catch(e => console.warn('network list error', e));
+  }
+
+  // ── Add / update network ─────────────────────────────────────────────────
+  function addNetwork() {
+    const ssid = document.getElementById('newSsid').value.trim();
+    const pass = document.getElementById('newPass').value;
+    if (!ssid) { showMsg('addMsg', false, 'Please enter an SSID.'); return; }
+
+    const body = new URLSearchParams({ ssid, password: pass });
+    fetch('/addWifiNetwork', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+      .then(r => r.json())
+      .then(data => {
+        showMsg('addMsg', data.ok, data.message);
+        if (data.ok) {
+          document.getElementById('newSsid').value = '';
+          document.getElementById('newPass').value = '';
+          renderNetworks(data.networks || []);
+        }
+      })
+      .catch(e => { console.warn('add network error', e); showMsg('addMsg', false, 'Request failed.'); });
+  }
+
+  // ── Remove network ───────────────────────────────────────────────────────
+  function removeNetwork(ssid) {
+    if (!confirm('Remove "' + ssid + '" from saved networks?')) return;
+    const body = new URLSearchParams({ ssid });
+    fetch('/removeWifiNetwork', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+      .then(r => r.json())
+      .then(data => renderNetworks(data.networks || []))
+      .catch(e => console.warn('remove network error', e));
+  }
+
+  // ── WiFi scan ────────────────────────────────────────────────────────────
+  function startScan() {
+    document.getElementById('scanList').innerHTML = '';
+    document.getElementById('scanStatus').textContent = 'Scanning…';
+    if (scanPollTimer) clearInterval(scanPollTimer);
+    fetch('/scanWifi')
+      .catch(e => { document.getElementById('scanStatus').textContent = 'Scan request failed.'; console.warn('scan error', e); });
+    scanPollTimer = setInterval(pollScan, 1500);
+  }
+
+  function pollScan() {
+    fetch('/getScanResults')
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'scanning') {
+          document.getElementById('scanStatus').textContent = 'Scanning…';
+          return;
+        }
+        clearInterval(scanPollTimer);
+        scanPollTimer = null;
+        if (data.status === 'done') {
+          document.getElementById('scanStatus').textContent =
+            data.networks.length + ' network(s) found.';
+          renderScanResults(data.networks || []);
+        } else {
+          document.getElementById('scanStatus').textContent = 'Scan complete.';
+        }
+      })
+      .catch(e => { console.warn('scan poll error', e); });
+  }
+
+  function renderScanResults(networks) {
+    const el = document.getElementById('scanList');
+    if (networks.length === 0) {
+      el.innerHTML = '<span class="empty-note">No networks found.</span>';
+      return;
+    }
+    // Sort by signal strength (strongest first)
+    networks.sort((a, b) => b.rssi - a.rssi);
+    el.innerHTML = networks.map(n => `
+      <div class="scan-row">
+        <span class="scan-ssid">${escHtml(n.ssid)}</span>
+        <span class="scan-rssi">${n.rssi} dBm</span>
+        <span class="scan-lock">${n.encrypted ? '🔒' : '🔓'}</span>
+        <button class="btn btn-green btn-sm" onclick="prefillNetwork(${JSON.stringify(n.ssid)})">+ Add</button>
+      </div>`).join('');
+  }
+
+  function prefillNetwork(ssid) {
+    document.getElementById('newSsid').value = ssid;
+    document.getElementById('newPass').value = '';
+    document.getElementById('newPass').focus();
+    document.getElementById('newSsid').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function showMsg(id, ok, text) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 5000);
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function reboot() {
+    if (confirm('Reboot the ESP32 GPS module?')) {
+      fetch('/reboot')
+        .then(() => alert('Rebooting…'))
+        .catch(e => { console.warn('reboot error', e); alert('Reboot request failed.'); });
+    }
+  }
+
+  // Support pressing Enter in the SSID/password fields
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('newPass').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addNetwork();
+    });
+    document.getElementById('newSsid').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('newPass').focus();
+    });
+    loadStatus();
+    loadNetworks();
+  });
+</script>
+</body>
+</html>
