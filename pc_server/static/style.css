@@ -1,0 +1,469 @@
+/* =============================================================================
+   Module Management Server — Shared Stylesheet
+   Style Standard v1.0
+
+   Color Palette
+   ─────────────
+   Primary Blue    #1565c0   (header, links, primary actions, table headers)
+   Dark Blue       #0d47a1   (primary hover, table header border)
+   Light Blue      #e3f2fd   (info message background, chart control hover)
+   Panel Gray      #37474f   (secondary panel headers e.g. Data Logging)
+   Muted Blue-Gray #546e7a   (loading badge background)
+
+   Success Green   #4caf50 / #2e7d32 / #e8f5e9   (online indicators)
+   Error Red       #f44336 / #c62828 / #ffebee   (offline / errors)
+   Warning Orange  #ff9800 / #e65100             (warn buttons, loading dot)
+   Offline Row     #fff3e0                        (table row tint when offline)
+
+   Body Background #f0f2f5
+   Card Background #ffffff
+   Muted Fill      #f5f5f5  (version box, stats bar, table hover)
+   Dark Muted Fill #f8f8f8  (diagnostics panel)
+   Border          #e0e0e0 / #cccccc / #eeeeee
+   Disabled Button #90a4ae
+
+   Text Primary    #222
+   Text Secondary  #555 / #666
+   Text Muted      #888 / #777 / #999
+   Text Link       #1565c0
+
+   Typography Scale
+   ────────────────
+   Page title (h1)       : 1.4 rem  bold
+   Card title (h2)       : 1.1 rem  bold
+   Panel title (h3)      : 1.0 rem  bold
+   Body / controls label : 0.9 rem
+   Info row              : 0.875 rem
+   Button (base)         : 0.875 rem  bold
+   Button (sm)           : 0.8 rem   bold
+   Badge / status msg    : 0.75–0.82 rem  bold
+   Monospace data        : 0.75–0.8 rem
+   ============================================================================= */
+
+/* ── Reset ──────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Base ────────────────────────────────────────────────────────────────────── */
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f2f5;
+  color: #222;
+  padding: 20px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+header {
+  background: #1565c0;
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 { font-size: 1.4rem; }
+/* .header-subtitle — also matched as header .subtitle for legacy templates */
+.header-subtitle,
+header .subtitle { font-size: 0.85rem; opacity: 0.8; }
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary            { background: #1565c0; color: white; }
+.btn-primary:hover      { background: #0d47a1; }
+.btn-primary:disabled   { background: #90a4ae; cursor: not-allowed; }
+.btn-secondary          { background: #757575; color: white; }
+.btn-secondary:hover    { background: #616161; }
+.btn-warn               { background: #ff9800; color: white; }
+.btn-warn:hover         { background: #e65100; }
+.btn-danger             { background: #f44336; color: white; }
+.btn-danger:hover       { background: #c62828; }
+/* Small modifier — combine with any variant: class="btn btn-sm btn-primary" */
+.btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+/* Icon button — inline, borderless refresh/action trigger */
+.btn-icon {
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 0.85rem;
+  margin-left: 6px;
+  transition: all 0.2s;
+}
+.btn-icon:hover  { background: #f0f0f0; border-color: #1565c0; }
+.btn-icon:active { transform: rotate(180deg); }
+
+/* Horizontal row of action buttons */
+.action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Badges ──────────────────────────────────────────────────────────────────── */
+/* .badge — pill shape used in card headers */
+.badge {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+/* .status-badge — smaller inline badge used inside table cells */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+.badge-online,
+.status-badge.badge-online  { background: #e8f5e9; color: #2e7d32; }
+.badge-offline,
+.status-badge.badge-offline { background: #ffebee; color: #c62828; }
+
+/* ── Status Dots ─────────────────────────────────────────────────────────────── */
+.status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-online  { background: #4caf50; }
+.dot-offline { background: #f44336; }
+.dot-loading { background: #ff9800; animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Status Messages ─────────────────────────────────────────────────────────── */
+/* One-line contextual feedback inside cards or forms */
+.status-msg {
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  border-radius: 4px;
+  min-height: 28px;
+}
+.msg-success { background: #e8f5e9; color: #2e7d32; }
+.msg-error   { background: #ffebee; color: #c62828; }
+.msg-info    { background: #e3f2fd; color: #1565c0; }
+
+/* ── Cards ───────────────────────────────────────────────────────────────────── */
+.card,
+.module-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+.card-header {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #eee;
+}
+.card-header h2 { font-size: 1.1rem; flex: 1; }
+.card-body { padding: 16px 20px; }
+
+/* Dark-header panel variant (e.g. Data Logging panel) */
+.panel-header,
+.data-log-panel .panel-header {
+  background: #37474f;
+  color: white;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.panel-header h2 { font-size: 1rem; flex: 1; }
+.panel-body,
+.data-log-panel .panel-body { padding: 16px 20px; }
+
+/* .data-log-panel — named instance of a card used for data logging status */
+.data-log-panel {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+/* ── Info Rows ───────────────────────────────────────────────────────────────── */
+/* Label : Value pairs inside cards */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+}
+.info-row span:first-child { color: #666; }
+.info-row .value { font-weight: bold; }
+
+/* ── Controls Bar ────────────────────────────────────────────────────────────── */
+/* Horizontal toolbar of filters/inputs above data views */
+.controls {
+  background: white;
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.controls label { font-size: 0.9rem; font-weight: bold; }
+.controls select,
+.controls input[type="number"],
+.controls input[type="text"] {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+/* ── Refresh Row ─────────────────────────────────────────────────────────────── */
+/* Inline auto-refresh control row above module grid */
+.refresh-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.refresh-row label { font-size: 0.85rem; color: #555; }
+.refresh-row input[type="number"] {
+  width: 70px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* ── Stats Bar ───────────────────────────────────────────────────────────────── */
+/* Row count / summary line inside data containers */
+.stats {
+  padding: 12px 20px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+/* ── Data Tables ─────────────────────────────────────────────────────────────── */
+.data-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+.table-wrapper {
+  overflow-x: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead {
+  position: sticky;
+  top: 0;
+  background: #1565c0;
+  color: white;
+  z-index: 10;
+}
+th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: bold;
+  font-size: 0.85rem;
+  border-bottom: 2px solid #0d47a1;
+}
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 0.85rem;
+}
+tbody tr:hover { background: #f5f5f5; }
+.offline-row   { background: #fff3e0; }
+.module-name   { font-weight: bold; color: #1565c0; }
+.timestamp     { font-family: 'Courier New', monospace; font-size: 0.8rem; color: #555; }
+.debug-data {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.debug-data:hover {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-all;
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────────────── */
+.pagination {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* ── Grids ───────────────────────────────────────────────────────────────────── */
+/* Module management cards */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+  gap: 20px;
+}
+/* Chart panels */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+/* Stat/info key–value grid inside panels */
+.data-log-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 24px;
+  margin-bottom: 12px;
+}
+
+/* ── Help / Info Block ───────────────────────────────────────────────────────── */
+/* Blue left-bordered callout (e.g. interactive chart instructions) */
+.help-text {
+  background: #e3f2fd;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #1565c0;
+  margin-bottom: 20px;
+  border-left: 4px solid #1565c0;
+}
+.help-text strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* ── Version Compare ─────────────────────────────────────────────────────────── */
+.version-compare {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.version-box {
+  flex: 1;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+.version-box .label { color: #888; font-size: 0.72rem; margin-bottom: 2px; }
+.version-box .ver   { font-weight: bold; font-size: 0.95rem; }
+.version-newer  { color: #1565c0; }
+.version-current{ color: #4caf50; }
+
+/* ── Update Section ──────────────────────────────────────────────────────────── */
+.update-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Diagnostics Panel ───────────────────────────────────────────────────────── */
+.diagnostics-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+}
+.diagnostics-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1565c0;
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 0;
+  margin-bottom: 8px;
+}
+.diagnostics-list {
+  display: none;
+  background: #f8f8f8;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.diagnostics-list.open { display: block; }
+
+/* ── Chart Containers ────────────────────────────────────────────────────────── */
+.chart-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 20px;
+}
+.chart-container h3 {
+  font-size: 1rem;
+  margin-bottom: 15px;
+  color: #1565c0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.chart-controls { display: flex; gap: 5px; }
+.chart-controls button {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  border: 1px solid #1565c0;
+  background: white;
+  color: #1565c0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.chart-controls button:hover { background: #e3f2fd; }
+.chart-wrapper {
+  position: relative;
+  height: 300px;
+}
+
+/* ── Loading & Error States ──────────────────────────────────────────────────── */
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+  font-size: 1.1rem;
+}
+.error {
+  padding: 20px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  margin: 20px;
+}

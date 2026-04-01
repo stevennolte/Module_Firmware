@@ -457,6 +457,12 @@ def charts_viewer():
     return render_template("charts.html")
 
 
+@app.route("/style-guide")
+def style_guide():
+    """UI style guide / design-standard reference page."""
+    return render_template("style_guide.html")
+
+
 @app.route("/api/modules")
 def api_modules():
     """Return live status for all managed modules."""
