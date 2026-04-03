@@ -7,6 +7,7 @@ on:
       - "ESP32_AIO/**"
       - "ESP32_Row_Controller/**"
       - "ESP32_WiFi_AP/**"
+      - "ESP32_GPS/**"
   workflow_dispatch:
 
 jobs:
@@ -39,7 +40,7 @@ jobs:
         id: info
         working-directory: ESP32_AIO
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/' | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
@@ -127,7 +128,7 @@ jobs:
         id: info
         working-directory: ESP32_Row_Controller
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/' | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
@@ -214,7 +215,7 @@ jobs:
         id: info
         working-directory: ESP32_WiFi_AP
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/' | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
@@ -267,6 +268,94 @@ jobs:
           draft: false
           prerelease: false
           # Update existing release/assets if the same tag was already created
+          fail_on_unmatched_files: false
+          update_release_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ──────────────────────────────────────────────────────────────────────────
+  build-esp32-gps:
+    name: Build ESP32_GPS
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Required to create GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-gps-${{ hashFiles('ESP32_GPS/platformio.ini') }}
+          restore-keys: ${{ runner.os }}-pio-gps-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Extract version info (pre-build)
+        id: info
+        working-directory: ESP32_GPS
+        run: |
+          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/' | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')
+          NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"         >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
+
+      - name: Build ESP32_GPS firmware
+        working-directory: ESP32_GPS
+        run: pio run --environment seeed_xiao_esp32s3
+
+      - name: Build ESP32_GPS filesystem image
+        working-directory: ESP32_GPS
+        run: pio run --target buildfs --environment seeed_xiao_esp32s3
+
+      - name: Rename firmware and filesystem binaries
+        run: |
+          cp ESP32_GPS/.pio/build/seeed_xiao_esp32s3/firmware.bin \
+             "${{ steps.info.outputs.binary }}"
+          cp ESP32_GPS/.pio/build/seeed_xiao_esp32s3/littlefs.bin \
+             "${{ steps.info.outputs.fs_binary }}"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.info.outputs.name }}_firmware
+          path: |
+            ${{ steps.info.outputs.binary }}
+            ${{ steps.info.outputs.fs_binary }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: "${{ steps.info.outputs.name }} v${{ steps.info.outputs.version }}"
+          body: |
+            Automated firmware release for **${{ steps.info.outputs.name }}**
+
+            **Version:** ${{ steps.info.outputs.version }}
+            **Firmware file:** `${{ steps.info.outputs.binary }}`
+            **Filesystem image:** `${{ steps.info.outputs.fs_binary }}`
+
+            Use the PC management server (`pc_server/`) to discover modules on the
+            network and push this update over-the-air.
+            The server will automatically push the filesystem image first, then
+            the firmware binary, so the web interface and firmware are always in sync.
+          files: |
+            ${{ steps.info.outputs.binary }}
+            ${{ steps.info.outputs.fs_binary }}
+          draft: false
+          prerelease: false
+          # Update existing release/assets if the same tag was already created
+          # (e.g. when only non-firmware files changed in the same commit)
           fail_on_unmatched_files: false
           update_release_body: true
         env:
