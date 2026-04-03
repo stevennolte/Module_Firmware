@@ -145,6 +145,10 @@ struct GPSState {
 
     // ── IMU watchdog ──
     uint32_t imuLastMsgMs = 0;  ///< millis() of last valid IMU frame
+    
+    // ── Debug ──
+    volatile int lastGgaFieldCount = 0;  ///< Number of fields in last GGA sentence (for debugging)
+    char lastGgaField13[20] = "";        ///< Raw content of field 13 for debugging
 } gpsState;
 
 // Yaw-rate calculation helpers (used only inside GPS task)
@@ -246,17 +250,23 @@ static bool isGpsPositionValid() {
  * @brief Log GPS position data to file.
  *
  * @details Appends CSV-formatted GPS data to /gpslog.csv with timestamp,
- *          coordinates in decimal degrees, fix quality, and other metrics.
+ *          all parsed GPS fields, IMU data, and raw NMEA sentence.
  *          Creates local copies of strings to avoid race conditions.
+ * @param rawNmea  The raw NMEA sentence (for debugging and validation)
  */
-static void logGpsData() {
+static void logGpsData(const char* rawNmea = nullptr) {
     if (!gpsState.enableGpsLogging) return;
     if (!isGpsPositionValid()) return;
     
     // Create local copies to avoid race conditions with NMEA parser
-    char lat[16], lon[16], latNS[2], lonEW[2];
-    char alt[12], fixQ[4], sats[4], hdop[8], speed[12], heading[8];
+    char fixTime[12], lat[16], lon[16], latNS[3], lonEW[3];
+    char alt[12], fixQ[4], sats[4], hdop[8], ageDGPS[12];
+    char speedKnots[12], vtgHeading[12];
+    char imuHeading[8], imuRoll[8], imuPitch[8], imuYawRate[8];
+    char rawNmeaCopy[200] = "";
     
+    // Copy GPS GGA fields
+    strncpy(fixTime, gpsState.fixTime, sizeof(fixTime) - 1);
     strncpy(lat, gpsState.latitude, sizeof(lat) - 1);
     strncpy(lon, gpsState.longitude, sizeof(lon) - 1);
     strncpy(latNS, gpsState.latNS, sizeof(latNS) - 1);
@@ -265,9 +275,32 @@ static void logGpsData() {
     strncpy(fixQ, gpsState.fixQuality, sizeof(fixQ) - 1);
     strncpy(sats, gpsState.numSats, sizeof(sats) - 1);
     strncpy(hdop, gpsState.HDOP, sizeof(hdop) - 1);
-    strncpy(speed, gpsState.speedKnots, sizeof(speed) - 1);
-    strncpy(heading, gpsState.imuHeading, sizeof(heading) - 1);
+    strncpy(ageDGPS, gpsState.ageDGPS, sizeof(ageDGPS) - 1);
     
+    // Copy VTG fields
+    strncpy(speedKnots, gpsState.speedKnots, sizeof(speedKnots) - 1);
+    strncpy(vtgHeading, gpsState.vtgHeading, sizeof(vtgHeading) - 1);
+    
+    // Copy IMU fields
+    strncpy(imuHeading, gpsState.imuHeading, sizeof(imuHeading) - 1);
+    strncpy(imuRoll, gpsState.imuRoll, sizeof(imuRoll) - 1);
+    strncpy(imuPitch, gpsState.imuPitch, sizeof(imuPitch) - 1);
+    strncpy(imuYawRate, gpsState.imuYawRate, sizeof(imuYawRate) - 1);
+    
+    // Copy raw NMEA if provided
+    if (rawNmea) {
+        strncpy(rawNmeaCopy, rawNmea, sizeof(rawNmeaCopy) - 1);
+        // Remove CR/LF from raw NMEA for cleaner CSV
+        for (size_t i = 0; i < strlen(rawNmeaCopy); i++) {
+            if (rawNmeaCopy[i] == '\r' || rawNmeaCopy[i] == '\n') {
+                rawNmeaCopy[i] = '\0';
+                break;
+            }
+        }
+    }
+    
+    // Null-terminate all strings
+    fixTime[sizeof(fixTime)-1] = '\0';
     lat[sizeof(lat)-1] = '\0';
     lon[sizeof(lon)-1] = '\0';
     latNS[sizeof(latNS)-1] = '\0';
@@ -276,8 +309,14 @@ static void logGpsData() {
     fixQ[sizeof(fixQ)-1] = '\0';
     sats[sizeof(sats)-1] = '\0';
     hdop[sizeof(hdop)-1] = '\0';
-    speed[sizeof(speed)-1] = '\0';
-    heading[sizeof(heading)-1] = '\0';
+    ageDGPS[sizeof(ageDGPS)-1] = '\0';
+    speedKnots[sizeof(speedKnots)-1] = '\0';
+    vtgHeading[sizeof(vtgHeading)-1] = '\0';
+    imuHeading[sizeof(imuHeading)-1] = '\0';
+    imuRoll[sizeof(imuRoll)-1] = '\0';
+    imuPitch[sizeof(imuPitch)-1] = '\0';
+    imuYawRate[sizeof(imuYawRate)-1] = '\0';
+    rawNmeaCopy[sizeof(rawNmeaCopy)-1] = '\0';
     
     // Validate NMEA format: latitude should be ddmm.mmmm (min 7 chars), longitude dddmm.mmmm (min 8 chars)
     if (strlen(lat) < 7 || strlen(lon) < 8) return;
@@ -325,18 +364,33 @@ static void logGpsData() {
         return;
     }
     
-    // Write CSV line: timestamp,lat,lon,alt,fixQuality,sats,hdop,speed,heading
-    char line[256];
-    snprintf(line, sizeof(line), "%lu,%.7f,%.7f,%s,%s,%s,%s,%s,%s\n",
+    // Write comprehensive CSV line with all parsed fields and raw NMEA
+    // Format: timestamp,fixTime,lat_nmea,latNS,lon_nmea,lonEW,lat_dec,lon_dec,
+    //         alt,fixQuality,sats,hdop,ageDGPS,speedKnots,vtgHeading,
+    //         imuHeading,imuRoll,imuPitch,imuYawRate,rawNMEA
+    char line[512];
+    snprintf(line, sizeof(line), 
+             "%lu,%s,%s,%s,%s,%s,%.7f,%.7f,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
              millis(),
+             fixTime,
+             lat,
+             latNS,
+             lon,
+             lonEW,
              decLat,
              decLon,
              alt,
              fixQ,
              sats,
              hdop,
-             speed,
-             heading);
+             ageDGPS,
+             speedKnots,
+             vtgHeading,
+             imuHeading,
+             imuRoll,
+             imuPitch,
+             imuYawRate,
+             rawNmeaCopy);
     
     logFile.print(line);
     logFile.close();
@@ -362,16 +416,29 @@ static void cleanField(char* s) {
 /**
  * @brief Parse a GGA sentence and populate gpsState GGA fields.
  * @param sentence  Null-terminated GGA sentence including leading '$'.
+ * 
+ * @details Parses manually to preserve empty fields (strtok skips empty fields).
+ *          GGA format: $GPGGA,time,lat,N/S,lon,E/W,qual,sats,hdop,alt,M,geoid,M,age,id*chk
  */
 static void parseGGA(const char* sentence) {
     char buf[160];
     strncpy(buf, sentence, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
 
-    char* fields[16] = {};
+    // Parse manually to preserve empty fields
+    char* fields[20] = {};
     int   n = 0;
-    char* tok = strtok(buf, ",*");
-    while (tok && n < 16) { fields[n++] = tok; tok = strtok(nullptr, ",*"); }
+    char* p = buf;
+    fields[n++] = p;
+    
+    // Split on commas, preserving empty fields
+    while (*p && n < 20) {
+        if (*p == ',' || *p == '*') {
+            *p = '\0';
+            fields[n++] = p + 1;
+        }
+        p++;
+    }
 
     if (n < 10) return;
 
@@ -389,6 +456,8 @@ static void parseGGA(const char* sentence) {
         }
     };
 
+    // GGA field indices: 0=$GPGGA, 1=time, 2=lat, 3=N/S, 4=lon, 5=E/W, 
+    //                    6=qual, 7=sats, 8=hdop, 9=alt, 10=M, 11=geoid, 12=M, 13=age, 14=id
     copy(gpsState.fixTime,    sizeof(gpsState.fixTime),    1);
     copy(gpsState.latitude,   sizeof(gpsState.latitude),   2);
     copy(gpsState.latNS,      sizeof(gpsState.latNS),      3);
@@ -398,7 +467,18 @@ static void parseGGA(const char* sentence) {
     copy(gpsState.numSats,    sizeof(gpsState.numSats),    7);
     copy(gpsState.HDOP,       sizeof(gpsState.HDOP),       8);
     copy(gpsState.altitude,   sizeof(gpsState.altitude),   9);
-    // Field 13 in GGA is age of DGPS corrections
+    
+    // Store field count for web interface debugging
+    gpsState.lastGgaFieldCount = n;
+    
+    // Store raw field 13 for debugging (before copy filters it)
+    gpsState.lastGgaField13[0] = '\0';
+    if (n > 13 && fields[13]) {
+        strncpy(gpsState.lastGgaField13, fields[13], sizeof(gpsState.lastGgaField13) - 1);
+        gpsState.lastGgaField13[sizeof(gpsState.lastGgaField13) - 1] = '\0';
+    }
+    
+    // Field 13 is age of DGPS corrections (after alt, M, geoid, M)
     if (n > 13) {
         copy(gpsState.ageDGPS, sizeof(gpsState.ageDGPS), 13);
     }
@@ -410,21 +490,35 @@ static void parseGGA(const char* sentence) {
 /**
  * @brief Parse a VTG sentence and populate gpsState VTG fields.
  * @param sentence  Null-terminated VTG sentence including leading '$'.
+ * 
+ * @details Parses manually to preserve empty fields (strtok skips empty fields).
+ *          VTG format: $GPVTG,heading,T,mag,M,knots,N,kph,K,mode*chk
  */
 static void parseVTG(const char* sentence) {
     char buf[100];
     strncpy(buf, sentence, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
 
-    char* fields[10] = {};
+    // Parse manually to preserve empty fields
+    char* fields[12] = {};
     int   n = 0;
-    char* tok = strtok(buf, ",*");
-    while (tok && n < 10) { fields[n++] = tok; tok = strtok(nullptr, ",*"); }
+    char* p = buf;
+    fields[n++] = p;
+    
+    // Split on commas, preserving empty fields
+    while (*p && n < 12) {
+        if (*p == ',' || *p == '*') {
+            *p = '\0';
+            fields[n++] = p + 1;
+        }
+        p++;
+    }
 
     if (n < 6) return;
 
     gpsState.speedKnots[0] = gpsState.vtgHeading[0] = '\0';
 
+    // VTG field indices: 0=$GPVTG, 1=heading(T), 2=T, 3=heading(M), 4=M, 5=knots, 6=N, 7=kph, 8=K, 9=mode
     // Field 1 – true course over ground
     if (fields[1] && *fields[1]) {
         strncpy(gpsState.vtgHeading, fields[1], sizeof(gpsState.vtgHeading) - 1);
@@ -711,8 +805,8 @@ static void gpsTask(void* param) {
                                 // Send IMU status to AgIO (if IMU is active)
                                 // sendIMUStatus();  // PGN 211 disabled
                                 
-                                // Log GPS data if logging is enabled
-                                logGpsData();
+                                // Log GPS data if logging is enabled (pass raw NMEA for debugging)
+                                logGpsData(buf);
                             } else {
                                 Serial.printf("  [SKIP] Position invalid\n");
                             }
@@ -1335,6 +1429,9 @@ static void handleGpsPos(AsyncWebServerRequest* req) {
     doc["hdop"] = atof(gpsState.HDOP);
     doc["heading"] = strlen(gpsState.imuHeading) > 0 ? atoi(gpsState.imuHeading) / 10.0 : 0.0;
     doc["speed"] = atof(gpsState.speedKnots);
+    doc["ageDGPS"] = atof(gpsState.ageDGPS);
+    doc["ggaFieldCount"] = gpsState.lastGgaFieldCount;
+    doc["ggaField13Raw"] = String(gpsState.lastGgaField13);  // Debug: raw field 13 content
     
     String json;
     serializeJson(doc, json);
@@ -1579,9 +1676,9 @@ void setup() {
             if (newState && !gpsState.enableGpsLogging && !LittleFS.exists("/gpslog.csv")) {
                 File logFile = LittleFS.open("/gpslog.csv", "w");
                 if (logFile) {
-                    logFile.println("timestamp_ms,latitude,longitude,altitude_m,fix_quality,satellites,hdop,speed_kn,heading_deg");
+                    logFile.println("timestamp_ms,fixTime,lat_nmea,latNS,lon_nmea,lonEW,lat_dec,lon_dec,altitude_m,fix_quality,satellites,hdop,ageDGPS,speed_kn,vtg_heading_deg,imu_heading,imu_roll,imu_pitch,imu_yaw_rate,rawNMEA");
                     logFile.close();
-                    Serial.println("GPS log file created with header");
+                    Serial.println("GPS log file created with comprehensive header");
                 }
             }
             

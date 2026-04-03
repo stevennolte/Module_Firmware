@@ -76,7 +76,10 @@ app = Flask(__name__)
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 def _github_headers() -> dict:
-    h = {"Accept": "application/vnd.github+json"}
+    h = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": f"{REPO_OWNER}/{REPO_NAME} PC Server"
+    }
     if GITHUB_TOKEN:
         h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
     return h
@@ -191,6 +194,11 @@ def get_latest_release(module_name: str) -> dict | None:
                 except Exception as ver_err:
                     app.logger.warning("Version parsing failed for %s: %s. Using first match.", module_name, ver_err)
                     result = candidates[0]
+        else:
+            app.logger.error(
+                "GitHub API request failed for %s: HTTP %d - %s",
+                module_name, r.status_code, r.text[:200]
+            )
                     
     except Exception as e:
         app.logger.warning("GitHub release lookup failed for %s: %s", module_name, e)

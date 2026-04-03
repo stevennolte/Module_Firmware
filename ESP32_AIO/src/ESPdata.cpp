@@ -179,15 +179,18 @@ uint8_t ESPdata::loadConfig(){
 
     // WiFi operating mode (0=AP only, 1=AP+STA, 2=STA only)
     wifiMode = (uint8_t)preferences.getInt("wifi_mode", 0);
+    Serial.printf("Loaded wifi_mode from preferences: %d\n", wifiMode);
 
     // STA network list
     staCfg.count = (uint8_t)preferences.getInt("sta_count", 0);
+    Serial.printf("Loaded sta_count from preferences: %d\n", staCfg.count);
     if (staCfg.count > STAConfig::MAX_NETWORKS) staCfg.count = STAConfig::MAX_NETWORKS;
     for (int i = 0; i < staCfg.count; i++) {
         String keySSID = "sta_ssid_" + String(i);
         String keyPass = "sta_pass_" + String(i);
         String s = preferences.getString(keySSID.c_str(), "");
         String p = preferences.getString(keyPass.c_str(), "");
+        Serial.printf("Loaded network %d: SSID=%s\n", i, s.c_str());
         strncpy(staCfg.ssids[i],     s.c_str(), sizeof(staCfg.ssids[i]) - 1);
         strncpy(staCfg.passwords[i], p.c_str(), sizeof(staCfg.passwords[i]) - 1);
         staCfg.ssids[i][sizeof(staCfg.ssids[i]) - 1]         = '\0';
@@ -302,6 +305,7 @@ bool ESPdata::setState(uint8_t state){
 
 uint8_t ESPdata::saveConfig(){
     // Save all configuration to Preferences
+    Serial.println("=== SAVING CONFIG TO PREFERENCES ===");
 
     preferences.putUChar("bootMode", program.bootMode);
     preferences.putULong("bootcount", program.bootcount);
@@ -312,7 +316,12 @@ uint8_t ESPdata::saveConfig(){
     preferences.putUChar("ap_ip3", apCfg.ips[3]);
     preferences.putString("ap_ssid", apCfg.ssid);
     preferences.putString("ap_pass", apCfg.password);
+    preferences.putInt("ap_ch", apCfg.channel);
+    preferences.putInt("ap_max", apCfg.maxClients);
+    
+    Serial.printf("Saving wifi_mode: %d\n", wifiMode);
     preferences.putInt("wifi_mode", wifiMode);
+    
     preferences.putUChar("ledBrightness", program.ledBrht);
     preferences.putFloat("wasZero", steer.wasZeroAngle);
     preferences.putString("name", program.name);
@@ -344,6 +353,7 @@ uint8_t ESPdata::saveConfig(){
     preferences.putUShort("serverPort", ota.port);
     preferences.putBool("externalGPS", gps.externalGPS);
 
+    Serial.println("=== CONFIG SAVED SUCCESSFULLY ===");
     return 1; // Success
 }
 
@@ -381,6 +391,34 @@ uint8_t ESPdata::saveWASzero(){
     preferences.putFloat("wasZero", steer.wasZeroAngle);
     Serial.println(F("Successfully updated WAS zero in Preferences"));
     return 1;
+}
+
+// Preferences wrapper methods for controlled NVS access
+int ESPdata::getInt(const char* key, int defaultValue) {
+    int value = preferences.getInt(key, defaultValue);
+    Serial.printf("Pref getInt: %s = %d\n", key, value);
+    return value;
+}
+
+size_t ESPdata::putInt(const char* key, int value) {
+    Serial.printf("Pref putInt: %s = %d\n", key, value);
+    return preferences.putInt(key, value);
+}
+
+String ESPdata::getString(const char* key, const String& defaultValue) {
+    String value = preferences.getString(key, defaultValue.c_str());
+    Serial.printf("Pref getString: %s = %s\n", key, value.c_str());
+    return value;
+}
+
+size_t ESPdata::putString(const char* key, const String& value) {
+    Serial.printf("Pref putString: %s = %s\n", key, value.c_str());
+    return preferences.putString(key, value.c_str());
+}
+
+bool ESPdata::remove(const char* key) {
+    Serial.printf("Pref remove: %s\n", key);
+    return preferences.remove(key);
 }
 
 // RTC Data methods

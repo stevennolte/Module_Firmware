@@ -866,13 +866,23 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "function escapeHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;'); }";
   
   html += "function renderNetworkList(networks) {";
+  html += "  console.log('renderNetworkList called with:', networks);";
   html += "  const container = document.getElementById('networkList');";
   html += "  container.innerHTML = '';";
   html += "  if (!networks || networks.length === 0) { container.innerHTML = '<p style=\"color:#888;\">No networks configured.</p>'; return; }";
   html += "  networks.forEach(function(net, idx) {";
+  html += "    console.log('Rendering network', idx, ':', net.ssid);";
   html += "    const item = document.createElement('div');";
   html += "    item.className = 'network-item';";
-  html += "    item.innerHTML = '<span class=\"ssid\">' + escapeHtml(net.ssid) + '</span><button class=\"button danger\" onclick=\"removeNetwork(' + idx + ', \\'' + escapeHtml(net.ssid).replace(/\\'/g,\"\\\\'\\'\") + \\'\\')\\\">' + 'Remove</button>';";
+  html += "    const btn = document.createElement('button');";
+  html += "    btn.className = 'button danger';";
+  html += "    btn.textContent = 'Remove';";
+  html += "    btn.onclick = function() { removeNetwork(idx, net.ssid); };";
+  html += "    const span = document.createElement('span');";
+  html += "    span.className = 'ssid';";
+  html += "    span.textContent = net.ssid;";
+  html += "    item.appendChild(span);";
+  html += "    item.appendChild(btn);";
   html += "    container.appendChild(item);";
   html += "  });";
   html += "}";
@@ -886,9 +896,13 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "}";
   
   html += "function loadSettings() {";
+  html += "  console.log('Loading settings...');";
   html += "  fetch('/getSettings')";
   html += "    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })";
   html += "    .then(data => {";
+  html += "      console.log('Settings loaded:', data);";
+  html += "      console.log('wifi_mode:', data.wifi_mode);";
+  html += "      console.log('sta_networks:', data.sta_networks);";
   html += "      if (data.wifi_mode !== undefined) document.getElementById('wifi_mode').value = String(data.wifi_mode);";
   html += "      if (data.ap_ssid !== undefined) document.getElementById('ap_ssid').value = data.ap_ssid;";
   html += "      if (data.ap_pass !== undefined) document.getElementById('ap_pass').value = data.ap_pass;";
@@ -913,12 +927,15 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.disableHeading !== undefined) document.getElementById('disableHeading').value = data.disableHeading;";
   html += "      showStatus('Settings loaded', false);";
   html += "    })";
-  html += "    .catch(error => showStatus('Failed to load settings: ' + error, true));";
+  html += "    .catch(error => { console.error('Load settings error:', error); showStatus('Failed to load settings: ' + error, true); });";
   html += "}";
   
   html += "function saveSettings() {";
+  html += "  console.log('saveSettings called');";
   html += "  const formData = new FormData();";
-  html += "  formData.append('wifi_mode', document.getElementById('wifi_mode').value);";
+  html += "  const wifiMode = document.getElementById('wifi_mode').value;";
+  html += "  console.log('wifi_mode value:', wifiMode);";
+  html += "  formData.append('wifi_mode', wifiMode);";
   html += "  formData.append('ap_ssid', document.getElementById('ap_ssid').value);";
   html += "  formData.append('ap_pass', document.getElementById('ap_pass').value);";
   html += "  formData.append('ap_ip3', document.getElementById('ap_ip3').value);";
@@ -938,10 +955,11 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('flipPitchRoll', document.getElementById('flipPitchRoll').value);";
   html += "  formData.append('invertRoll', document.getElementById('invertRoll').value);";
   html += "  formData.append('disableHeading', document.getElementById('disableHeading').value);";
+  html += "  console.log('Sending POST to /saveSettings');";
   html += "  fetch('/saveSettings', { method: 'POST', body: formData })";
-  html += "    .then(r => r.text())";
-  html += "    .then(data => showStatus(data, false))";
-  html += "    .catch(error => showStatus('Failed to save settings: ' + error, true));";
+  html += "    .then(r => { console.log('Response received:', r.status); return r.text(); })";
+  html += "    .then(data => { console.log('Response data:', data); showStatus(data, false); })";
+  html += "    .catch(error => { console.error('Save error:', error); showStatus('Failed to save settings: ' + error, true); });";
   html += "}";
 
   html += "function addNetwork() {";
@@ -984,6 +1002,9 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   JsonDocument doc;
   
   // WiFi settings
+  Serial.printf("wifiMode: %d\n", espData.wifiMode);
+  Serial.printf("staCfg.count: %d\n", espData.staCfg.count);
+  
   doc["wifi_mode"] = espData.wifiMode;
   doc["ap_ssid"]   = espData.apCfg.ssid;
   doc["ap_pass"]   = espData.apCfg.password;
@@ -991,6 +1012,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["ap_ip3"]    = espData.apCfg.ips[3];
   JsonArray networks = doc.createNestedArray("sta_networks");
   for (int i = 0; i < espData.staCfg.count; i++) {
+    Serial.printf("Network %d: SSID='%s'\n", i, espData.staCfg.ssids[i]);
     JsonObject net = networks.createNestedObject();
     net["ssid"] = espData.staCfg.ssids[i];
     net["pass"] = espData.staCfg.passwords[i];
@@ -1019,6 +1041,8 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   
   String response;
   serializeJson(doc, response);
+  Serial.println("JSON Response:");
+  Serial.println(response);
   request->send(200, "application/json", response);
   Serial.println("Settings JSON sent successfully");
 }
@@ -1026,6 +1050,15 @@ void handleGetSettings(AsyncWebServerRequest *request) {
 // Save settings from JSON POST
 void handleSaveSettings(AsyncWebServerRequest *request) {
   Serial.println("=== SAVE SETTINGS REQUEST ===");
+  
+  // Log all received parameters
+  int params = request->params();
+  Serial.printf("Received %d parameters:\n", params);
+  for(int i = 0; i < params; i++){
+    const AsyncWebParameter* p = request->getParam(i);
+    Serial.printf("  %s = %s\n", p->name().c_str(), p->value().c_str());
+  }
+  
   bool doReboot = false;
 
   // WiFi / AP settings (require reboot)
@@ -1052,9 +1085,13 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("wifi_mode", true)) {
     int mode = request->getParam("wifi_mode", true)->value().toInt();
+    Serial.println("Received wifi_mode: " + String(mode));
     if (mode >= 0 && mode <= 2) {
       espData.wifiMode = mode;
+      Serial.println("Set wifiMode to: " + String(espData.wifiMode));
       doReboot = true;
+    } else {
+      Serial.println("Invalid wifi_mode value: " + String(mode));
     }
   }
 
@@ -1125,6 +1162,7 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
 }
 
 void handleAddNetwork(AsyncWebServerRequest *request) {
+  Serial.println("=== ADD NETWORK REQUEST ===");
   if (!request->hasParam("ssid", true)) {
     request->send(400, "text/plain", "Missing ssid");
     return;
@@ -1132,6 +1170,10 @@ void handleAddNetwork(AsyncWebServerRequest *request) {
   String ssid = request->getParam("ssid", true)->value();
   String pass = request->hasParam("pass", true) ? request->getParam("pass", true)->value() : "";
   ssid.trim();
+  
+  Serial.println("SSID: " + ssid);
+  Serial.println("Pass length: " + String(pass.length()));
+  
   if (ssid.length() == 0 || ssid.length() >= 64) {
     request->send(400, "text/plain", "SSID must be 1–63 characters");
     return;
@@ -1140,54 +1182,87 @@ void handleAddNetwork(AsyncWebServerRequest *request) {
     request->send(400, "text/plain", "Password must be fewer than 64 characters");
     return;
   }
-  int count = espData.preferences.getInt("sta_count", 0);
+  int count = espData.getInt("sta_count", 0);
+  Serial.println("Current network count: " + String(count));
+  
   if (count >= ESPdata::STAConfig::MAX_NETWORKS) {
     request->send(400, "text/plain", "Maximum number of networks reached");
     return;
   }
   for (int i = 0; i < count; i++) {
     String keySSID = "sta_ssid_" + String(i);
-    if (espData.preferences.getString(keySSID.c_str(), "") == ssid) {
+    if (espData.getString(keySSID.c_str(), "") == ssid) {
       request->send(400, "text/plain", "Network already exists");
       return;
     }
   }
+  
+  // Save to preferences
   String keySSID = "sta_ssid_" + String(count);
   String keyPass = "sta_pass_" + String(count);
-  espData.preferences.putString(keySSID.c_str(), ssid);
-  espData.preferences.putString(keyPass.c_str(), pass);
-  espData.preferences.putInt("sta_count", count + 1);
+  espData.putString(keySSID.c_str(), ssid);
+  espData.putString(keyPass.c_str(), pass);
+  espData.putInt("sta_count", count + 1);
+  
+  // Also update in-memory structure
+  strncpy(espData.staCfg.ssids[count], ssid.c_str(), sizeof(espData.staCfg.ssids[count]) - 1);
+  strncpy(espData.staCfg.passwords[count], pass.c_str(), sizeof(espData.staCfg.passwords[count]) - 1);
+  espData.staCfg.ssids[count][sizeof(espData.staCfg.ssids[count]) - 1] = '\0';
+  espData.staCfg.passwords[count][sizeof(espData.staCfg.passwords[count]) - 1] = '\0';
+  espData.staCfg.count = count + 1;
+  
+  Serial.println("Network added successfully. New count: " + String(espData.staCfg.count));
   request->send(200, "text/plain", "Network added. Rebooting...");
   delay(500);
   ESP.restart();
 }
 
 void handleRemoveNetwork(AsyncWebServerRequest *request) {
+  Serial.println("=== REMOVE NETWORK REQUEST ===");
   if (!request->hasParam("index", true)) {
     request->send(400, "text/plain", "Missing index");
     return;
   }
   int idx   = request->getParam("index", true)->value().toInt();
-  int count = espData.preferences.getInt("sta_count", 0);
+  int count = espData.getInt("sta_count", 0);
+  
+  Serial.println("Removing network at index: " + String(idx));
+  Serial.println("Current network count: " + String(count));
+  
   if (idx < 0 || idx >= count) {
     request->send(400, "text/plain", "Invalid index");
     return;
   }
+  
+  // Shift networks in preferences
   for (int i = idx; i < count - 1; i++) {
     String keySSID_src = "sta_ssid_" + String(i + 1);
     String keyPass_src = "sta_pass_" + String(i + 1);
     String keySSID_dst = "sta_ssid_" + String(i);
     String keyPass_dst = "sta_pass_" + String(i);
-    espData.preferences.putString(keySSID_dst.c_str(),
-        espData.preferences.getString(keySSID_src.c_str(), ""));
-    espData.preferences.putString(keyPass_dst.c_str(),
-        espData.preferences.getString(keyPass_src.c_str(), ""));
+    espData.putString(keySSID_dst.c_str(),
+        espData.getString(keySSID_src.c_str(), ""));
+    espData.putString(keyPass_dst.c_str(),
+        espData.getString(keyPass_src.c_str(), ""));
+        
+    // Also update in-memory structure
+    strncpy(espData.staCfg.ssids[i], espData.staCfg.ssids[i + 1], sizeof(espData.staCfg.ssids[i]) - 1);
+    strncpy(espData.staCfg.passwords[i], espData.staCfg.passwords[i + 1], sizeof(espData.staCfg.passwords[i]) - 1);
+    espData.staCfg.ssids[i][sizeof(espData.staCfg.ssids[i]) - 1] = '\0';
+    espData.staCfg.passwords[i][sizeof(espData.staCfg.passwords[i]) - 1] = '\0';
   }
+  
+  // Remove last network entry
   String keySSID_last = "sta_ssid_" + String(count - 1);
   String keyPass_last = "sta_pass_" + String(count - 1);
-  espData.preferences.remove(keySSID_last.c_str());
-  espData.preferences.remove(keyPass_last.c_str());
-  espData.preferences.putInt("sta_count", count - 1);
+  espData.remove(keySSID_last.c_str());
+  espData.remove(keyPass_last.c_str());
+  espData.putInt("sta_count", count - 1);
+  
+  // Update in-memory count
+  espData.staCfg.count = count - 1;
+  
+  Serial.println("Network removed successfully. New count: " + String(espData.staCfg.count));
   request->send(200, "text/plain", "Network removed. Rebooting...");
   delay(500);
   ESP.restart();

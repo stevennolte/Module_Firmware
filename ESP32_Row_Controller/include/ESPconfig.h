@@ -89,6 +89,16 @@ public:
     // WiFi operating mode: 0 = AP only, 1 = AP+STA, 2 = STA only
     uint8_t wifiMode;
 
+    // WiFi/Network configuration (destination IP for UDP communication)
+    class WifiConfig {
+        public:
+            uint8_t ips[4];    // Destination IP address (e.g., AgIO computer)
+            WifiConfig() {
+                ips[0] = 192; ips[1] = 168; ips[2] = 1; ips[3] = 255;
+            }
+    };
+    WifiConfig wifiCfg;
+
     class OTAConfig {
         public:
             uint8_t state;
@@ -118,7 +128,7 @@ public:
     };
     SectionData sectionData;
 
-    ESPconfig() : progCfg(), progData(), apCfg(), staCfg(), wifiMode(0), otaCfg() {}
+    ESPconfig() : progCfg(), progData(), apCfg(), staCfg(), wifiMode(0), wifiCfg(), otaCfg() {}
 };
 
 #endif

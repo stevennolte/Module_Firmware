@@ -14,7 +14,7 @@
 #include "Arduino.h"
 
 /// @brief Current firmware version string (MAJOR.MINOR.PATCH format)
-#define VERSION "1.0.0087"
+#define VERSION "1.0.0091"
 
 /// @brief Program name identifier used for network identification and display
 #define NAME "ESP32_GPS"

@@ -115,6 +115,46 @@ public:
      */
     uint8_t saveWASzero();
     
+    // Preferences wrapper methods for controlled NVS access
+    /**
+     * @brief Gets an integer value from NVS preferences
+     * @param key Preference key name
+     * @param defaultValue Default value if key doesn't exist
+     * @return int Stored value or default
+     */
+    int getInt(const char* key, int defaultValue = 0);
+    
+    /**
+     * @brief Stores an integer value in NVS preferences
+     * @param key Preference key name
+     * @param value Value to store
+     * @return size_t Number of bytes written
+     */
+    size_t putInt(const char* key, int value);
+    
+    /**
+     * @brief Gets a string value from NVS preferences
+     * @param key Preference key name
+     * @param defaultValue Default value if key doesn't exist
+     * @return String Stored value or default
+     */
+    String getString(const char* key, const String& defaultValue = "");
+    
+    /**
+     * @brief Stores a string value in NVS preferences
+     * @param key Preference key name
+     * @param value Value to store
+     * @return size_t Number of bytes written
+     */
+    size_t putString(const char* key, const String& value);
+    
+    /**
+     * @brief Removes a key-value pair from NVS preferences
+     * @param key Preference key name to remove
+     * @return bool True if removed successfully
+     */
+    bool remove(const char* key);
+    
     /**
      * @brief Sets the current program state
      * @param state Program state (1=normal, 2=recovery)
