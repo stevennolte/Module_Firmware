@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Style Guide — Module Management Server</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    /* ── Style-guide-only rules ── */
+    .sg-section {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .sg-section-header {
+      background: #37474f;
+      color: white;
+      padding: 12px 20px;
+      font-size: 1rem;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+    }
+    .sg-section-body { padding: 24px 28px; }
+
+    .sg-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .sg-row:last-child { margin-bottom: 0; }
+
+    .sg-label {
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .sg-item { display: flex; flex-direction: column; }
+
+    .sg-swatch {
+      width: 60px;
+      height: 40px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+    .sg-swatch-label {
+      font-size: 0.7rem;
+      color: #555;
+      margin-top: 4px;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+    }
+
+    .sg-divider {
+      border: none;
+      border-top: 1px solid #e0e0e0;
+      margin: 20px 0;
+    }
+
+    .sg-code {
+      background: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: #333;
+    }
+
+    .sg-nav {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 12px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+    .sg-nav a { color: #1565c0; text-decoration: none; font-weight: bold; }
+    .sg-nav a:hover { text-decoration: underline; }
+
+    .sg-demo-card {
+      max-width: 520px;
+    }
+
+    .sg-type-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .sg-type-row span { color: #333; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🎨 Style Guide</h1>
+    <div class="header-subtitle">Module Management Server — Design Standard v1.0</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-sm btn-secondary" onclick="window.location.href='/'">← Dashboard</button>
+  </div>
+</header>
+
+<nav class="sg-nav">
+  <a href="#colors">Colors</a>
+  <a href="#typography">Typography</a>
+  <a href="#buttons">Buttons</a>
+  <a href="#badges">Badges &amp; Dots</a>
+  <a href="#messages">Status Messages</a>
+  <a href="#cards">Cards &amp; Panels</a>
+  <a href="#forms">Form Controls</a>
+  <a href="#tables">Tables</a>
+  <a href="#grids">Grids</a>
+  <a href="#charts">Charts</a>
+  <a href="#help">Help Block</a>
+  <a href="#loading">Loading &amp; Errors</a>
+  <a href="#newpage">New Page Template</a>
+</nav>
+
+<!-- ── COLORS ─────────────────────────────────────────────────────────── -->
+<div class="sg-section" id="colors">
+  <div class="sg-section-header">Colors</div>
+  <div class="sg-section-body">
+
+    <div class="sg-label">Primary</div>
+    <div class="sg-row" style="margin-bottom:24px;">
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#1565c0;"></div>
+        <div class="sg-swatch-label">#1565c0<br>Primary Blue</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#0d47a1;"></div>
+        <div class="sg-swatch-label">#0d47a1<br>Dark Blue</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#e3f2fd;"></div>
+        <div class="sg-swatch-label">#e3f2fd<br>Light Blue</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#90a4ae;"></div>
+        <div class="sg-swatch-label">#90a4ae<br>Disabled</div>
+      </div>
+    </div>
+
+    <div class="sg-label">Panels &amp; Surfaces</div>
+    <div class="sg-row" style="margin-bottom:24px;">
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#37474f;"></div>
+        <div class="sg-swatch-label">#37474f<br>Panel Gray</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#546e7a;"></div>
+        <div class="sg-swatch-label">#546e7a<br>Muted Blue-Gray</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#f0f2f5;"></div>
+        <div class="sg-swatch-label">#f0f2f5<br>Page Background</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#ffffff;"></div>
+        <div class="sg-swatch-label">#ffffff<br>Card Background</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#f5f5f5;"></div>
+        <div class="sg-swatch-label">#f5f5f5<br>Muted Fill</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#f8f8f8;"></div>
+        <div class="sg-swatch-label">#f8f8f8<br>Dark Muted Fill</div>
+      </div>
+    </div>
+
+    <div class="sg-label">Semantic</div>
+    <div class="sg-row" style="margin-bottom:24px;">
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#4caf50;"></div>
+        <div class="sg-swatch-label">#4caf50<br>Success</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#2e7d32;"></div>
+        <div class="sg-swatch-label">#2e7d32<br>Success Dark</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#e8f5e9;"></div>
+        <div class="sg-swatch-label">#e8f5e9<br>Success Light</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#f44336;"></div>
+        <div class="sg-swatch-label">#f44336<br>Error</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#c62828;"></div>
+        <div class="sg-swatch-label">#c62828<br>Error Dark</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#ffebee;"></div>
+        <div class="sg-swatch-label">#ffebee<br>Error Light</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#ff9800;"></div>
+        <div class="sg-swatch-label">#ff9800<br>Warning</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#e65100;"></div>
+        <div class="sg-swatch-label">#e65100<br>Warning Dark</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#fff3e0;"></div>
+        <div class="sg-swatch-label">#fff3e0<br>Warning Light</div>
+      </div>
+    </div>
+
+    <div class="sg-label">Text</div>
+    <div class="sg-row">
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#222;"></div>
+        <div class="sg-swatch-label">#222<br>Primary</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#555;"></div>
+        <div class="sg-swatch-label">#555<br>Secondary</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#666;"></div>
+        <div class="sg-swatch-label">#666<br>Label</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#888;"></div>
+        <div class="sg-swatch-label">#888<br>Muted</div>
+      </div>
+      <div class="sg-item">
+        <div class="sg-swatch" style="background:#999;"></div>
+        <div class="sg-swatch-label">#999<br>Placeholder</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── TYPOGRAPHY ─────────────────────────────────────────────────────── -->
+<div class="sg-section" id="typography">
+  <div class="sg-section-header">Typography</div>
+  <div class="sg-section-body">
+    <div class="sg-type-row">
+      <span style="font-size:1.4rem; font-weight:bold;">Page Title — 1.4 rem bold (h1 inside header)</span>
+      <span style="font-size:1.1rem; font-weight:bold;">Card Title — 1.1 rem bold (h2 inside .card-header)</span>
+      <span style="font-size:1rem; font-weight:bold;">Panel / Chart Title — 1.0 rem bold (h3)</span>
+      <span style="font-size:0.9rem;">Controls &amp; Labels — 0.9 rem</span>
+      <span style="font-size:0.875rem;">Body / Info Row — 0.875 rem</span>
+      <span style="font-size:0.875rem; font-weight:bold;">Button (base) — 0.875 rem bold</span>
+      <span style="font-size:0.85rem;">Subtitle / Diagnostics Toggle — 0.85 rem</span>
+      <span style="font-size:0.82rem;">Status Message — 0.82 rem</span>
+      <span style="font-size:0.8rem; font-weight:bold;">Button (sm) — 0.8 rem bold</span>
+      <span style="font-size:0.8rem; font-family:'Courier New',monospace; color:#555;">Timestamp / IP — 0.8 rem Courier New</span>
+      <span style="font-size:0.75rem; font-weight:bold;">Badge — 0.75 rem bold</span>
+      <span style="font-size:0.75rem; font-family:'Courier New',monospace;">Debug Data — 0.75 rem Courier New</span>
+      <span style="font-size:0.78rem; font-family:monospace;">Diagnostics List — 0.78 rem monospace</span>
+    </div>
+    <p style="font-size:0.85rem; color:#555; margin-top:8px;">
+      Base font: <strong>Arial, sans-serif</strong>. Monospace data uses <strong>Courier New</strong> or the system <strong>monospace</strong> stack.
+    </p>
+  </div>
+</div>
+
+<!-- ── BUTTONS ────────────────────────────────────────────────────────── -->
+<div class="sg-section" id="buttons">
+  <div class="sg-section-header">Buttons</div>
+  <div class="sg-section-body">
+
+    <div class="sg-label">Variants (normal size)</div>
+    <div class="sg-row">
+      <div class="sg-item">
+        <button class="btn btn-primary">btn-primary</button>
+        <div class="sg-swatch-label">Main actions (update, apply)</div>
+      </div>
+      <div class="sg-item">
+        <button class="btn btn-secondary">btn-secondary</button>
+        <div class="sg-swatch-label">Navigation, neutral actions</div>
+      </div>
+      <div class="sg-item">
+        <button class="btn btn-warn">btn-warn</button>
+        <div class="sg-swatch-label">Refresh, caution actions</div>
+      </div>
+      <div class="sg-item">
+        <button class="btn btn-danger">btn-danger</button>
+        <div class="sg-swatch-label">Destructive (reboot, stop)</div>
+      </div>
+      <div class="sg-item">
+        <button class="btn btn-primary" disabled>btn-primary disabled</button>
+        <div class="sg-swatch-label">Unavailable action</div>
+      </div>
+    </div>
+
+    <hr class="sg-divider">
+    <div class="sg-label">Small modifier — add <span class="sg-code">btn-sm</span> alongside any variant</div>
+    <div class="sg-row">
+      <button class="btn btn-sm btn-primary">btn-sm btn-primary</button>
+      <button class="btn btn-sm btn-secondary">btn-sm btn-secondary</button>
+      <button class="btn btn-sm btn-warn">btn-sm btn-warn</button>
+      <button class="btn btn-sm btn-danger">btn-sm btn-danger</button>
+    </div>
+
+    <hr class="sg-divider">
+    <div class="sg-label">Icon button — inline refresh/action trigger (<span class="sg-code">btn-icon</span>)</div>
+    <div class="sg-row">
+      <span style="font-size:0.85rem;">GitHub version</span>
+      <button class="btn-icon" title="Refresh">↻</button>
+    </div>
+
+    <hr class="sg-divider">
+    <div class="sg-label">Action row — horizontal group of buttons (<span class="sg-code">action-row</span>)</div>
+    <div class="action-row">
+      <button class="btn btn-sm btn-primary">⬆ Update Firmware</button>
+      <button class="btn btn-sm btn-primary">📦 Update Filesystem</button>
+      <button class="btn btn-sm btn-primary">🌐 Open Web Interface</button>
+      <button class="btn btn-sm btn-danger">⟳ Reboot</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── BADGES & DOTS ──────────────────────────────────────────────────── -->
+<div class="sg-section" id="badges">
+  <div class="sg-section-header">Badges &amp; Status Dots</div>
+  <div class="sg-section-body">
+
+    <div class="sg-label">Pill badges — used in card headers (<span class="sg-code">badge</span>)</div>
+    <div class="sg-row" style="margin-bottom:20px;">
+      <span class="badge badge-online">Online</span>
+      <span class="badge badge-offline">Offline</span>
+      <span class="badge" style="background:#546e7a;color:white;">Loading…</span>
+    </div>
+
+    <div class="sg-label">Status badges — inline in table cells (<span class="sg-code">status-badge</span>)</div>
+    <div class="sg-row" style="margin-bottom:20px;">
+      <span class="status-badge badge-online">ONLINE</span>
+      <span class="status-badge badge-offline">OFFLINE</span>
+    </div>
+
+    <div class="sg-label">Status dots — left of card title (<span class="sg-code">status-dot</span>)</div>
+    <div class="sg-row">
+      <div class="sg-item" style="align-items:center; gap:6px; flex-direction:row;">
+        <span class="status-dot dot-online"></span>
+        <span style="font-size:0.85rem;">Online</span>
+      </div>
+      <div class="sg-item" style="align-items:center; gap:6px; flex-direction:row;">
+        <span class="status-dot dot-offline"></span>
+        <span style="font-size:0.85rem;">Offline</span>
+      </div>
+      <div class="sg-item" style="align-items:center; gap:6px; flex-direction:row;">
+        <span class="status-dot dot-loading"></span>
+        <span style="font-size:0.85rem;">Loading (animated pulse)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── STATUS MESSAGES ────────────────────────────────────────────────── -->
+<div class="sg-section" id="messages">
+  <div class="sg-section-header">Status Messages</div>
+  <div class="sg-section-body">
+    <p style="font-size:0.85rem; color:#555; margin-bottom:16px;">
+      One-line feedback shown inside cards and panels after user actions.
+      Apply <span class="sg-code">status-msg</span> with a context modifier.
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px; max-width:500px;">
+      <div class="status-msg msg-info">ℹ Module online. Checking GitHub for latest firmware…</div>
+      <div class="status-msg msg-success">✓ Update complete. Module rebooting…</div>
+      <div class="status-msg msg-error">✗ Module is offline – check network/power.</div>
+    </div>
+    <div style="margin-top:16px; font-size:0.82rem; color:#555;">
+      Classes: <span class="sg-code">msg-info</span> &nbsp;
+               <span class="sg-code">msg-success</span> &nbsp;
+               <span class="sg-code">msg-error</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── CARDS & PANELS ─────────────────────────────────────────────────── -->
+<div class="sg-section" id="cards">
+  <div class="sg-section-header">Cards &amp; Panels</div>
+  <div class="sg-section-body">
+
+    <div class="sg-label">Standard card — white with shadow (<span class="sg-code">card</span>)</div>
+    <div class="card sg-demo-card" style="margin-bottom:24px;">
+      <div class="card-header">
+        <span class="status-dot dot-online"></span>
+        <h2>ESP32_AIO</h2>
+        <span class="badge badge-online">Online</span>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <span>mDNS hostname</span>
+          <span class="value">ESP32_AIO.local</span>
+        </div>
+        <div class="info-row">
+          <span>IP address</span>
+          <span class="value">192.168.1.105</span>
+        </div>
+        <div class="info-row">
+          <span>Current version</span>
+          <span class="value">1.1.005</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sg-label">Dark-header panel — secondary sections (<span class="sg-code">panel-header</span>)</div>
+    <div class="card sg-demo-card">
+      <div class="panel-header">
+        <h2>📊 Data Logging</h2>
+        <span class="badge" style="background:#546e7a;color:white;">Active</span>
+      </div>
+      <div class="panel-body">
+        <div class="data-log-grid">
+          <div class="info-row">
+            <span>Rows logged</span>
+            <span class="value">1,024</span>
+          </div>
+          <div class="info-row">
+            <span>Google Drive</span>
+            <span class="value">Synced</span>
+          </div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-sm btn-primary">☁ Sync Now</button>
+          <button class="btn btn-sm btn-primary">📊 View Data</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── FORM CONTROLS ──────────────────────────────────────────────────── -->
+<div class="sg-section" id="forms">
+  <div class="sg-section-header">Form Controls</div>
+  <div class="sg-section-body">
+
+    <div class="sg-label">Controls bar (<span class="sg-code">controls</span>) — filter/pagination row above data views</div>
+    <div class="controls" style="margin-bottom:24px;">
+      <div>
+        <label for="sg-mod">Filter by module:</label>
+        <select id="sg-mod">
+          <option>All modules</option>
+          <option>ESP32_AIO</option>
+          <option>ESP32_GPS</option>
+        </select>
+      </div>
+      <div>
+        <label for="sg-rows">Rows per page:</label>
+        <select id="sg-rows">
+          <option>50</option>
+          <option selected>100</option>
+          <option>250</option>
+        </select>
+      </div>
+      <button class="btn btn-primary">↻ Refresh</button>
+    </div>
+
+    <div class="sg-label">Refresh row (<span class="sg-code">refresh-row</span>) — auto-refresh interval control</div>
+    <div class="refresh-row">
+      <label for="sg-interval">Refresh interval (s):</label>
+      <input type="number" id="sg-interval" value="5" min="2" max="60">
+      <button class="btn btn-sm btn-primary">Apply</button>
+      <button class="btn btn-sm btn-warn">↻ Refresh Now</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── TABLES ─────────────────────────────────────────────────────────── -->
+<div class="sg-section" id="tables">
+  <div class="sg-section-header">Tables</div>
+  <div class="sg-section-body">
+    <p style="font-size:0.85rem;color:#555;margin-bottom:16px;">
+      Wrap in <span class="sg-code">data-container</span> &gt; <span class="sg-code">table-wrapper</span> for sticky headers and scrolling.
+      The stats bar above the table uses <span class="sg-code">stats</span>; the pagination footer uses <span class="sg-code">pagination</span>.
+    </p>
+    <div class="data-container">
+      <div class="stats">Showing 1–3 of 1,024 rows | Total logged: 1,024</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Module</th>
+              <th>IP Address</th>
+              <th>Version</th>
+              <th>Debug Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="timestamp">4/1/2026, 6:00:00 PM</td>
+              <td class="module-name">ESP32_AIO <span class="status-badge badge-online">ONLINE</span></td>
+              <td>192.168.1.105</td>
+              <td>1.1.005</td>
+              <td class="debug-data" title="free_heap: 180000, satellites: 12">free_heap: 180000, satellites: 12</td>
+            </tr>
+            <tr>
+              <td class="timestamp">4/1/2026, 5:59:00 PM</td>
+              <td class="module-name">ESP32_GPS <span class="status-badge badge-online">ONLINE</span></td>
+              <td>192.168.1.110</td>
+              <td>1.0.012</td>
+              <td class="debug-data" title="latitude: 41.8781, longitude: -87.6298">latitude: 41.8781, longitude: -87.6298</td>
+            </tr>
+            <tr class="offline-row">
+              <td class="timestamp">4/1/2026, 5:58:00 PM</td>
+              <td class="module-name">ESP32_Row_Controller <span class="status-badge badge-offline">OFFLINE</span></td>
+              <td>—</td>
+              <td>—</td>
+              <td class="debug-data">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="btn btn-secondary" disabled>← Previous</button>
+        <span>Page 1 of 342</span>
+        <button class="btn btn-secondary">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── GRIDS ──────────────────────────────────────────────────────────── -->
+<div class="sg-section" id="grids">
+  <div class="sg-section-header">Grid Layouts</div>
+  <div class="sg-section-body">
+    <div style="font-size:0.85rem;color:#555;display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <span class="sg-code">module-grid</span> —
+        <code>repeat(auto-fill, minmax(520px, 1fr))</code>
+        — Module management cards. Cards are at least 520 px wide and fill the available row width.
+      </div>
+      <div>
+        <span class="sg-code">charts-grid</span> —
+        <code>repeat(auto-fit, minmax(500px, 1fr))</code>
+        — Chart panels. Uses <em>auto-fit</em> to collapse empty tracks; minimum 500 px.
+      </div>
+      <div>
+        <span class="sg-code">data-log-grid</span> —
+        <code>repeat(auto-fill, minmax(200px, 1fr))</code>
+        — Compact key–value pairs inside a panel. Minimum 200 px per column.
+      </div>
+    </div>
+    <hr class="sg-divider">
+    <div class="sg-label">data-log-grid demo</div>
+    <div class="data-log-grid" style="max-width:700px;">
+      <div class="info-row"><span>Last log time</span><span class="value">6:00 PM</span></div>
+      <div class="info-row"><span>Rows logged</span><span class="value">1,024</span></div>
+      <div class="info-row"><span>Google Drive sync</span><span class="value">Enabled</span></div>
+      <div class="info-row"><span>Last sync time</span><span class="value">5:55 PM</span></div>
+      <div class="info-row"><span>Rows synced</span><span class="value">1,020</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHARTS ─────────────────────────────────────────────────────────── -->
+<div class="sg-section" id="charts">
+  <div class="sg-section-header">Chart Containers</div>
+  <div class="sg-section-body">
+    <p style="font-size:0.85rem;color:#555;margin-bottom:16px;">
+      Use <span class="sg-code">chart-container</span> inside <span class="sg-code">charts-grid</span>.
+      The canvas lives inside <span class="sg-code">chart-wrapper</span> (fixed 300 px height).
+      Reset-zoom and other inline controls use <span class="sg-code">chart-controls</span>.
+    </p>
+
+    <div class="help-text" style="margin-bottom:20px;">
+      <strong>📌 Interactive Features:</strong>
+      • <strong>Zoom:</strong> Scroll wheel or pinch to zoom in/out &nbsp;|&nbsp;
+      <strong>Pan:</strong> Click and drag &nbsp;|&nbsp;
+      <strong>Reset:</strong> Use Reset Zoom button &nbsp;|&nbsp;
+      <strong>Legend:</strong> Click to show/hide series
+    </div>
+
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));">
+      <div class="chart-container">
+        <h3>
+          💾 Memory Usage
+          <div class="chart-controls">
+            <button onclick="void(0)">Reset Zoom</button>
+          </div>
+        </h3>
+        <div class="chart-wrapper" style="display:flex;align-items:center;justify-content:center;color:#bbb;font-size:0.9rem;">
+          [Chart.js canvas renders here]
+        </div>
+      </div>
+      <div class="chart-container">
+        <h3>
+          🌍 GPS Position
+          <div class="chart-controls">
+            <button onclick="void(0)">Reset Zoom</button>
+          </div>
+        </h3>
+        <div class="chart-wrapper" style="display:flex;align-items:center;justify-content:center;color:#bbb;font-size:0.9rem;">
+          [Chart.js canvas renders here]
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HELP BLOCK ─────────────────────────────────────────────────────── -->
+<div class="sg-section" id="help">
+  <div class="sg-section-header">Help / Info Block</div>
+  <div class="sg-section-body">
+    <p style="font-size:0.85rem;color:#555;margin-bottom:16px;">
+      Blue left-border callout for usage tips or contextual instructions.
+      Class: <span class="sg-code">help-text</span>.
+    </p>
+    <div class="help-text">
+      <strong>📌 Tip:</strong>
+      Use the <strong>Refresh Now</strong> button to immediately poll all modules, or adjust the
+      auto-refresh interval to change the polling rate.
+    </div>
+  </div>
+</div>
+
+<!-- ── LOADING & ERRORS ───────────────────────────────────────────────── -->
+<div class="sg-section" id="loading">
+  <div class="sg-section-header">Loading &amp; Error States</div>
+  <div class="sg-section-body">
+    <div class="sg-label"><span class="sg-code">loading</span> — centred placeholder while data is fetched</div>
+    <div style="background:#f5f5f5;border-radius:8px;margin-bottom:20px;">
+      <div class="loading">Loading data…</div>
+    </div>
+
+    <div class="sg-label"><span class="sg-code">error</span> — inline error inside a container</div>
+    <div style="background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);overflow:hidden;">
+      <div class="error">Failed to load data: Network request failed</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── NEW PAGE TEMPLATE ──────────────────────────────────────────────── -->
+<div class="sg-section" id="newpage">
+  <div class="sg-section-header">New Page Template</div>
+  <div class="sg-section-body">
+    <p style="font-size:0.85rem;color:#555;margin-bottom:12px;">
+      Copy this boilerplate to start a new page. It links the shared stylesheet,
+      sets up the standard header, and leaves a placeholder for page content.
+    </p>
+    <pre style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:16px;font-size:0.78rem;line-height:1.7;overflow-x:auto;"><code>{% raw %}&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+  &lt;title&gt;Page Title — Module Management Server&lt;/title&gt;
+  &lt;link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"&gt;
+  &lt;style&gt;
+    /* Page-specific styles only — avoid duplicating shared rules */
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;header&gt;
+  &lt;div&gt;
+    &lt;h1&gt;🔧 Page Title&lt;/h1&gt;
+    &lt;div class="header-subtitle"&gt;Brief description&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="header-actions"&gt;
+    &lt;button class="btn btn-sm btn-secondary" onclick="window.location.href='{{ url_for('index') }}'&gt;
+      ← Dashboard
+    &lt;/button&gt;
+  &lt;/div&gt;
+&lt;/header&gt;
+
+&lt;!-- Optional: controls bar --&gt;
+&lt;div class="controls"&gt;
+  &lt;div&gt;
+    &lt;label for="myFilter"&gt;Filter:&lt;/label&gt;
+    &lt;select id="myFilter"&gt;&lt;/select&gt;
+  &lt;/div&gt;
+  &lt;button class="btn btn-primary"&gt;↻ Refresh&lt;/button&gt;
+&lt;/div&gt;
+
+&lt;!-- Page content --&gt;
+
+&lt;script&gt;
+  // JavaScript here
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;{% endraw %}</code></pre>
+    <p style="font-size:0.82rem;color:#555;margin-top:12px;">
+      <strong>Guidelines:</strong>
+      Only add page-specific CSS in the inline <code>&lt;style&gt;</code> block.
+      Never redefine colours, button styles, or layout primitives already in <code>style.css</code>.
+      Use semantic HTML5 elements and keep JavaScript in a single <code>&lt;script&gt;</code> block at the bottom of the body.
+    </p>
+  </div>
+</div>
+
+<footer style="text-align:center;font-size:0.8rem;color:#999;padding:24px 0 8px;">
+  Module Management Server — Style Guide v1.0
+</footer>
+
+</body>
+</html>
