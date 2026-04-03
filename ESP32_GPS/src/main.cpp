@@ -62,8 +62,8 @@
 #define AP_CHANNEL    6
 #define AP_MAX_CLIENTS 8
 
-#define STA_DEFAULT_SSID     "SSEI"
-#define STA_DEFAULT_PASSWORD "Nd14il!la"
+#define STA_DEFAULT_SSID     "NOLTE_FARM"
+#define STA_DEFAULT_PASSWORD "DontLoseMoney89"
 
 /// Static AP IP address (192.168.5.1)
 #define AP_IP_1  192
@@ -636,12 +636,13 @@ static void gpsTask(void* param) {
     static int   idx      = 0;
     static uint32_t lastStatusMs = 0;
     static uint32_t lastSubnetMs = 0;
+    static char lastGgaTime[16] = {0};  // Track last GGA timestamp to filter duplicates
 
     Serial.println("GPS task started on core " + String(xPortGetCoreID()));
 
     while (true) {
-        // ── Read IMU every iteration to keep buffer drained ──────────────
-        readIMU();
+        // ── Read IMU only when GGA is received ──────────────────────────
+        // readIMU();
 
         // ── Read GPS UART ─────────────────────────────────────────────────
         while (gpsSerial.available()) {
@@ -663,40 +664,58 @@ static void gpsTask(void* param) {
 
                     // On GGA sentences: read latest IMU then build + send PANDA (or forward raw NMEA)
                     if (strstr(buf, "GGA") != nullptr) {
-                        uint32_t now = millis();
-                        readIMU();  // get the freshest IMU frame before PANDA
+                        Serial.printf("[RX GGA #%lu] time=%s fixQ=%s\n", 
+                                      (unsigned long)gpsState.ggaCount, gpsState.fixTime, gpsState.fixQuality);
                         
-                        // Only build and send if GPS position is valid
-                        if (isGpsPositionValid()) {
-                            const char* messageToSend = nullptr;
+                        // Filter duplicate GGA sentences by comparing timestamps
+                        if (strcmp(gpsState.fixTime, lastGgaTime) == 0 && lastGgaTime[0] != '\0') {
+                            // Skip duplicate - same timestamp as previous GGA
+                            Serial.printf("  [SKIP] Duplicate timestamp\n");
+                        } else {
+                            // Update last GGA timestamp
+                            strncpy(lastGgaTime, gpsState.fixTime, sizeof(lastGgaTime) - 1);
+                            lastGgaTime[sizeof(lastGgaTime) - 1] = '\0';
                             
-                            if (gpsState.useRawNMEA) {
-                                // Send raw NMEA sentence
-                                messageToSend = buf;
+                            uint32_t now = millis();
+                            readIMU();  // get the freshest IMU frame before PANDA
+                            
+                            // Only build and send if GPS position is valid
+                            if (isGpsPositionValid()) {
+                                const char* messageToSend = nullptr;
+                                
+                                if (gpsState.useRawNMEA) {
+                                    // Send raw NMEA sentence
+                                    messageToSend = buf;
+                                } else {
+                                    // Build and send PANDA sentence
+                                    buildPandaSentence();
+                                    messageToSend = gpsState.nmea;
+                                }
+
+                                // Broadcast on the AP subnet (if enabled)
+                                if (gpsState.enablePandaBroadcast && messageToSend) {
+                                    IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
+                                                    gpsState.agioSubnet[2], 255);
+                                    Serial.printf("  [BROADCAST] PANDA #%lu\n", (unsigned long)gpsState.pandaCount);
+                                    udpGPS.writeTo((const uint8_t*)messageToSend,
+                                                   strlen(messageToSend), bcast, PORT_GPS);
+                                    taskYIELD();
+                                } else {
+                                    Serial.printf("  [NO TX] Broadcast disabled or no message\n");
+                                }
+
+                                gpsState.pandaCount++;
+                                if (gpsState.pandaCount == 1) gpsState.firstPandaMs = now;
+                                gpsState.lastPandaMs = now;
+
+                                // Send IMU status to AgIO (if IMU is active)
+                                // sendIMUStatus();  // PGN 211 disabled
+                                
+                                // Log GPS data if logging is enabled
+                                logGpsData();
                             } else {
-                                // Build and send PANDA sentence
-                                buildPandaSentence();
-                                messageToSend = gpsState.nmea;
+                                Serial.printf("  [SKIP] Position invalid\n");
                             }
-
-                            // Broadcast on the AP subnet (if enabled)
-                            if (gpsState.enablePandaBroadcast && messageToSend) {
-                                IPAddress bcast(gpsState.agioSubnet[0], gpsState.agioSubnet[1],
-                                                gpsState.agioSubnet[2], 255);
-                                udpGPS.writeTo((const uint8_t*)messageToSend,
-                                               strlen(messageToSend), bcast, PORT_GPS);
-                                taskYIELD();
-                            }
-
-                            gpsState.pandaCount++;
-                            if (gpsState.pandaCount == 1) gpsState.firstPandaMs = now;
-                            gpsState.lastPandaMs = now;
-
-                            // Send IMU status to AgIO (if IMU is active)
-                            sendIMUStatus();
-                            
-                            // Log GPS data if logging is enabled
-                            logGpsData();
                         }
                     }
                 }
@@ -787,7 +806,8 @@ static void startUDPaio() {
 
         switch (d[3]) {
             case 200: {
-                // Hello from AgIO – send GPS module presence reply
+                // Hello from AgIO – GPS module and IMU hello responses disabled
+                /*
                 uint8_t reply[11] = {};
                 reply[0] = 0x80;
                 reply[1] = 0x81;
@@ -816,6 +836,7 @@ static void startUDPaio() {
                 for (int i = 2; i < (int)reply[4] + 5; i++) ck += reply[i];
                 reply[10] = ck;
                 udpAIO.writeTo(reply, sizeof(reply), bcast, PORT_AGIO);
+                */
                 break;
             }
             case 201:
@@ -972,6 +993,9 @@ static void initGPS() {
         gpsState.gpsState = 2;
         Serial.println("UM980 failed – raw NMEA forwarding only");
     } else {
+        // Clear all existing NMEA message configurations
+        myGNSS.sendCommand("UNLOG");                        delay(500);
+        
         // Enable all satellite systems (GPS, GLONASS, BeiDou, Galileo, QZSS)
         myGNSS.sendCommand("CONFIG SIGNALGROUP 1");         delay(300);  // All constellations
         
@@ -981,9 +1005,22 @@ static void initGPS() {
         myGNSS.sendCommand("CONFIG HEADING RELIABILITY 3"); delay(300);
         myGNSS.sendCommand("CONFIG HEADING VARIABLELENGTH");delay(300);
         myGNSS.sendCommand("CONFIG SMOOTH HEADING 0");      delay(300);
-        myGNSS.sendCommand("GNGGA 0.1");                    delay(300);  // GN = all GNSS systems
-        myGNSS.sendCommand("GPVTG 0.1");                    delay(300);
-        Serial.println("UM980 configured: All satellites enabled, 10Hz output");
+        
+        // Explicitly disable all GGA message types on all ports
+        myGNSS.sendCommand("GPGGA 0");                      delay(200);  // Disable GPS-only GGA
+        myGNSS.sendCommand("GLGGA 0");                      delay(200);  // Disable GLONASS GGA
+        myGNSS.sendCommand("BDGGA 0");                      delay(200);  // Disable BeiDou GGA
+        myGNSS.sendCommand("GAGGA 0");                      delay(200);  // Disable Galileo GGA
+        myGNSS.sendCommand("GBGGA 0");                      delay(200);  // Disable BDS GGA (alternate)
+        
+        // Enable only combined GNSS GGA at 10Hz on COM1
+        myGNSS.sendCommand("GNGGA COM1 0.1");               delay(300);  // GN = all GNSS systems
+        myGNSS.sendCommand("GPVTG COM1 0.1");               delay(300);  // VTG for speed
+        
+        // Save configuration to NVRAM so it persists across power cycles
+        myGNSS.sendCommand("SAVECONFIG");                   delay(500);
+        Serial.println("UM980 configured: All satellites enabled, 10Hz GNGGA only, config saved");
+        Serial.println("UM980 configured: All satellites enabled, 10Hz GNGGA only");
     }
 }
 
@@ -1407,12 +1444,12 @@ void setup() {
 
     // ── Power Relay ───────────────────────────────────────────────────────
     pinMode(POWER_RELAY_PIN, OUTPUT);
-    digitalWrite(POWER_RELAY_PIN, LOW);
-    Serial.println("Power relay LOW - waiting 1s...");
-    delay(1000);
+    // digitalWrite(POWER_RELAY_PIN, LOW);
+    // Serial.println("Power relay LOW - waiting 1s...");
+    // delay(1000);
     digitalWrite(POWER_RELAY_PIN, HIGH);
-    Serial.println("Power relay HIGH");
-    delay(1000);
+    Serial.println("Power relay HIGH (no power cycle)");
+    delay(100);
     // ── LED ───────────────────────────────────────────────────────────────
     // pixel.begin();  // Disabled - no NeoPixel on Xiao
     // setLED(0, 0, 50);   // dim blue = booting

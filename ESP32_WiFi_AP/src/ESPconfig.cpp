@@ -8,13 +8,13 @@ uint8_t ESPconfig::loadConfig() {
     // AP settings
     apCfg.ips[0] = preferences.getInt("ap_ip0", 192);
     apCfg.ips[1] = preferences.getInt("ap_ip1", 168);
-    apCfg.ips[2] = preferences.getInt("ap_ip2", 1);
+    apCfg.ips[2] = preferences.getInt("ap_ip2", 10);
     apCfg.ips[3] = preferences.getInt("ap_ip3", 1);
     apCfg.channel    = (uint8_t)preferences.getInt("ap_ch",  6);
     apCfg.maxClients = (uint8_t)preferences.getInt("ap_max", 8);
 
-    String apSSID = preferences.getString("ap_ssid", "AgOpenGPS");
-    String apPass = preferences.getString("ap_pass", "1234567890");
+    String apSSID = preferences.getString("ap_ssid", "NOLTE_FARM");
+    String apPass = preferences.getString("ap_pass", "DontLoseMoney89");
     strncpy(apCfg.ssid,     apSSID.c_str(), sizeof(apCfg.ssid) - 1);
     strncpy(apCfg.password, apPass.c_str(),  sizeof(apCfg.password) - 1);
     apCfg.ssid[sizeof(apCfg.ssid) - 1]         = '\0';

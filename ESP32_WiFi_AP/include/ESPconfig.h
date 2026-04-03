@@ -46,9 +46,9 @@ public:
         uint8_t channel;   // WiFi channel (1–13)
         uint8_t maxClients;
         APConfig() {
-            strncpy(ssid, "AgOpenGPS", sizeof(ssid));
-            strncpy(password, "1234567890", sizeof(password));
-            ips[0] = 192; ips[1] = 168; ips[2] = 1; ips[3] = 1;
+            strncpy(ssid, "NOLTE_FARM", sizeof(ssid));
+            strncpy(password, "DontLoseMoney89", sizeof(password));
+            ips[0] = 192; ips[1] = 168; ips[2] = 10; ips[3] = 1;
             channel    = 6;
             maxClients = 8;
         }
