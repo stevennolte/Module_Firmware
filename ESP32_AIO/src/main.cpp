@@ -1032,28 +1032,28 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   if (request->hasParam("ap_ssid", true)) {
     String v = request->getParam("ap_ssid", true)->value();
     if (v.length() > 0 && v.length() < 64) {
-      espData.preferences.putString("ap_ssid", v);
+      snprintf(espData.apCfg.ssid, sizeof(espData.apCfg.ssid), "%s", v.c_str());
       doReboot = true;
     }
   }
   if (request->hasParam("ap_pass", true)) {
     String v = request->getParam("ap_pass", true)->value();
     if (v.length() > 0 && v.length() < 64) {
-      espData.preferences.putString("ap_pass", v);
+      snprintf(espData.apCfg.password, sizeof(espData.apCfg.password), "%s", v.c_str());
       doReboot = true;
     }
   }
   if (request->hasParam("ap_ip3", true)) {
     int ip3 = request->getParam("ap_ip3", true)->value().toInt();
     if (ip3 >= 1 && ip3 <= 254) {
-      espData.preferences.putUChar("ap_ip3", ip3);
+      espData.apCfg.ips[3] = ip3;
       doReboot = true;
     }
   }
   if (request->hasParam("wifi_mode", true)) {
     int mode = request->getParam("wifi_mode", true)->value().toInt();
     if (mode >= 0 && mode <= 2) {
-      espData.preferences.putInt("wifi_mode", mode);
+      espData.wifiMode = mode;
       doReboot = true;
     }
   }
@@ -1076,7 +1076,6 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("wasOffset", true)) {
     espData.steer.steerOffset = request->getParam("wasOffset", true)->value().toInt();
-  }
   }
   if (request->hasParam("pidInputFilt", true)) {
     float oldValue = espData.steer.pidInputFilt;

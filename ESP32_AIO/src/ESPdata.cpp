@@ -310,6 +310,8 @@ uint8_t ESPdata::saveConfig(){
     preferences.putUChar("ap_ip1", apCfg.ips[1]);
     preferences.putUChar("ap_ip2", apCfg.ips[2]);
     preferences.putUChar("ap_ip3", apCfg.ips[3]);
+    preferences.putString("ap_ssid", apCfg.ssid);
+    preferences.putString("ap_pass", apCfg.password);
     preferences.putInt("wifi_mode", wifiMode);
     preferences.putUChar("ledBrightness", program.ledBrht);
     preferences.putFloat("wasZero", steer.wasZeroAngle);
