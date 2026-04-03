@@ -95,7 +95,7 @@ class WAS{
         
         ESPdata* espData;           ///< @brief Pointer to central data management system
         I2CManager& i2cManager;    ///< @brief I2C manager for ADC readings
-       
+        float filteredRawADS;       ///< @brief Filtered raw ADC value for noise reduction
         
 };
 

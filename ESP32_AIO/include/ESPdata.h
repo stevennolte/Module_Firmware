@@ -559,7 +559,9 @@ public:
         uint8_t useADS = 0;     
         uint16_t rawADS = 0;        ///< @brief Raw ADS1115 ADC value for analog sensors
         bool wirelessWAS = false;           ///< @brief Wheel angle sensor source (false=wired, true=wireless)
+        bool invertWAS = false;             ///< @brief Invert wheel angle sensor direction (false=normal, true=inverted)
         float wasZeroAngle = 0.0;     ///< @brief Wheel angle sensor zero calibration value
+        float wasFilterValue = 0.2;   ///< @brief WAS voltage filter coefficient (0.0-1.0, default 0.2)
         uint32_t looptime = 0;   
         uint32_t looptimestamp = 0;
         float sensorVoltage = 0.0;      ///< @brief Voltage reading from analog wheel angle sensor

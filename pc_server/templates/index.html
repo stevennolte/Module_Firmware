@@ -194,35 +194,56 @@
 
   // ── Module status ──────────────────────────────────────────────────────
   async function refreshModuleStatus(name) {
+    // Fetch status for a single module (called by GitHub refresh button)
     try {
       const res  = await fetch('/api/modules');
       const list = await res.json();
       const mod  = list.find(m => m.name === name);
       if (!mod) return;
 
-      setOnline(name, mod.online);
-      document.getElementById('ip-'      + name).textContent = mod.ip      || '—';
-      document.getElementById('curver-'  + name).textContent = mod.current_version || '—';
-      document.getElementById('dev-ver-' + name).textContent = mod.current_version || '—';
+      updateModuleUI(mod);
+    } catch (e) {
+      console.error('Status fetch error:', e);
+    }
+  }
 
-      const rebootBtn = document.getElementById('btn-reboot-' + name);
-      if (rebootBtn) rebootBtn.disabled = !mod.online;
-
-      const webBtn = document.getElementById('btn-web-' + name);
-      if (webBtn) webBtn.disabled = !mod.online;
-
-      if (!mod.online) {
-        setMsg(name, 'Module is offline – check network/power.', 'error');
-        const fwBtn = document.getElementById('btn-update-fw-' + name);
-        const fsBtn = document.getElementById('btn-update-fs-' + name);
-        if (fwBtn) fwBtn.disabled = true;
-        if (fsBtn) fsBtn.disabled = true;
-      } else {
-        setMsg(name, 'Module online. Checking GitHub for latest firmware…', 'info');
-        refreshLatestFirmware(name, mod.current_version);
+  async function refreshAllModuleStatus() {
+    // Fetch status for all modules at once (more efficient)
+    try {
+      const res  = await fetch('/api/modules');
+      const list = await res.json();
+      
+      for (const mod of list) {
+        updateModuleUI(mod);
       }
     } catch (e) {
       console.error('Status fetch error:', e);
+    }
+  }
+
+  function updateModuleUI(mod) {
+    const name = mod.name;
+    
+    setOnline(name, mod.online);
+    document.getElementById('ip-'      + name).textContent = mod.ip      || '—';
+    document.getElementById('curver-'  + name).textContent = mod.current_version || '—';
+    document.getElementById('dev-ver-' + name).textContent = mod.current_version || '—';
+
+    const rebootBtn = document.getElementById('btn-reboot-' + name);
+    if (rebootBtn) rebootBtn.disabled = !mod.online;
+
+    const webBtn = document.getElementById('btn-web-' + name);
+    if (webBtn) webBtn.disabled = !mod.online;
+
+    if (!mod.online) {
+      setMsg(name, 'Module is offline – check network/power.', 'error');
+      const fwBtn = document.getElementById('btn-update-fw-' + name);
+      const fsBtn = document.getElementById('btn-update-fs-' + name);
+      if (fwBtn) fwBtn.disabled = true;
+      if (fsBtn) fsBtn.disabled = true;
+    } else {
+      setMsg(name, 'Module online. Checking GitHub for latest firmware…', 'info');
+      refreshLatestFirmware(name, mod.current_version);
     }
   }
 
@@ -417,11 +438,15 @@
   }
 
   // ── Auto-refresh ───────────────────────────────────────────────────────
-  function refreshAll() {
+  async function refreshAll() {
+    // Fetch all module status in one API call
+    await refreshAllModuleStatus();
+    
+    // Refresh diagnostics for open panels
     {% for mod in modules %}
-    refreshModuleStatus('{{ mod.name }}');
     if (openDiagPanels.has('{{ mod.name }}')) fetchDiagnostics('{{ mod.name }}');
     {% endfor %}
+    
     fetchDataLogStatus();
   }
 

@@ -217,6 +217,7 @@ uint8_t ESPdata::loadConfig(){
     
     // Load WAS zero angle
     steer.wasZeroAngle = preferences.getFloat("wasZero", 0.0);
+    steer.wasFilterValue = preferences.getFloat("wasFilter", 0.2);
 
     // Load program name and verify
     String configName = preferences.getString("name", "ESP32_AIO");
@@ -324,6 +325,7 @@ uint8_t ESPdata::saveConfig(){
     
     preferences.putUChar("ledBrightness", program.ledBrht);
     preferences.putFloat("wasZero", steer.wasZeroAngle);
+    preferences.putFloat("wasFilter", steer.wasFilterValue);
     preferences.putString("name", program.name);
 
     // Save PID values

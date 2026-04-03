@@ -26,6 +26,7 @@ import threading
 import time
 import os
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from packaging import version as pkg_version
 
@@ -85,27 +86,38 @@ def _github_headers() -> dict:
     return h
 
 
-def resolve_mdns(hostname: str) -> str | None:
+def resolve_mdns(hostname: str, timeout: float = 2.0) -> str | None:
     """
     Attempt to resolve an mDNS hostname (e.g. 'ESP32_AIO.local') to an IP.
     Returns None if the host cannot be found.
     """
+    def _resolve(name: str) -> str | None:
+        try:
+            return socket.gethostbyname(name)
+        except socket.gaierror:
+            return None
+    
+    # Set a timeout for DNS resolution
+    original_timeout = socket.getdefaulttimeout()
     try:
-        return socket.gethostbyname(hostname + ".local")
-    except socket.gaierror:
-        pass
-    # Also try with underscores replaced by hyphens (some OS mDNS stacks
-    # normalise underscores to hyphens).
-    try:
-        return socket.gethostbyname(hostname.replace("_", "-") + ".local")
-    except socket.gaierror:
-        return None
+        socket.setdefaulttimeout(timeout)
+        
+        # Try with .local suffix
+        result = _resolve(hostname + ".local")
+        if result:
+            return result
+            
+        # Also try with underscores replaced by hyphens (some OS mDNS stacks
+        # normalise underscores to hyphens).
+        return _resolve(hostname.replace("_", "-") + ".local")
+    finally:
+        socket.setdefaulttimeout(original_timeout)
 
 
 def get_module_version(ip: str) -> dict | None:
     """Query a module's /version endpoint.  Returns dict or None on failure."""
     try:
-        r = requests.get(f"http://{ip}/version", timeout=3)
+        r = requests.get(f"http://{ip}/version", timeout=2)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -474,9 +486,9 @@ def style_guide():
 @app.route("/api/modules")
 def api_modules():
     """Return live status for all managed modules."""
-    result = []
-    for mod in MODULES:
-        ip = resolve_mdns(mod["mdns_name"])
+    def check_module(mod):
+        """Check a single module's status."""
+        ip = resolve_mdns(mod["mdns_name"], timeout=1.5)
         entry = {
             "name":      mod["name"],
             "mdns_name": mod["mdns_name"],
@@ -489,7 +501,27 @@ def api_modules():
                 entry["online"]          = True
                 entry["current_version"] = ver.get("version", "unknown")
                 entry["current_name"]    = ver.get("name",    mod["name"])
-        result.append(entry)
+        return entry
+    
+    # Check all modules in parallel for faster response
+    result = []
+    with ThreadPoolExecutor(max_workers=len(MODULES)) as executor:
+        future_to_mod = {executor.submit(check_module, mod): mod for mod in MODULES}
+        for future in as_completed(future_to_mod):
+            try:
+                result.append(future.result())
+            except Exception as e:
+                mod = future_to_mod[future]
+                app.logger.error(f"Error checking module {mod['name']}: {e}")
+                result.append({
+                    "name":      mod["name"],
+                    "mdns_name": mod["mdns_name"],
+                    "ip":        None,
+                    "online":    False,
+                })
+    
+    # Sort by module name for consistent ordering
+    result.sort(key=lambda x: x["name"])
     return jsonify(result)
 
 

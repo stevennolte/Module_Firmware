@@ -836,6 +836,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='form-group'><label>WAS Offset:</label><input type='number' id='wasOffset' step='1' min='-2048' max='2048'></div>";
   html += "<div class='form-group'><label>PID Input Filter:</label><input type='number' id='pidInputFilt' step='0.01' min='0' max='1'></div>";
   html += "<div class='form-group'><label>PID Output Filter:</label><input type='number' id='pidOutputFilt' step='0.01' min='0' max='1'></div>";
+  html += "<div class='form-group'><label>WAS Voltage Filter:</label><input type='number' id='wasFilter' step='0.01' min='0' max='1'></div>";
   html += "<div class='form-group'><label>Use ADS1115:</label><select id='useADS'><option value='1'>Yes</option><option value='0'>No</option></select></div>";
   html += "</div>";
   
@@ -916,6 +917,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.wasOffset !== undefined) document.getElementById('wasOffset').value = data.wasOffset;";
   html += "      if (data.pidInputFilt !== undefined) document.getElementById('pidInputFilt').value = data.pidInputFilt;";
   html += "      if (data.pidOutputFilt !== undefined) document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
+  html += "      if (data.wasFilter !== undefined) document.getElementById('wasFilter').value = data.wasFilter;";
   html += "      if (data.useADS !== undefined) document.getElementById('useADS').value = data.useADS;";
   html += "      if (data.gpsSource !== undefined) document.getElementById('gpsSource').value = data.gpsSource;";
   html += "      if (data.pandaMode !== undefined) document.getElementById('pandaMode').value = data.pandaMode;";
@@ -947,6 +949,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('wasOffset', parseInt(document.getElementById('wasOffset').value) || 0);";
   html += "  formData.append('pidInputFilt', parseFloat(document.getElementById('pidInputFilt').value) || 0.1);";
   html += "  formData.append('pidOutputFilt', parseFloat(document.getElementById('pidOutputFilt').value) || 0.1);";
+  html += "  formData.append('wasFilter', parseFloat(document.getElementById('wasFilter').value) || 0.2);";
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
   html += "  formData.append('gpsSource', document.getElementById('gpsSource').value);";
   html += "  formData.append('pandaMode', document.getElementById('pandaMode').value);";
@@ -1027,6 +1030,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["wasOffset"] = espData.steer.steerOffset;
   doc["pidInputFilt"] = espData.steer.pidInputFilt;
   doc["pidOutputFilt"] = espData.steer.pidOutputFilt;
+  doc["wasFilter"] = espData.steer.wasFilterValue;
   doc["useADS"] = espData.steer.useADS;
   
   // System settings
@@ -1121,6 +1125,9 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("pidOutputFilt", true)) {
     espData.steer.pidOutputFilt = request->getParam("pidOutputFilt", true)->value().toFloat();
+  }
+  if (request->hasParam("wasFilter", true)) {
+    espData.steer.wasFilterValue = request->getParam("wasFilter", true)->value().toFloat();
   }
   if (request->hasParam("useADS", true)) {
     espData.steer.useADS = request->getParam("useADS", true)->value().toInt();
