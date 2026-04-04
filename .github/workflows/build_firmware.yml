@@ -40,7 +40,7 @@ jobs:
         id: info
         working-directory: ESP32_AIO
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
@@ -128,7 +128,7 @@ jobs:
         id: info
         working-directory: ESP32_Row_Controller
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
@@ -215,7 +215,7 @@ jobs:
         id: info
         working-directory: ESP32_WiFi_AP
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
@@ -302,7 +302,7 @@ jobs:
         id: info
         working-directory: ESP32_GPS
         run: |
-          VERSION=$(grep '#define VERSION' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION"   >> $GITHUB_OUTPUT
           echo "name=$NAME"         >> $GITHUB_OUTPUT
