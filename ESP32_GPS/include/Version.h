@@ -8,8 +8,8 @@
  *          - PATCH: Bug fixes and minor updates (auto-incremented by build script)
  */
 
-#ifndef VERSION_H
-#define VERSION_H
+#ifndef Version_h
+#define Version_h
 
 #include "Arduino.h"
 
