@@ -9,21 +9,21 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; display: flex; flex-direction: column; height: 100vh; }
-    header { background: #1a6b2f; color: white; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
-    header h1 { font-size: 1.3rem; }
-    header .sub { font-size: 0.8rem; opacity: 0.85; }
-    nav { background: #0f4520; padding: 8px 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-    nav a { text-decoration: none; color: white; padding: 6px 14px; font-size: 0.85rem; font-weight: bold; background: #1a6b2f; border-radius: 6px; transition: background 0.2s; }
-    nav a:hover { background: #0f4520; }
+    header { background: #1565c0; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+    header h1 { font-size: 1.4rem; }
+    header .sub { font-size: 0.85rem; opacity: 0.8; }
+    nav { background: #0d47a1; padding: 8px 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 6px 14px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0d47a1; }
     .controls { background: white; padding: 12px 20px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .controls .info { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; font-size: 0.85rem; }
     .controls .info-item { display: flex; flex-direction: column; }
     .controls .info-item .lbl { color: #777; font-size: 0.75rem; text-transform: uppercase; }
-    .controls .info-item .val { font-weight: bold; color: #1a6b2f; }
-    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; color: white; transition: background 0.2s; }
-    .btn-green { background: #1a6b2f; } .btn-green:hover { background: #0f4520; }
-    .btn-red   { background: #c0392b; } .btn-red:hover   { background: #922b21; }
-    .btn-blue  { background: #2980b9; } .btn-blue:hover  { background: #1f5f8b; }
+    .controls .info-item .val { font-weight: bold; color: #1565c0; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem; font-weight: bold; color: white; transition: background 0.2s; }
+    .btn-primary   { background: #1565c0; } .btn-primary:hover   { background: #0d47a1; }
+    .btn-danger    { background: #f44336; } .btn-danger:hover    { background: #c62828; }
+    .btn-secondary { background: #757575; } .btn-secondary:hover { background: #616161; }
     #map { flex: 1; width: 100%; }
     .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
     .badge-ok  { background: #d4edda; color: #155724; }
@@ -82,9 +82,9 @@
     </div>
   </div>
   <div style="display: flex; gap: 8px;">
-    <button class="btn btn-green" onclick="toggleTracking()" id="trackBtn">Start Tracking</button>
-    <button class="btn btn-blue" onclick="centerMap()">Re-center</button>
-    <button class="btn btn-red" onclick="clearTrail()">Clear Trail</button>
+    <button class="btn btn-primary" onclick="toggleTracking()" id="trackBtn">Start Tracking</button>
+    <button class="btn btn-secondary" onclick="centerMap()">Re-center</button>
+    <button class="btn btn-danger" onclick="clearTrail()">Clear Trail</button>
   </div>
 </div>
 
@@ -112,7 +112,7 @@
   // Custom icon for current position
   const posIcon = L.divIcon({
     className: 'pos-marker',
-    html: '<div style="background:#1a6b2f;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(0,0,0,0.4);"></div>',
+    html: '<div style="background:#1565c0;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(0,0,0,0.4);"></div>',
     iconSize: [22, 22],
     iconAnchor: [11, 11]
   });
@@ -122,10 +122,10 @@
     const btn = document.getElementById('trackBtn');
     if (tracking) {
       btn.textContent = 'Stop Tracking';
-      btn.className = 'btn btn-red';
+      btn.className = 'btn btn-danger';
     } else {
       btn.textContent = 'Start Tracking';
-      btn.className = 'btn btn-green';
+      btn.className = 'btn btn-primary';
     }
   }
 

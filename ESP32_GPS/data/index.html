@@ -7,19 +7,19 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 16px; }
-    header { background: #1a6b2f; color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
-    header h1 { font-size: 1.3rem; }
-    header .sub { font-size: 0.8rem; opacity: 0.85; }
-    nav { margin-bottom: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
-    nav a { text-decoration: none; color: white; padding: 8px 16px; font-size: 0.85rem; font-weight: bold; background: #1a6b2f; border-radius: 6px; transition: background 0.2s; }
-    nav a:hover { background: #0f4520; }
+    header { background: #1565c0; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+    header h1 { font-size: 1.4rem; }
+    header .sub { font-size: 0.85rem; opacity: 0.8; }
+    nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0d47a1; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
     .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 18px; }
     .card h2 { font-size: 0.95rem; color: #555; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em; }
     .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; }
     .stat-row:last-child { border-bottom: none; }
     .stat-row .lbl { color: #777; }
-    .stat-row .val { font-weight: bold; color: #1a6b2f; }
+    .stat-row .val { font-weight: bold; color: #1565c0; }
     .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: bold; }
     .badge-ok  { background: #d4edda; color: #155724; }
     .badge-warn{ background: #fff3cd; color: #856404; }
@@ -27,8 +27,8 @@
     .badge-off { background: #e2e3e5; color: #666; }
     .panda-box { font-family: monospace; font-size: 0.78rem; background: #f8f9fa; border-radius: 6px; padding: 8px; word-break: break-all; margin-top: 8px; min-height: 32px; color: #333; }
     .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; color: white; transition: background 0.2s; }
-    .btn-green { background: #1a6b2f; } .btn-green:hover { background: #0f4520; }
-    .btn-red   { background: #c0392b; } .btn-red:hover   { background: #922b21; }
+    .btn-primary { background: #1565c0; } .btn-primary:hover { background: #0d47a1; }
+    .btn-danger  { background: #f44336; } .btn-danger:hover  { background: #c62828; }
     .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
     .toggle-container { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
     #lastUpdate { font-size: 0.75rem; color: #aaa; text-align: right; margin-top: 6px; }
@@ -55,10 +55,10 @@
   <h2>Firmware / Filesystem Update</h2>
   <p style="font-size:0.85rem;color:#666;margin:8px 0;">Firmware file must start with <strong>ESP32_GPS</strong>.</p>
   <form method="POST" action="/update"    enctype="multipart/form-data" style="margin-bottom:8px;">
-    <input type="file" name="update" accept=".bin"> <button class="btn btn-green" type="submit">Flash Firmware</button>
+    <input type="file" name="update" accept=".bin"> <button class="btn btn-primary" type="submit">Flash Firmware</button>
   </form>
   <form method="POST" action="/updatefs"  enctype="multipart/form-data">
-    <input type="file" name="update" accept=".bin"> <button class="btn btn-green" type="submit">Flash Filesystem</button>
+    <input type="file" name="update" accept=".bin"> <button class="btn btn-primary" type="submit">Flash Filesystem</button>
   </form>
 </div>
 
@@ -109,11 +109,11 @@
     <div class="stat-row"><span class="lbl">NTRIP bytes</span>   <span class="val" id="ntripByt">--</span></div>
     <div class="toggle-container">
       <span class="lbl">GPS Broadcast</span>
-      <button id="fwdBtn" class="btn btn-sm btn-green" onclick="toggleGpsForwarding()">ON</button>
+      <button id="fwdBtn" class="btn btn-sm btn-primary" onclick="toggleGpsForwarding()">ON</button>
     </div>
     <div class="toggle-container">
       <span class="lbl">Message Format</span>
-      <button id="fmtBtn" class="btn btn-sm btn-green" onclick="toggleMessageFormat()">PANDA</button>
+      <button id="fmtBtn" class="btn btn-sm btn-primary" onclick="toggleMessageFormat()">PANDA</button>
     </div>
     <h2 style="margin-top:12px;">Last PANDA sentence</h2>
     <div class="panda-box" id="pandaRaw">waiting for data…</div>
@@ -125,11 +125,11 @@
     <div class="stat-row"><span class="lbl">Log file size</span> <span class="val" id="logSize">--</span></div>
     <div class="toggle-container">
       <span class="lbl">Logging Active</span>
-      <button id="logBtn" class="btn btn-sm btn-green" onclick="toggleGpsLogging()">OFF</button>
+      <button id="logBtn" class="btn btn-sm btn-primary" onclick="toggleGpsLogging()">OFF</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;">
-      <button class="btn btn-green btn-sm" onclick="downloadGpsLog()">Download CSV</button>
-      <button class="btn btn-red btn-sm" onclick="clearGpsLog()">Clear Log</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadGpsLog()">Download CSV</button>
+      <button class="btn btn-danger btn-sm" onclick="clearGpsLog()">Clear Log</button>
     </div>
   </div>
 
@@ -162,10 +162,10 @@
     const btn = document.getElementById('fwdBtn');
     if (enabled) {
       btn.textContent = 'ON';
-      btn.className = 'btn btn-sm btn-green';
+      btn.className = 'btn btn-sm btn-primary';
     } else {
       btn.textContent = 'OFF';
-      btn.className = 'btn btn-sm btn-red';
+      btn.className = 'btn btn-sm btn-danger';
     }
   }
 
@@ -189,10 +189,10 @@
     const btn = document.getElementById('fmtBtn');
     if (useRaw) {
       btn.textContent = 'RAW NMEA';
-      btn.className = 'btn btn-sm btn-green';
+      btn.className = 'btn btn-sm btn-primary';
     } else {
       btn.textContent = 'PANDA';
-      btn.className = 'btn btn-sm btn-green';
+      btn.className = 'btn btn-sm btn-primary';
     }
   }
 
@@ -216,10 +216,10 @@
     const btn = document.getElementById('logBtn');
     if (enabled) {
       btn.textContent = 'ON';
-      btn.className = 'btn btn-sm btn-green';
+      btn.className = 'btn btn-sm btn-primary';
     } else {
       btn.textContent = 'OFF';
-      btn.className = 'btn btn-sm btn-red';
+      btn.className = 'btn btn-sm btn-danger';
     }
   }
 
