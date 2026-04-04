@@ -44,6 +44,11 @@
           if (data.ap_ch   !== undefined) document.getElementById('ap_ch').value   = data.ap_ch;
           if (data.ap_ip3  !== undefined) document.getElementById('ap_ip3').value  = data.ap_ip3;
           renderNetworkList(data.sta_networks || []);
+          loadRowPins(data.row_pins || []);
+          loadToolbarPins(data.toolbar_pins || []);
+          if (data.row_active_high !== undefined) {
+            document.getElementById('row_active_high').value = data.row_active_high ? '1' : '0';
+          }
         })
         .catch(e => console.error('Failed to load settings:', e));
     }
@@ -169,6 +174,140 @@
         .catch(err => { statusEl.textContent = 'Upload error: ' + err; statusEl.style.color = 'red'; });
     }
 
+    function loadRowPins(rowPins) {
+      const container = document.getElementById('rowPinsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      for (let i = 0; i < rowPins.length; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.style.marginBottom = '8px';
+        const label = document.createElement('label');
+        label.textContent = 'Row ' + (i + 1) + ' Pin';
+        label.style.display = 'inline-block';
+        label.style.width = '100px';
+        label.style.fontWeight = 'normal';
+        label.style.marginTop = '0';
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = 'row_pin_' + i;
+        input.value = rowPins[i];
+        input.min = '0';
+        input.max = '48';
+        input.style.width = '80px';
+        input.style.display = 'inline-block';
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        container.appendChild(wrapper);
+      }
+    }
+
+    function saveRowPins() {
+      const formData = new URLSearchParams();
+      const msgEl = document.getElementById('rowPinsMsg');
+      let valid = true;
+      
+      // Collect all row pin values
+      for (let i = 0; i < 12; i++) {
+        const input = document.getElementById('row_pin_' + i);
+        if (!input) { valid = false; break; }
+        const value = parseInt(input.value);
+        if (isNaN(value) || value < 0 || value > 48) {
+          msgEl.textContent = 'Invalid pin value for Row ' + (i + 1) + '. Must be 0-48.';
+          msgEl.style.color = 'red';
+          return;
+        }
+        formData.append('row_pin_' + i, value);
+      }
+      
+      if (!valid) {
+        msgEl.textContent = 'Error reading row pin values.';
+        msgEl.style.color = 'red';
+        return;
+      }
+      
+      // Add row active high/low setting
+      const activeHighEl = document.getElementById('row_active_high');
+      if (activeHighEl) {
+        formData.append('row_active_high', activeHighEl.value);
+      }
+      
+      fetch('/saveRowPins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      })
+        .then(r => r.text())
+        .then(msg => {
+          msgEl.textContent = msg;
+          msgEl.style.color = msg.includes('Rebooting') ? 'green' : 'red';
+        })
+        .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });
+    }
+
+    function loadToolbarPins(toolbarPins) {
+      const container = document.getElementById('toolbarPinsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      for (let i = 0; i < toolbarPins.length; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.style.marginBottom = '8px';
+        const label = document.createElement('label');
+        label.textContent = 'Toolbar Sensor ' + (i + 1) + ' Pin';
+        label.style.display = 'inline-block';
+        label.style.width = '150px';
+        label.style.fontWeight = 'normal';
+        label.style.marginTop = '0';
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = 'toolbar_pin_' + i;
+        input.value = toolbarPins[i];
+        input.min = '0';
+        input.max = '48';
+        input.style.width = '80px';
+        input.style.display = 'inline-block';
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        container.appendChild(wrapper);
+      }
+    }
+
+    function saveToolbarPins() {
+      const formData = new URLSearchParams();
+      const msgEl = document.getElementById('toolbarPinsMsg');
+      let valid = true;
+      
+      // Collect toolbar pin values
+      for (let i = 0; i < 2; i++) {
+        const input = document.getElementById('toolbar_pin_' + i);
+        if (!input) { valid = false; break; }
+        const value = parseInt(input.value);
+        if (isNaN(value) || value < 0 || value > 48) {
+          msgEl.textContent = 'Invalid pin value for Toolbar Sensor ' + (i + 1) + '. Must be 0-48.';
+          msgEl.style.color = 'red';
+          return;
+        }
+        formData.append('toolbar_pin_' + i, value);
+      }
+      
+      if (!valid) {
+        msgEl.textContent = 'Error reading toolbar pin values.';
+        msgEl.style.color = 'red';
+        return;
+      }
+      
+      fetch('/saveToolbarPins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      })
+        .then(r => r.text())
+        .then(msg => {
+          msgEl.textContent = msg;
+          msgEl.style.color = msg.includes('Rebooting') ? 'green' : 'red';
+        })
+        .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });
+    }
+
     window.onload = function() { loadSettings(); fetchModuleName(); };
   </script>
 </head>
@@ -224,6 +363,31 @@
     <input type="password" id="new_pass" placeholder="Network password">
     <button onclick="addNetwork()">Add Network</button>
     <p id="networkMsg"></p>
+  </div>
+
+  <div class="card">
+    <h2>Row Pin Configuration</h2>
+    <small>Configure the GPIO pins for each row output. Changes take effect after reboot. Default: 11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4</small>
+    <div id="rowPinsContainer" style="margin-top: 16px;">
+      <p style="color:#888;font-size:0.875rem;">Loading...</p>
+    </div>
+    <label style="margin-top: 16px;">Row Active State</label>
+    <select id="row_active_high">
+      <option value="1">Active HIGH (ON = pin HIGH, OFF = pin LOW)</option>
+      <option value="0">Active LOW (ON = pin LOW, OFF = pin HIGH)</option>
+    </select>
+    <button onclick="saveRowPins()">Save Row Pins &amp; Reboot</button>
+    <p id="rowPinsMsg"></p>
+  </div>
+
+  <div class="card">
+    <h2>Toolbar Sensor Pin Configuration</h2>
+    <small>Configure the GPIO pins for the two toolbar lift sensors. Either sensor reading HIGH indicates toolbar is up. Changes take effect after reboot. Default: 1, 2</small>
+    <div id="toolbarPinsContainer" style="margin-top: 16px;">
+      <p style="color:#888;font-size:0.875rem;">Loading...</p>
+    </div>
+    <button onclick="saveToolbarPins()">Save Toolbar Pins &amp; Reboot</button>
+    <p id="toolbarPinsMsg"></p>
   </div>
 
   <div class="card">

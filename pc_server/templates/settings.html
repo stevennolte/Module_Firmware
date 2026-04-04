@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - Module Management Server</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .settings-container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    
+    .settings-section {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .settings-section h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 1.25rem;
+      color: #333;
+      border-bottom: 2px solid #4CAF50;
+      padding-bottom: 8px;
+    }
+    
+    .module-list {
+      display: grid;
+      gap: 12px;
+    }
+    
+    .module-checkbox {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .module-checkbox:hover {
+      background: #e8f5e9;
+    }
+    
+    .module-checkbox input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-right: 12px;
+      cursor: pointer;
+    }
+    
+    .module-checkbox label {
+      cursor: pointer;
+      font-size: 1rem;
+      color: #333;
+      flex: 1;
+    }
+    
+    .module-mdns {
+      font-size: 0.875rem;
+      color: #666;
+      margin-left: auto;
+      font-family: monospace;
+    }
+    
+    .button-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    
+    .select-all-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚙️ Settings</h1>
+    <div class="subtitle">Configure which modules appear on the dashboard</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="window.location.href='/'">← Back to Dashboard</button>
+  </div>
+</header>
+
+<div class="settings-container">
+  <div class="settings-section">
+    <h2>Visible Modules</h2>
+    <p style="color: #666; margin-bottom: 16px;">
+      Select which modules you want to see on the main dashboard. 
+      Unchecked modules will be hidden but can be re-enabled here at any time.
+    </p>
+    
+    <div class="select-all-row">
+      <button class="btn btn-sm btn-secondary" onclick="selectAll()">✓ Select All</button>
+      <button class="btn btn-sm btn-secondary" onclick="deselectAll()">✗ Deselect All</button>
+    </div>
+    
+    <div class="module-list" id="moduleList">
+      {% for mod in all_modules %}
+      <div class="module-checkbox">
+        <input type="checkbox" 
+               id="mod-{{ mod.name }}" 
+               value="{{ mod.name }}"
+               data-mdns="{{ mod.mdns_name }}">
+        <label for="mod-{{ mod.name }}">{{ mod.name }}</label>
+        <span class="module-mdns">{{ mod.mdns_name }}.local</span>
+      </div>
+      {% endfor %}
+    </div>
+    
+    <div class="button-row">
+      <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+      <button class="btn btn-secondary" onclick="resetToDefault()">↻ Reset to Default</button>
+    </div>
+    
+    <div class="status-msg msg-info" id="statusMsg" style="margin-top: 16px; display: none;">
+      Ready to save
+    </div>
+  </div>
+</div>
+
+<script>
+  // Load current settings on page load
+  async function loadSettings() {
+    try {
+      const res = await fetch('/api/settings');
+      const settings = await res.json();
+      
+      // Get all checkboxes
+      const checkboxes = document.querySelectorAll('#moduleList input[type="checkbox"]');
+      const visibleModules = new Set(settings.visible_modules || []);
+      
+      checkboxes.forEach(cb => {
+        cb.checked = visibleModules.has(cb.value);
+      });
+      
+      showMessage('Settings loaded', 'success');
+      setTimeout(() => hideMessage(), 2000);
+    } catch (e) {
+      showMessage('Failed to load settings: ' + e, 'error');
+    }
+  }
+  
+  async function saveSettings() {
+    const checkboxes = document.querySelectorAll('#moduleList input[type="checkbox"]');
+    const visibleModules = Array.from(checkboxes)
+      .filter(cb => cb.checked)
+      .map(cb => cb.value);
+    
+    if (visibleModules.length === 0) {
+      showMessage('⚠ Please select at least one module', 'warn');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visible_modules: visibleModules })
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok) {
+        showMessage('✓ Settings saved successfully! Redirecting to dashboard...', 'success');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } else {
+        showMessage('Error: ' + (result.error || 'Failed to save'), 'error');
+      }
+    } catch (e) {
+      showMessage('Network error: ' + e, 'error');
+    }
+  }
+  
+  function selectAll() {
+    const checkboxes = document.querySelectorAll('#moduleList input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+    showMessage('All modules selected', 'info');
+    setTimeout(() => hideMessage(), 2000);
+  }
+  
+  function deselectAll() {
+    const checkboxes = document.querySelectorAll('#moduleList input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    showMessage('All modules deselected', 'info');
+    setTimeout(() => hideMessage(), 2000);
+  }
+  
+  function resetToDefault() {
+    if (!confirm('Reset to show all modules?')) return;
+    selectAll();
+    showMessage('Reset to default (all modules visible)', 'info');
+    setTimeout(() => hideMessage(), 2000);
+  }
+  
+  function showMessage(text, type) {
+    const msg = document.getElementById('statusMsg');
+    msg.textContent = text;
+    msg.className = 'status-msg msg-' + type;
+    msg.style.display = 'block';
+  }
+  
+  function hideMessage() {
+    const msg = document.getElementById('statusMsg');
+    msg.style.display = 'none';
+  }
+  
+  // Load settings when page loads
+  window.onload = loadSettings;
+</script>
+</body>
+</html>

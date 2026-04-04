@@ -13,6 +13,8 @@ class ESPconfig
 public:
     uint8_t loadConfig();
     uint8_t updateIP();
+    uint8_t updateRowPins();
+    uint8_t updateToolbarPins();
     Preferences preferences;
 
     class GPIO_Definitions {
@@ -22,8 +24,10 @@ public:
             uint8_t POWER_RELAY_PIN = 12;
             // 12 row unit MOSFET output pins
             uint8_t rowPins[NUM_ROWS] = {11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4};
-            // Digital input: toolbar lifted sensor (HIGH = toolbar up, LOW = toolbar down)
-            uint8_t TOOLBAR_PIN = 1;
+            // Digital inputs: toolbar lifted sensors (HIGH = toolbar up, LOW = toolbar down)
+            uint8_t toolbarPins[2] = {1, 2};
+            // Row pin active state: true = active HIGH, false = active LOW
+            bool rowActiveHigh = true;
             GPIO_Definitions() {}
     };
     GPIO_Definitions gpioDefs;

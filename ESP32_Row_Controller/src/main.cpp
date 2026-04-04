@@ -29,7 +29,8 @@ auto& gpioDefs    = espConfig.gpioDefs;
 void initRowOutputs() {
     for (int i = 0; i < NUM_ROWS; i++) {
         pinMode(gpioDefs.rowPins[i], OUTPUT);
-        digitalWrite(gpioDefs.rowPins[i], LOW);
+        // Set to inactive state (opposite of active state)
+        digitalWrite(gpioDefs.rowPins[i], gpioDefs.rowActiveHigh ? LOW : HIGH);
     }
 }
 
@@ -42,14 +43,19 @@ void updateRowOutputs() {
     if (sectionData.toolbarOverrideEnabled) {
         toolbarUp = sectionData.toolbarOverrideValue;
     } else {
-        toolbarUp = digitalRead(gpioDefs.TOOLBAR_PIN) == HIGH;
+        // Check both toolbar sensors - if either is HIGH, toolbar is up
+        toolbarUp = (digitalRead(gpioDefs.toolbarPins[0]) == HIGH) || 
+                    (digitalRead(gpioDefs.toolbarPins[1]) == HIGH);
     }
     
     sectionData.toolbarUp = toolbarUp;
 
     for (int i = 0; i < NUM_ROWS; i++) {
         bool active = !toolbarUp && (sectionData.rowStates[i] == 1);
-        digitalWrite(gpioDefs.rowPins[i], active ? HIGH : LOW);
+        // Write active or inactive state based on rowActiveHigh setting
+        uint8_t activeState = gpioDefs.rowActiveHigh ? HIGH : LOW;
+        uint8_t inactiveState = gpioDefs.rowActiveHigh ? LOW : HIGH;
+        digitalWrite(gpioDefs.rowPins[i], active ? activeState : inactiveState);
     }
 
     // Update LED state: toolbar up = state 3, normal operation = state 1
@@ -230,6 +236,15 @@ void handleGetSettings(AsyncWebServerRequest *request) {
         net["ssid"] = espConfig.staCfg.ssids[i];
         net["pass"] = espConfig.staCfg.passwords[i];
     }
+    JsonArray rowPins = doc.createNestedArray("row_pins");
+    for (int i = 0; i < NUM_ROWS; i++) {
+        rowPins.add(espConfig.gpioDefs.rowPins[i]);
+    }
+    JsonArray toolbarPins = doc.createNestedArray("toolbar_pins");
+    for (int i = 0; i < 2; i++) {
+        toolbarPins.add(espConfig.gpioDefs.toolbarPins[i]);
+    }
+    doc["row_active_high"] = espConfig.gpioDefs.rowActiveHigh;
     String json;
     serializeJson(doc, json);
     request->send(200, "application/json", json);
@@ -330,6 +345,89 @@ void handleRemoveNetwork(AsyncWebServerRequest *request) {
     ESP.restart();
 }
 
+// Save row pins configuration and reboot
+void handleSaveRowPins(AsyncWebServerRequest *request) {
+    bool valid = true;
+    uint8_t newRowPins[NUM_ROWS];
+    
+    // Parse and validate all row pin parameters
+    for (int i = 0; i < NUM_ROWS; i++) {
+        String paramName = "row_pin_" + String(i);
+        if (request->hasParam(paramName, true)) {
+            int pinValue = request->getParam(paramName, true)->value().toInt();
+            // Validate pin number (ESP32 GPIO range, excluding some restricted pins)
+            if (pinValue < 0 || pinValue > 48) {
+                valid = false;
+                break;
+            }
+            newRowPins[i] = (uint8_t)pinValue;
+        } else {
+            valid = false;
+            break;
+        }
+    }
+    
+    if (!valid) {
+        request->send(400, "text/plain", "Invalid row pin configuration");
+        return;
+    }
+    
+    // Save to preferences and update runtime configuration
+    for (int i = 0; i < NUM_ROWS; i++) {
+        espConfig.gpioDefs.rowPins[i] = newRowPins[i];
+    }
+    
+    // Handle row active high/low setting
+    if (request->hasParam("row_active_high", true)) {
+        String value = request->getParam("row_active_high", true)->value();
+        espConfig.gpioDefs.rowActiveHigh = (value == "1" || value == "true");
+    }
+    
+    espConfig.updateRowPins();
+    
+    request->send(200, "text/plain", "Row pins saved. Rebooting...");
+    delay(500);
+    ESP.restart();
+}
+
+// Save toolbar pins configuration and reboot
+void handleSaveToolbarPins(AsyncWebServerRequest *request) {
+    bool valid = true;
+    uint8_t newToolbarPins[2];
+    
+    // Parse and validate toolbar pin parameters
+    for (int i = 0; i < 2; i++) {
+        String paramName = "toolbar_pin_" + String(i);
+        if (request->hasParam(paramName, true)) {
+            int pinValue = request->getParam(paramName, true)->value().toInt();
+            // Validate pin number (ESP32 GPIO range)
+            if (pinValue < 0 || pinValue > 48) {
+                valid = false;
+                break;
+            }
+            newToolbarPins[i] = (uint8_t)pinValue;
+        } else {
+            valid = false;
+            break;
+        }
+    }
+    
+    if (!valid) {
+        request->send(400, "text/plain", "Invalid toolbar pin configuration");
+        return;
+    }
+    
+    // Save to preferences and update runtime configuration
+    for (int i = 0; i < 2; i++) {
+        espConfig.gpioDefs.toolbarPins[i] = newToolbarPins[i];
+    }
+    espConfig.updateToolbarPins();
+    
+    request->send(200, "text/plain", "Toolbar pins saved. Rebooting...");
+    delay(500);
+    ESP.restart();
+}
+
 // Return current section states as JSON for the web UI
 void handleGetSections(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(512);
@@ -378,9 +476,10 @@ void setup() {
 
     espConfig.progData.confRes = espConfig.loadConfig();
 
-    // Setup row MOSFET outputs and toolbar input
+    // Setup row MOSFET outputs and toolbar inputs
     initRowOutputs();
-    pinMode(gpioDefs.TOOLBAR_PIN, INPUT_PULLDOWN);
+    pinMode(gpioDefs.toolbarPins[0], INPUT_PULLDOWN);
+    pinMode(gpioDefs.toolbarPins[1], INPUT_PULLDOWN);
     
     // Setup power relay (starts LOW, will turn on after boot)
     pinMode(gpioDefs.POWER_RELAY_PIN, OUTPUT);
@@ -419,6 +518,8 @@ void setup() {
     server.on("/saveSettings",   HTTP_POST, handleSaveSettings);
     server.on("/addNetwork",     HTTP_POST, handleAddNetwork);
     server.on("/removeNetwork",  HTTP_POST, handleRemoveNetwork);
+    server.on("/saveRowPins",    HTTP_POST, handleSaveRowPins);
+    server.on("/saveToolbarPins", HTTP_POST, handleSaveToolbarPins);
 
     // Upload & OTA
     server.on("/upload", HTTP_POST,

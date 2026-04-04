@@ -50,6 +50,25 @@ uint8_t ESPconfig::loadConfig() {
         staCfg.passwords[i][sizeof(staCfg.passwords[i]) - 1] = '\0';
     }
 
+    // Load row pins configuration
+    // Default values: {11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4}
+    const uint8_t defaultRowPins[NUM_ROWS] = {11, 10, 9, 8, 18, 17, 16, 15, 7, 6, 5, 4};
+    for (int i = 0; i < NUM_ROWS; i++) {
+        String key = "row_pin_" + String(i);
+        gpioDefs.rowPins[i] = (uint8_t)preferences.getInt(key.c_str(), defaultRowPins[i]);
+    }
+
+    // Load toolbar pins configuration
+    // Default values: {1, 2}
+    const uint8_t defaultToolbarPins[2] = {1, 2};
+    for (int i = 0; i < 2; i++) {
+        String key = "toolbar_pin_" + String(i);
+        gpioDefs.toolbarPins[i] = (uint8_t)preferences.getInt(key.c_str(), defaultToolbarPins[i]);
+    }
+
+    // Load row pin active state configuration (true = active HIGH, false = active LOW)
+    gpioDefs.rowActiveHigh = preferences.getBool("row_active_high", true);
+
     // Parse version string
     char versionBuf[64];
     strncpy(versionBuf, VERSION, sizeof(versionBuf) - 1);
@@ -75,5 +94,22 @@ uint8_t ESPconfig::updateIP() {
     preferences.putInt("ap_ip1", apCfg.ips[1]);
     preferences.putInt("ap_ip2", apCfg.ips[2]);
     preferences.putInt("ap_ip3", apCfg.ips[3]);
+    return 1;
+}
+
+uint8_t ESPconfig::updateRowPins() {
+    for (int i = 0; i < NUM_ROWS; i++) {
+        String key = "row_pin_" + String(i);
+        preferences.putInt(key.c_str(), gpioDefs.rowPins[i]);
+    }
+    preferences.putBool("row_active_high", gpioDefs.rowActiveHigh);
+    return 1;
+}
+
+uint8_t ESPconfig::updateToolbarPins() {
+    for (int i = 0; i < 2; i++) {
+        String key = "toolbar_pin_" + String(i);
+        preferences.putInt(key.c_str(), gpioDefs.toolbarPins[i]);
+    }
     return 1;
 }

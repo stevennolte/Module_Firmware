@@ -71,10 +71,41 @@ GDRIVE_SYNC_INTERVAL = int(os.environ.get("GDRIVE_SYNC_INTERVAL", "300"))
 
 _LOG_CSV_HEADER = ["timestamp", "module_name", "module_ip", "version", "data"]
 _SYNC_STATE_FILE = _SERVER_DIR / "sync_state.json"
+_USER_SETTINGS_FILE = _SERVER_DIR / "user_settings.json"
 
 app = Flask(__name__)
 
 # ── Helpers ───────────────────────────────────────────────────────────────
+
+def _load_user_settings() -> dict:
+    """Load user settings from JSON file. Returns default settings if file doesn't exist."""
+    default_settings = {
+        "visible_modules": [mod["name"] for mod in MODULES],  # All modules visible by default
+    }
+    try:
+        if _USER_SETTINGS_FILE.exists():
+            with open(_USER_SETTINGS_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        app.logger.warning(f"Failed to load user settings: {e}")
+    return default_settings
+
+
+def _save_user_settings(settings: dict) -> None:
+    """Save user settings to JSON file."""
+    try:
+        with open(_USER_SETTINGS_FILE, "w") as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        app.logger.error(f"Failed to save user settings: {e}")
+
+
+def _get_visible_modules() -> list:
+    """Get list of modules that should be visible based on user settings."""
+    settings = _load_user_settings()
+    visible_names = set(settings.get("visible_modules", []))
+    return [mod for mod in MODULES if mod["name"] in visible_names]
+
 
 def _github_headers() -> dict:
     h = {
@@ -461,7 +492,8 @@ def _gdrive_sync_loop() -> None:
 
 @app.route("/")
 def index():
-    return render_template("index.html", modules=MODULES,
+    visible_modules = _get_visible_modules()
+    return render_template("index.html", modules=visible_modules,
                            repo_owner=REPO_OWNER, repo_name=REPO_NAME)
 
 
@@ -477,10 +509,50 @@ def charts_viewer():
     return render_template("charts.html")
 
 
+@app.route("/settings")
+def settings_page():
+    """Settings page."""
+    return render_template("settings.html", all_modules=MODULES)
+
+
 @app.route("/style-guide")
 def style_guide():
     """UI style guide / design-standard reference page."""
     return render_template("style_guide.html")
+
+
+@app.route("/api/settings", methods=["GET"])
+def api_get_settings():
+    """Get current user settings."""
+    settings = _load_user_settings()
+    return jsonify(settings)
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_save_settings():
+    """Save user settings."""
+    try:
+        settings = request.get_json()
+        if not settings:
+            return jsonify({"error": "No settings provided"}), 400
+        
+        # Validate visible_modules
+        if "visible_modules" in settings:
+            valid_module_names = {mod["name"] for mod in MODULES}
+            visible_modules = settings["visible_modules"]
+            
+            if not isinstance(visible_modules, list):
+                return jsonify({"error": "visible_modules must be a list"}), 400
+            
+            # Filter out invalid module names
+            settings["visible_modules"] = [
+                name for name in visible_modules if name in valid_module_names
+            ]
+        
+        _save_user_settings(settings)
+        return jsonify({"success": True, "message": "Settings saved successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/modules")
