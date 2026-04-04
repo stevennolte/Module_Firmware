@@ -350,6 +350,30 @@
           statusEl.style.color = 'red';
         });
     }
+
+    function uploadFilesystem() {
+      const fileInput = document.getElementById('fsFile');
+      const statusEl = document.getElementById('fsStatus');
+      if (!fileInput.files.length) {
+        statusEl.textContent = 'Please select a filesystem image.';
+        statusEl.style.color = 'red';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('update', fileInput.files[0]);
+      statusEl.textContent = 'Uploading...';
+      statusEl.style.color = '#333';
+      fetch('/updatefs', { method: 'POST', body: formData })
+        .then(r => r.text())
+        .then(msg => {
+          statusEl.textContent = msg;
+          statusEl.style.color = msg.includes('complete') || msg.includes('Rebooting') ? 'green' : 'red';
+        })
+        .catch(err => {
+          statusEl.textContent = 'Upload error: ' + err;
+          statusEl.style.color = 'red';
+        });
+    }
   </script>
 </head>
 <body>
@@ -412,6 +436,15 @@
       <button onclick="uploadFirmware()">Update Firmware</button>
     </div>
     <p id="fwStatus" style="margin-top:8px;"></p>
+  </div>
+
+  <div class="card">
+    <h1>Filesystem Update</h1>
+    <div class="action-row">
+      <input type="file" id="fsFile" accept=".bin">
+      <button onclick="uploadFilesystem()">Flash Filesystem</button>
+    </div>
+    <p id="fsStatus" style="margin-top:8px;"></p>
   </div>
 
   <div class="card">
