@@ -212,19 +212,7 @@ void ESPudp::begin(ESPGPS* gps){
               // sendUDP(aioReply);
               // udp.writeTo(aioReply, sizeof(aioReply), espData->wifiCfg.moduleIP, espData->wifiCfg.aioPort);
               // aioReply[2] = 126;
-              delay(10);
-              if (espData->gps.imuState == 1){
-              aioReply[2] = 79;
-              aioReply[3] = 121;
-              aioReply[4] = 5;
-              aioReply[5] = 0;
-              aioReply[6] = 0;
-              aioReply[7] = 0;
-              aioReply[8] = 0;  
-              aioReply[9] = 0;
-              aioReply[10] = calcChecksum(aioReply, sizeof(aioReply));
-              udp.writeTo(aioReply, sizeof(aioReply), IPAddress(espData->wifi.ips[0],espData->wifi.ips[1], espData->wifi.ips[2],255) , espData->wifi.aioPort);
-              }// TODO: Send back a hello packet
+
               break;
             case 201:
               
