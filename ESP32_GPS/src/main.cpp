@@ -57,8 +57,8 @@
 
 // ── WiFi / network constants ───────────────────────────────────────────────
 
-#define AP_SSID       "NOLTE_FARM"
-#define AP_PASSWORD   "DontLoseMoney89"
+#define AP_SSID_DEFAULT       "ESP32_GPS"
+#define AP_PASSWORD_DEFAULT   "12345678"
 #define AP_CHANNEL    6
 #define AP_MAX_CLIENTS 8
 
@@ -80,6 +80,72 @@
 #define PORT_GPS    9999
 /// NTRIP corrections input port
 #define PORT_NTRIP  2233
+
+// ── Persistent settings ────────────────────────────────────────────────────
+
+/**
+ * @brief Persistent settings stored in LittleFS as /settings.json.
+ */
+struct AppSettings {
+    // WiFi STA credentials
+    char staSsid[64]     = STA_DEFAULT_SSID;
+    char staPassword[64] = STA_DEFAULT_PASSWORD;
+
+    // WiFi AP
+    bool apEnabled       = false;           ///< Start AP when STA fails
+    char apSsid[64]      = AP_SSID_DEFAULT;
+    char apPassword[64]  = AP_PASSWORD_DEFAULT;
+
+    // IMU behaviour
+    bool disableHeading  = false;
+    bool invertRoll      = true;
+    bool flipPitchRoll   = true;
+} appSettings;
+
+/// Load settings from LittleFS; keeps defaults when the file is absent/corrupt.
+static void loadSettings() {
+    if (!LittleFS.exists("/settings.json")) return;
+    File f = LittleFS.open("/settings.json", "r");
+    if (!f) return;
+    JsonDocument doc;
+    if (deserializeJson(doc, f) == DeserializationError::Ok) {
+        if (doc["staSsid"].is<const char*>())
+            strlcpy(appSettings.staSsid,     doc["staSsid"],     sizeof(appSettings.staSsid));
+        if (doc["staPassword"].is<const char*>())
+            strlcpy(appSettings.staPassword, doc["staPassword"], sizeof(appSettings.staPassword));
+        if (doc["apEnabled"].is<bool>())
+            appSettings.apEnabled = doc["apEnabled"];
+        if (doc["apSsid"].is<const char*>())
+            strlcpy(appSettings.apSsid,     doc["apSsid"],     sizeof(appSettings.apSsid));
+        if (doc["apPassword"].is<const char*>())
+            strlcpy(appSettings.apPassword, doc["apPassword"], sizeof(appSettings.apPassword));
+        if (doc["disableHeading"].is<bool>())
+            appSettings.disableHeading = doc["disableHeading"];
+        if (doc["invertRoll"].is<bool>())
+            appSettings.invertRoll = doc["invertRoll"];
+        if (doc["flipPitchRoll"].is<bool>())
+            appSettings.flipPitchRoll = doc["flipPitchRoll"];
+    }
+    f.close();
+}
+
+/// Persist current settings to LittleFS.
+static bool saveSettings() {
+    File f = LittleFS.open("/settings.json", "w");
+    if (!f) return false;
+    JsonDocument doc;
+    doc["staSsid"]       = appSettings.staSsid;
+    doc["staPassword"]   = appSettings.staPassword;
+    doc["apEnabled"]     = appSettings.apEnabled;
+    doc["apSsid"]        = appSettings.apSsid;
+    doc["apPassword"]    = appSettings.apPassword;
+    doc["disableHeading"]= appSettings.disableHeading;
+    doc["invertRoll"]    = appSettings.invertRoll;
+    doc["flipPitchRoll"] = appSettings.flipPitchRoll;
+    serializeJson(doc, f);
+    f.close();
+    return true;
+}
 
 // ── GPS / IMU data ─────────────────────────────────────────────────────────
 
@@ -1254,14 +1320,14 @@ static void startWiFiAP() {
     }
     
     // Start AP - try with hidden=false (explicitly visible)
-    Serial.printf("Starting AP: %s on channel %d\n", AP_SSID, AP_CHANNEL);
-    bool apStarted = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, false, AP_MAX_CLIENTS);
+    Serial.printf("Starting AP: %s on channel %d\n", appSettings.apSsid, AP_CHANNEL);
+    bool apStarted = WiFi.softAP(appSettings.apSsid, appSettings.apPassword, AP_CHANNEL, false, AP_MAX_CLIENTS);
     
     if (!apStarted) {
         Serial.println("ERROR: Failed to start AP!");
         // Try again on channel 1 as fallback
         Serial.println("Retrying on channel 1...");
-        apStarted = WiFi.softAP(AP_SSID, AP_PASSWORD, 1, false, AP_MAX_CLIENTS);
+        apStarted = WiFi.softAP(appSettings.apSsid, appSettings.apPassword, 1, false, AP_MAX_CLIENTS);
     }
     
     delay(500);
@@ -1279,7 +1345,7 @@ static void startWiFiAP() {
     
     if (WiFi.softAPgetStationNum() >= 0) {  // Check if AP functions are working
         Serial.printf("WiFi AP ACTIVE - SSID=%s  IP=%s\n",
-                      AP_SSID, WiFi.softAPIP().toString().c_str());
+                      appSettings.apSsid, WiFi.softAPIP().toString().c_str());
         Serial.printf("AP MAC: %s\n", WiFi.softAPmacAddress().c_str());
         Serial.printf("AP is broadcasting and should be visible\n");
     } else {
@@ -1300,7 +1366,7 @@ static void updateDebugVars() {
     debugVars.push_back("Version: "  + String(VERSION));
     debugVars.push_back("Uptime [s]: " + String(millis() / 1000.0f, 1));
     debugVars.push_back("Free Heap: " + String(ESP.getFreeHeap()) + " B");
-    debugVars.push_back("AP SSID: "  + String(AP_SSID));
+    debugVars.push_back("AP SSID: "  + String(appSettings.apSsid));
     debugVars.push_back("AP IP: "    + WiFi.softAPIP().toString());
     debugVars.push_back("AP Clients: " + String(WiFi.softAPgetStationNum()));
     debugVars.push_back("--- GPS ---");
@@ -1559,13 +1625,27 @@ void setup() {
         Serial.println("LittleFS mounted");
     }
 
+    // ── Load persistent settings ──────────────────────────────────────────
+    loadSettings();
+    Serial.printf("Settings loaded – STA SSID: %s  AP enabled: %s\n",
+                  appSettings.staSsid, appSettings.apEnabled ? "yes" : "no");
+
+    // Apply IMU settings from persistent config
+    gpsState.disableHeading = appSettings.disableHeading;
+    gpsState.invertRoll     = appSettings.invertRoll;
+    gpsState.flipPitchRoll  = appSettings.flipPitchRoll;
+
     // ── WiFi STA/Client ───────────────────────────────────────────────────
     // Try connecting to WiFi network first (60 second timeout)
-    bool staConnected = connectWiFiSTA(STA_DEFAULT_SSID, STA_DEFAULT_PASSWORD, 60000);
+    bool staConnected = connectWiFiSTA(appSettings.staSsid, appSettings.staPassword, 60000);
     
     if (!staConnected) {
-        Serial.println("STA connection failed - starting AP mode");
-        startWiFiAP();
+        if (appSettings.apEnabled) {
+            Serial.println("STA connection failed - starting AP mode");
+            startWiFiAP();
+        } else {
+            Serial.println("STA connection failed - AP mode disabled by settings");
+        }
     } else {
         Serial.println("WiFi connected - AP mode not needed");
     }
@@ -1602,10 +1682,76 @@ void setup() {
     server.on("/map.html", HTTP_GET, [](AsyncWebServerRequest* r) {
         r->send(LittleFS, "/map.html", "text/html");
     });
+    server.on("/settings.html", HTTP_GET, [](AsyncWebServerRequest* r) {
+        r->send(LittleFS, "/settings.html", "text/html");
+    });
     server.on("/getDebugVars", HTTP_GET, handleDebugVars);
     server.on("/getGpsPos",    HTTP_GET, handleGpsPos);
     server.on("/getFiles",     HTTP_GET, handleFileList);
     server.on("/reboot",       HTTP_GET, handleReboot);
+
+    // Settings
+    server.on("/getSettings", HTTP_GET, [](AsyncWebServerRequest* r) {
+        JsonDocument doc;
+        doc["staSsid"]        = appSettings.staSsid;
+        doc["staPassword"]    = appSettings.staPassword;
+        doc["apEnabled"]      = appSettings.apEnabled;
+        doc["apSsid"]         = appSettings.apSsid;
+        doc["apPassword"]     = appSettings.apPassword;
+        doc["disableHeading"] = appSettings.disableHeading;
+        doc["invertRoll"]     = appSettings.invertRoll;
+        doc["flipPitchRoll"]  = appSettings.flipPitchRoll;
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+    server.on("/saveSettings", HTTP_POST, [](AsyncWebServerRequest* r) {
+        auto param = [&](const char* key, bool isBody = true) -> String {
+            return r->hasParam(key, isBody) ? r->getParam(key, isBody)->value() : String();
+        };
+        auto boolParam = [&](const char* key, bool current) -> bool {
+            if (!r->hasParam(key, true)) return current;
+            String v = r->getParam(key, true)->value();
+            return v == "1" || v == "true" || v == "on";
+        };
+
+        String ss = param("staSsid");
+        if (ss.length() > 0 && ss.length() < (int)sizeof(appSettings.staSsid))
+            strlcpy(appSettings.staSsid, ss.c_str(), sizeof(appSettings.staSsid));
+
+        String sp = param("staPassword");
+        if (sp.length() > 0 && sp.length() < (int)sizeof(appSettings.staPassword))
+            strlcpy(appSettings.staPassword, sp.c_str(), sizeof(appSettings.staPassword));
+
+        appSettings.apEnabled = boolParam("apEnabled", appSettings.apEnabled);
+
+        String apSsidParam = param("apSsid");
+        if (apSsidParam.length() > 0 && apSsidParam.length() < (int)sizeof(appSettings.apSsid))
+            strlcpy(appSettings.apSsid, apSsidParam.c_str(), sizeof(appSettings.apSsid));
+
+        String ap = param("apPassword");
+        if (ap.length() > 0 && ap.length() < (int)sizeof(appSettings.apPassword))
+            strlcpy(appSettings.apPassword, ap.c_str(), sizeof(appSettings.apPassword));
+
+        appSettings.disableHeading = boolParam("disableHeading", appSettings.disableHeading);
+        appSettings.invertRoll     = boolParam("invertRoll",     appSettings.invertRoll);
+        appSettings.flipPitchRoll  = boolParam("flipPitchRoll",  appSettings.flipPitchRoll);
+
+        // Apply IMU settings immediately
+        gpsState.disableHeading = appSettings.disableHeading;
+        gpsState.invertRoll     = appSettings.invertRoll;
+        gpsState.flipPitchRoll  = appSettings.flipPitchRoll;
+
+        bool ok = saveSettings();
+        Serial.printf("Settings saved: STA=%s apEnabled=%d\n", appSettings.staSsid, appSettings.apEnabled);
+        if (ok) {
+            r->send(200, "text/plain", "Settings saved. Rebooting...");
+            delay(500);
+            ESP.restart();
+        } else {
+            r->send(500, "text/plain", "Failed to save settings.");
+        }
+    });
 
     // PANDA broadcast control
     server.on("/getGpsForwarding", HTTP_GET, [](AsyncWebServerRequest* r) {
@@ -1749,7 +1895,7 @@ void setup() {
         Serial.printf("Setup complete – STA Mode  IP: %s\n", WiFi.localIP().toString().c_str());
     } else {
         Serial.printf("Setup complete – AP: %s  IP: %s\n",
-                      AP_SSID, WiFi.softAPIP().toString().c_str());
+                      appSettings.apSsid, WiFi.softAPIP().toString().c_str());
     }
 }
 
