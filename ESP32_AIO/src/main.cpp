@@ -383,6 +383,7 @@ void handleFirmwareUpload(AsyncWebServerRequest *request, String filename, size_
       fwUpdateSkip = true;
     } else if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
       Update.printError(Serial);
+      fwUpdateSkip = true;
     }
   }
 
