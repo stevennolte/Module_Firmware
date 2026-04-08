@@ -3,7 +3,7 @@
 
 #include "Arduino.h"
 
-#define VERSION "1.0.0119"
+#define VERSION "1.0.0120"
 #define NAME "ESP32_Row_Controller"
 
 #endif
