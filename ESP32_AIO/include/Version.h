@@ -24,7 +24,7 @@
 #include "Arduino.h"
 
 /// @brief Current firmware version string (MAJOR.MINOR.PATCH format)
-#define VERSION "1.1.0052"
+#define VERSION "1.1.0053"
 
 /// @brief Program name identifier used for network identification and display
 #define NAME "ESP32_AIO"
