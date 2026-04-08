@@ -1472,6 +1472,7 @@ static void handleFirmwareUpload(AsyncWebServerRequest* req, String filename,
             fwUpdateSkip = true;
         } else if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             Update.printError(Serial);
+            fwUpdateSkip = true;
         }
     }
     if (fwUpdateSkip) {

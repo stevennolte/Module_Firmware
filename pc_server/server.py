@@ -575,10 +575,15 @@ def api_modules():
                 entry["current_name"]    = ver.get("name",    mod["name"])
         return entry
     
+    # Only return modules that are visible in the UI
+    visible_modules = _get_visible_modules()
+    if not visible_modules:
+        return jsonify([])
+
     # Check all modules in parallel for faster response
     result = []
-    with ThreadPoolExecutor(max_workers=len(MODULES)) as executor:
-        future_to_mod = {executor.submit(check_module, mod): mod for mod in MODULES}
+    with ThreadPoolExecutor(max_workers=len(visible_modules)) as executor:
+        future_to_mod = {executor.submit(check_module, mod): mod for mod in visible_modules}
         for future in as_completed(future_to_mod):
             try:
                 result.append(future.result())

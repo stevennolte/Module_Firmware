@@ -35,6 +35,7 @@ void handleFirmwareUpload(AsyncWebServerRequest* request, String filename,
             fwUpdateSkip = true;
         } else if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
             Update.printError(Serial);
+            fwUpdateSkip = true;
         }
     }
     if (fwUpdateSkip) {
