@@ -170,6 +170,7 @@ uint8_t ESPdata::loadConfig(){
     apCfg.maxClients = (uint8_t)preferences.getInt("ap_max", 8);
     {
         String apSSID = preferences.getString("ap_ssid", NAME);
+        if (apSSID == "NOLTE_FARM" || apSSID.isEmpty()) apSSID = NAME;
         String apPass = preferences.getString("ap_pass", "1234567890");
         strncpy(apCfg.ssid,     apSSID.c_str(), sizeof(apCfg.ssid) - 1);
         strncpy(apCfg.password, apPass.c_str(),  sizeof(apCfg.password) - 1);
