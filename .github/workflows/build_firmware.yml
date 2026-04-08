@@ -16,10 +16,15 @@ jobs:
     name: Build ESP32_AIO
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # Required to create GitHub Releases
+      contents: write   # Required to create GitHub Releases and push version bumps
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,17 +41,23 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio
 
-      - name: Extract version info (pre-build)
+      - name: Increment version and extract info
         id: info
         working-directory: ESP32_AIO
         run: |
           VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
-          echo "version=$VERSION"   >> $GITHUB_OUTPUT
-          echo "name=$NAME"         >> $GITHUB_OUTPUT
-          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
-          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
-          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH_WIDTH=${#PATCH}
+          PATCH_NUM=$((10#$PATCH))
+          NEW_PATCH=$(printf "%0${PATCH_WIDTH}d" $((PATCH_NUM + 1)))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          sed -i "s/#define VERSION \"${VERSION}\"/#define VERSION \"${NEW_VERSION}\"/" include/Version.h
+          echo "version=$NEW_VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"             >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${NEW_VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${NEW_VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
 
       - name: Build ESP32_AIO firmware
         working-directory: ESP32_AIO
@@ -62,6 +73,15 @@ jobs:
              "${{ steps.info.outputs.binary }}"
           cp ESP32_AIO/.pio/build/esp32-s3-devkitc-1/littlefs.bin \
              "${{ steps.info.outputs.fs_binary }}"
+
+      - name: Commit and push version bump
+        run: |
+          git add ESP32_AIO/include/Version.h
+          git commit -m "chore: bump ESP32_AIO version to ${{ steps.info.outputs.version }} [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep $((i * 5))
+          done || exit 1
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -104,10 +124,15 @@ jobs:
     name: Build ESP32_Row_Controller
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # Required to create GitHub Releases
+      contents: write   # Required to create GitHub Releases and push version bumps
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -124,17 +149,23 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio
 
-      - name: Extract version info (pre-build)
+      - name: Increment version and extract info
         id: info
         working-directory: ESP32_Row_Controller
         run: |
           VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
-          echo "version=$VERSION"   >> $GITHUB_OUTPUT
-          echo "name=$NAME"         >> $GITHUB_OUTPUT
-          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
-          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
-          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH_WIDTH=${#PATCH}
+          PATCH_NUM=$((10#$PATCH))
+          NEW_PATCH=$(printf "%0${PATCH_WIDTH}d" $((PATCH_NUM + 1)))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          sed -i "s/#define VERSION \"${VERSION}\"/#define VERSION \"${NEW_VERSION}\"/" include/Version.h
+          echo "version=$NEW_VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"             >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${NEW_VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${NEW_VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
 
       - name: Build ESP32_Row_Controller firmware
         working-directory: ESP32_Row_Controller
@@ -150,6 +181,15 @@ jobs:
              "${{ steps.info.outputs.binary }}"
           cp ESP32_Row_Controller/.pio/build/esp32-s3-devkitc-1/littlefs.bin \
              "${{ steps.info.outputs.fs_binary }}"
+
+      - name: Commit and push version bump
+        run: |
+          git add ESP32_Row_Controller/include/Version.h
+          git commit -m "chore: bump ESP32_Row_Controller version to ${{ steps.info.outputs.version }} [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep $((i * 5))
+          done || exit 1
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -191,10 +231,15 @@ jobs:
     name: Build ESP32_WiFi_AP
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # Required to create GitHub Releases
+      contents: write   # Required to create GitHub Releases and push version bumps
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -211,17 +256,23 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio
 
-      - name: Extract version info (pre-build)
+      - name: Increment version and extract info
         id: info
         working-directory: ESP32_WiFi_AP
         run: |
           VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
-          echo "version=$VERSION"   >> $GITHUB_OUTPUT
-          echo "name=$NAME"         >> $GITHUB_OUTPUT
-          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
-          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
-          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH_WIDTH=${#PATCH}
+          PATCH_NUM=$((10#$PATCH))
+          NEW_PATCH=$(printf "%0${PATCH_WIDTH}d" $((PATCH_NUM + 1)))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          sed -i "s/#define VERSION \"${VERSION}\"/#define VERSION \"${NEW_VERSION}\"/" include/Version.h
+          echo "version=$NEW_VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"             >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${NEW_VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${NEW_VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
 
       - name: Build ESP32_WiFi_AP firmware
         working-directory: ESP32_WiFi_AP
@@ -237,6 +288,15 @@ jobs:
              "${{ steps.info.outputs.binary }}"
           cp ESP32_WiFi_AP/.pio/build/esp32-s3-devkitc-1/littlefs.bin \
              "${{ steps.info.outputs.fs_binary }}"
+
+      - name: Commit and push version bump
+        run: |
+          git add ESP32_WiFi_AP/include/Version.h
+          git commit -m "chore: bump ESP32_WiFi_AP version to ${{ steps.info.outputs.version }} [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep $((i * 5))
+          done || exit 1
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -278,10 +338,15 @@ jobs:
     name: Build ESP32_GPS
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # Required to create GitHub Releases
+      contents: write   # Required to create GitHub Releases and push version bumps
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -298,17 +363,23 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio
 
-      - name: Extract version info (pre-build)
+      - name: Increment version and extract info
         id: info
         working-directory: ESP32_GPS
         run: |
           VERSION=$(grep '#define VERSION "' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
           NAME=$(grep '#define NAME' include/Version.h | sed 's/.*"\(.*\)".*/\1/')
-          echo "version=$VERSION"   >> $GITHUB_OUTPUT
-          echo "name=$NAME"         >> $GITHUB_OUTPUT
-          echo "tag=${NAME}_${VERSION}" >> $GITHUB_OUTPUT
-          echo "binary=${NAME}_${VERSION}.bin" >> $GITHUB_OUTPUT
-          echo "fs_binary=${NAME}_${VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH_WIDTH=${#PATCH}
+          PATCH_NUM=$((10#$PATCH))
+          NEW_PATCH=$(printf "%0${PATCH_WIDTH}d" $((PATCH_NUM + 1)))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          sed -i "s/#define VERSION \"${VERSION}\"/#define VERSION \"${NEW_VERSION}\"/" include/Version.h
+          echo "version=$NEW_VERSION"   >> $GITHUB_OUTPUT
+          echo "name=$NAME"             >> $GITHUB_OUTPUT
+          echo "tag=${NAME}_${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "binary=${NAME}_${NEW_VERSION}.bin" >> $GITHUB_OUTPUT
+          echo "fs_binary=${NAME}_${NEW_VERSION}.littlefs.bin" >> $GITHUB_OUTPUT
 
       - name: Build ESP32_GPS firmware
         working-directory: ESP32_GPS
@@ -324,6 +395,15 @@ jobs:
              "${{ steps.info.outputs.binary }}"
           cp ESP32_GPS/.pio/build/seeed_xiao_esp32s3/littlefs.bin \
              "${{ steps.info.outputs.fs_binary }}"
+
+      - name: Commit and push version bump
+        run: |
+          git add ESP32_GPS/include/Version.h
+          git commit -m "chore: bump ESP32_GPS version to ${{ steps.info.outputs.version }} [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep $((i * 5))
+          done || exit 1
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
