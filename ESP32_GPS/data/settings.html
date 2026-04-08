@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - ESP32 GPS Module</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 16px; }
+    header { background: #1565c0; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+    header h1 { font-size: 1.4rem; }
+    header .sub { font-size: 0.85rem; opacity: 0.8; }
+    nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0d47a1; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 20px; margin-bottom: 20px; max-width: 560px; }
+    .card h2 { font-size: 0.95rem; color: #555; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .05em; }
+    .field { display: flex; flex-direction: column; margin-bottom: 14px; }
+    .field label { font-size: 0.85rem; color: #555; margin-bottom: 4px; }
+    .field input[type="text"],
+    .field input[type="password"] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; width: 100%; }
+    .field input[type="text"]:focus,
+    .field input[type="password"]:focus { outline: none; border-color: #1565c0; }
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+    .toggle-row label { font-size: 0.875rem; color: #444; }
+    .toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 24px; transition: background 0.2s; }
+    .slider::before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
+    input:checked + .slider { background: #1565c0; }
+    input:checked + .slider::before { transform: translateX(20px); }
+    .btn { display: inline-block; padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: bold; color: white; transition: background 0.2s; }
+    .btn-primary { background: #1565c0; } .btn-primary:hover { background: #0d47a1; }
+    .status { margin-top: 14px; font-size: 0.85rem; padding: 8px 12px; border-radius: 6px; display: none; }
+    .status-ok  { background: #d4edda; color: #155724; }
+    .status-err { background: #f8d7da; color: #721c24; }
+    .hint { font-size: 0.78rem; color: #888; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GPS Module &ndash; Settings</h1>
+    <div class="sub">Changes are saved to flash and take effect after reboot.</div>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Status</a>
+  <a href="map.html">Map</a>
+  <a href="settings.html">Settings</a>
+</nav>
+
+<form id="settingsForm">
+
+  <!-- WiFi STA -->
+  <div class="card">
+    <h2>WiFi &ndash; Station (Client)</h2>
+    <div class="field">
+      <label for="staSsid">Network SSID</label>
+      <input type="text" id="staSsid" name="staSsid" maxlength="63" pattern="[ -~]+" title="Printable characters only" placeholder="e.g. MyFarmNetwork">
+    </div>
+    <div class="field">
+      <label for="staPassword">Password</label>
+      <input type="password" id="staPassword" name="staPassword" maxlength="63" placeholder="WiFi password">
+    </div>
+    <p class="hint">The module connects to this network on boot. If the connection fails and AP mode is enabled below, an access point is started instead.</p>
+  </div>
+
+  <!-- WiFi AP -->
+  <div class="card">
+    <h2>WiFi &ndash; Access Point (Fallback)</h2>
+    <div class="toggle-row">
+      <label for="apEnabled">Enable AP when STA fails</label>
+      <label class="toggle">
+        <input type="checkbox" id="apEnabled" name="apEnabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="apSsid">AP SSID</label>
+      <input type="text" id="apSsid" name="apSsid" maxlength="63" pattern="[ -~]+" title="Printable characters only" placeholder="e.g. ESP32_GPS">
+    </div>
+    <div class="field">
+      <label for="apPassword">AP Password</label>
+      <input type="password" id="apPassword" name="apPassword" maxlength="63" minlength="8" placeholder="min 8 characters">
+    </div>
+    <p class="hint">The AP IP address is always 192.168.5.1.</p>
+  </div>
+
+  <!-- IMU -->
+  <div class="card">
+    <h2>IMU Orientation</h2>
+    <div class="toggle-row">
+      <label for="disableHeading">Disable IMU heading (send 0)</label>
+      <label class="toggle">
+        <input type="checkbox" id="disableHeading" name="disableHeading">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row" style="margin-top:8px;">
+      <label for="invertRoll">Invert roll axis</label>
+      <label class="toggle">
+        <input type="checkbox" id="invertRoll" name="invertRoll">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row" style="margin-top:8px;">
+      <label for="flipPitchRoll">Swap pitch &amp; roll axes</label>
+      <label class="toggle">
+        <input type="checkbox" id="flipPitchRoll" name="flipPitchRoll">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-primary" onclick="saveSettings()">Save &amp; Reboot</button>
+  <div id="status" class="status"></div>
+
+</form>
+
+<script>
+  function showStatus(msg, isError) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = 'status ' + (isError ? 'status-err' : 'status-ok');
+    el.style.display = 'block';
+  }
+
+  function loadSettings() {
+    fetch('/getSettings')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('staSsid').value       = d.staSsid     || '';
+        document.getElementById('staPassword').value   = d.staPassword  || '';
+        document.getElementById('apEnabled').checked   = !!d.apEnabled;
+        document.getElementById('apSsid').value        = d.apSsid      || '';
+        document.getElementById('apPassword').value    = d.apPassword   || '';
+        document.getElementById('disableHeading').checked = !!d.disableHeading;
+        document.getElementById('invertRoll').checked     = !!d.invertRoll;
+        document.getElementById('flipPitchRoll').checked  = !!d.flipPitchRoll;
+      })
+      .catch(e => showStatus('Failed to load settings: ' + e, true));
+  }
+
+  function saveSettings() {
+    const apPwd = document.getElementById('apPassword').value;
+    const apEnabled = document.getElementById('apEnabled').checked;
+    if (apEnabled && apPwd.length > 0 && apPwd.length < 8) {
+      showStatus('AP password must be at least 8 characters.', true);
+      return;
+    }
+    const data = new URLSearchParams();
+    data.append('staSsid',        document.getElementById('staSsid').value);
+    data.append('staPassword',    document.getElementById('staPassword').value);
+    data.append('apEnabled',      document.getElementById('apEnabled').checked  ? '1' : '0');
+    data.append('apSsid',         document.getElementById('apSsid').value);
+    data.append('apPassword',     document.getElementById('apPassword').value);
+    data.append('disableHeading', document.getElementById('disableHeading').checked ? '1' : '0');
+    data.append('invertRoll',     document.getElementById('invertRoll').checked     ? '1' : '0');
+    data.append('flipPitchRoll',  document.getElementById('flipPitchRoll').checked  ? '1' : '0');
+
+    fetch('/saveSettings', { method: 'POST', body: data })
+      .then(r => r.text())
+      .then(msg => showStatus(msg, false))
+      .catch(e  => showStatus('Save failed: ' + e, true));
+  }
+
+  window.onload = loadSettings;
+</script>
+</body>
+</html>
