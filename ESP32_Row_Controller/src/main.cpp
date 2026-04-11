@@ -152,6 +152,10 @@ void updateDebugVars() {
     debugVars.push_back("Program State: " + String(progData.state));
     debugVars.push_back("Speed: " + String(sectionData.speed));
     debugVars.push_back("Toolbar Up: " + String(sectionData.toolbarUp ? "YES" : "NO"));
+    debugVars.push_back("Toolbar Pin 1 (GPIO " + String(espConfig.gpioDefs.toolbarPins[0]) + "): " + 
+                        String(digitalRead(espConfig.gpioDefs.toolbarPins[0]) == HIGH ? "HIGH" : "LOW"));
+    debugVars.push_back("Toolbar Pin 2 (GPIO " + String(espConfig.gpioDefs.toolbarPins[1]) + "): " + 
+                        String(digitalRead(espConfig.gpioDefs.toolbarPins[1]) == HIGH ? "HIGH" : "LOW"));
     debugVars.push_back("Last Section Msg [ms ago]: " +
                         String(millis() - sectionData.lastSectionMsg));
     for (int i = 0; i < NUM_ROWS; i++) {

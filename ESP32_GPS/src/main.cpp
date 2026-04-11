@@ -1636,8 +1636,8 @@ void setup() {
     gpsState.flipPitchRoll  = appSettings.flipPitchRoll;
 
     // ── WiFi STA/Client ───────────────────────────────────────────────────
-    // Try connecting to WiFi network first (60 second timeout)
-    bool staConnected = connectWiFiSTA(appSettings.staSsid, appSettings.staPassword, 60000);
+    // Try connecting to WiFi network first (120 second timeout)
+    bool staConnected = connectWiFiSTA(appSettings.staSsid, appSettings.staPassword, 120000);
     
     if (!staConnected) {
         if (appSettings.apEnabled) {
