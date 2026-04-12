@@ -167,32 +167,32 @@ def get_module_debug_vars(ip: str) -> list | None:
     return None
 
 
-# Simple in-process release cache  {module_name: (timestamp, release_dict | None)}
+# In-process release caches.
+# _all_releases_cache: {module_name: (timestamp, list[release_dict])}
+# _release_cache:      {module_name: (timestamp, release_dict | None)}  – latest only
+_all_releases_cache: dict = {}
 _release_cache: dict = {}
 _release_cache_lock = threading.Lock()
 
 
-def get_latest_release(module_name: str) -> dict | None:
+def get_all_releases(module_name: str) -> list:
     """
-    Fetch the latest GitHub release whose tag starts with <module_name>.
-    Returns a dict with keys: version, tag, download_url, asset_name, published_at,
-    and optionally fs_download_url, fs_asset_name if a LittleFS image is present.
-    Returns None if nothing is found.
+    Fetch every GitHub release whose tag starts with <module_name>.
+    Returns a list of dicts (newest version first) with keys:
+      version, tag, download_url, asset_name, published_at,
+      and optionally fs_download_url, fs_asset_name.
+    Returns an empty list if nothing is found.
     """
     with _release_cache_lock:
-        cached = _release_cache.get(module_name)
+        cached = _all_releases_cache.get(module_name)
         if cached and (time.time() - cached[0]) < RELEASE_CACHE_TTL:
             return cached[1]
 
-    result = None
     candidates = []
     try:
-        url = (
-            f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases"
-        )
+        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases"
         r = requests.get(url, headers=_github_headers(), timeout=10)
         if r.status_code == 200:
-            # Collect all matching releases
             for release in r.json():
                 tag: str = release.get("tag_name", "")
                 if not tag.startswith(module_name):
@@ -206,17 +206,13 @@ def get_latest_release(module_name: str) -> dict | None:
                     if not (aname.endswith(".bin") and module_name in aname):
                         continue
                     if aname.endswith(".littlefs.bin"):
-                        # Filesystem image asset
                         fs_url = asset["browser_download_url"]
                         fs_name = aname
                     else:
-                        # Firmware binary asset (first non-filesystem .bin wins)
                         if fw_url is None:
                             fw_url = asset["browser_download_url"]
                             fw_name = aname
                 if fw_url:
-                    # Strip the leading "MODULE_NAME_" prefix from the tag
-                    # to get just the version string.
                     ver_str = tag[len(module_name):].lstrip("_").lstrip("v")
                     entry = {
                         "version":      ver_str,
@@ -229,22 +225,39 @@ def get_latest_release(module_name: str) -> dict | None:
                         entry["fs_download_url"] = fs_url
                         entry["fs_asset_name"]   = fs_name
                     candidates.append(entry)
-            
-            # Find the release with the highest version number
-            if candidates:
-                try:
-                    result = max(candidates, key=lambda x: pkg_version.parse(x["version"]))
-                except Exception as ver_err:
-                    app.logger.warning("Version parsing failed for %s: %s. Using first match.", module_name, ver_err)
-                    result = candidates[0]
+
+            # Sort descending by version number (newest first)
+            try:
+                candidates.sort(key=lambda x: pkg_version.parse(x["version"]), reverse=True)
+            except Exception as ver_err:
+                app.logger.warning("Version sort failed for %s: %s.", module_name, ver_err)
         else:
             app.logger.error(
                 "GitHub API request failed for %s: HTTP %d - %s",
                 module_name, r.status_code, r.text[:200]
             )
-                    
     except Exception as e:
         app.logger.warning("GitHub release lookup failed for %s: %s", module_name, e)
+
+    with _release_cache_lock:
+        _all_releases_cache[module_name] = (time.time(), candidates)
+
+    return candidates
+
+
+def get_latest_release(module_name: str) -> dict | None:
+    """
+    Return the release with the highest version for <module_name>.
+    Uses get_all_releases() so the two caches stay in sync.
+    Returns None if nothing is found.
+    """
+    with _release_cache_lock:
+        cached = _release_cache.get(module_name)
+        if cached and (time.time() - cached[0]) < RELEASE_CACHE_TTL:
+            return cached[1]
+
+    all_releases = get_all_releases(module_name)
+    result = all_releases[0] if all_releases else None
 
     with _release_cache_lock:
         _release_cache[module_name] = (time.time(), result)
@@ -639,10 +652,10 @@ def api_refresh_github_version(name: str):
     if not mod:
         return jsonify({"error": "Unknown module"}), 404
 
-    # Clear the cache for this module
+    # Clear both caches for this module
     with _release_cache_lock:
-        if name in _release_cache:
-            del _release_cache[name]
+        _release_cache.pop(name, None)
+        _all_releases_cache.pop(name, None)
 
     # Fetch fresh data from GitHub
     release = get_latest_release(name)
@@ -651,11 +664,23 @@ def api_refresh_github_version(name: str):
     return jsonify(release)
 
 
+@app.route("/api/module/<name>/releases")
+def api_all_releases(name: str):
+    """Return all available GitHub releases for the named module, newest first."""
+    mod = next((m for m in MODULES if m["name"] == name), None)
+    if not mod:
+        return jsonify({"error": "Unknown module"}), 404
+
+    releases = get_all_releases(name)
+    return jsonify(releases)
+
+
 @app.route("/api/module/<name>/update", methods=["POST"])
 def api_push_update(name: str):
     """
-    Download the latest firmware (and filesystem image if available) from GitHub
-    and push them to the module via OTA.
+    Download firmware (and filesystem image if available) from GitHub and push
+    via OTA.  An optional JSON body may contain a ``tag`` field to select a
+    specific release; when omitted the latest release is used.
     If a filesystem image is present in the release, it is pushed first via
     /updatefs, the module reboots, and then the firmware is pushed via /update.
     """
@@ -667,9 +692,18 @@ def api_push_update(name: str):
     if not ip:
         return jsonify({"error": "Module not reachable on network"}), 503
 
-    release = get_latest_release(name)
-    if not release:
-        return jsonify({"error": "No firmware release found on GitHub"}), 404
+    # Resolve which release to push
+    body = request.get_json(silent=True) or {}
+    requested_tag = body.get("tag", "").strip()
+    if requested_tag:
+        all_releases = get_all_releases(name)
+        release = next((r for r in all_releases if r["tag"] == requested_tag), None)
+        if not release:
+            return jsonify({"error": f"Release tag '{requested_tag}' not found"}), 404
+    else:
+        release = get_latest_release(name)
+        if not release:
+            return jsonify({"error": "No firmware release found on GitHub"}), 404
 
     # ── Step 1: Push filesystem image (if available) ──────────────────────
     if release.get("fs_download_url"):

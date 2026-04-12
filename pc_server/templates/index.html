@@ -140,6 +140,13 @@
           </div>
         </div>
 
+        <div class="info-row" id="ver-select-row-{{ mod.name }}" style="margin-top:8px; display:none;">
+          <label for="ver-select-{{ mod.name }}" style="font-size:0.85rem; color:#555;">Push version:</label>
+          <select id="ver-select-{{ mod.name }}" style="flex:1; padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;"
+                  onchange="onVersionSelectChange('{{ mod.name }}')">
+          </select>
+        </div>
+
         <div class="action-row">
           <button class="btn btn-primary btn-sm" id="btn-update-fw-{{ mod.name }}"
                   onclick="pushFirmwareUpdate('{{ mod.name }}')" disabled>
@@ -279,6 +286,9 @@
         fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
       }
 
+      // Load the full release list into the version selector
+      await loadVersionSelector(name, rel.tag);
+
       const fwBtn = document.getElementById('btn-update-fw-' + name);
       const fsBtn = document.getElementById('btn-update-fs-' + name);
       if (rel.version && currentVersion) {
@@ -305,6 +315,61 @@
     }
   }
 
+  // ── Version selector ───────────────────────────────────────────────────
+  // releases store: { module_name: [ {version, tag, fs_download_url, ...} ] }
+  const _releasesStore = {};
+
+  async function loadVersionSelector(name, selectedTag) {
+    try {
+      const res = await fetch('/api/module/' + name + '/releases');
+      if (!res.ok) return;
+      const releases = await res.json();
+      _releasesStore[name] = releases;
+
+      const sel = document.getElementById('ver-select-' + name);
+      const row = document.getElementById('ver-select-row-' + name);
+      if (!sel || !row) return;
+
+      sel.innerHTML = '';
+      releases.forEach((r, idx) => {
+        const opt = document.createElement('option');
+        opt.value = r.tag;
+        const latestLabel = idx === 0 ? ' (latest)' : '';
+        opt.textContent = `v${r.version}${latestLabel}`;
+        if (r.tag === selectedTag) opt.selected = true;
+        sel.appendChild(opt);
+      });
+
+      row.style.display = releases.length > 1 ? '' : 'none';
+    } catch (e) {
+      // Non-critical – selector simply won't appear
+    }
+  }
+
+  function getSelectedRelease(name) {
+    const sel = document.getElementById('ver-select-' + name);
+    const tag = sel ? sel.value : null;
+    const releases = _releasesStore[name] || [];
+    return releases.find(r => r.tag === tag) || null;
+  }
+
+  function onVersionSelectChange(name) {
+    const rel = getSelectedRelease(name);
+    if (!rel) return;
+    const currentVersion = document.getElementById('dev-ver-' + name).textContent;
+    const fwBtn = document.getElementById('btn-update-fw-' + name);
+    const fsBtn = document.getElementById('btn-update-fs-' + name);
+    const fsEl  = document.getElementById('gh-fs-' + name);
+    if (fwBtn) fwBtn.disabled = false;
+    if (fsBtn) fsBtn.disabled = !rel.fs_download_url;
+    if (fsEl)  fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
+    document.getElementById('gh-ver-' + name).textContent = rel.version || '—';
+    if (rel.version && currentVersion && currentVersion !== '—') {
+      const arrow = rel.version !== currentVersion ? `${currentVersion} → ${rel.version}` : `v${currentVersion} (same)`;
+      setMsg(name, `Selected: ${arrow}`, 'info');
+    }
+  }
+
   // ── Refresh GitHub Version ─────────────────────────────────────────────
   async function refreshGitHubVersion(name) {
     const btn = document.getElementById('btn-gh-refresh-' + name);
@@ -328,6 +393,9 @@
       if (fsEl) {
         fsEl.textContent = rel.fs_download_url ? '📦 includes web UI image' : '';
       }
+
+      // Reload the version selector with fresh data
+      await loadVersionSelector(name, rel.tag);
 
       // Refresh module status to update comparison
       const currentVersion = document.getElementById('dev-ver-' + name).textContent;
@@ -387,10 +455,17 @@
   async function pushFirmwareUpdate(name) {
     const btn = document.getElementById('btn-update-fw-' + name);
     btn.disabled = true;
-    setMsg(name, 'Downloading firmware from GitHub and pushing to module…', 'info');
+    const rel = getSelectedRelease(name);
+    const tagDesc = rel ? `v${rel.version}` : 'latest';
+    setMsg(name, `Downloading firmware ${tagDesc} from GitHub and pushing to module…`, 'info');
 
     try {
-      const res  = await fetch('/api/module/' + name + '/update', { method: 'POST' });
+      const body = rel ? { tag: rel.tag } : {};
+      const res  = await fetch('/api/module/' + name + '/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
         const fsNote = data.filesystem_updated ? ' (filesystem + firmware updated)' : '';
@@ -410,11 +485,18 @@
   async function pushFilesystemUpdate(name) {
     const btn = document.getElementById('btn-update-fs-' + name);
     btn.disabled = true;
-    setMsg(name, 'Downloading filesystem image from GitHub and pushing to module…', 'info');
+    const rel = getSelectedRelease(name);
+    const tagDesc = rel ? `v${rel.version}` : 'latest';
+    setMsg(name, `Downloading filesystem image ${tagDesc} from GitHub and pushing to module…`, 'info');
 
     try {
-      // Note: The /update endpoint handles both filesystem and firmware updates
-      const res  = await fetch('/api/module/' + name + '/update', { method: 'POST' });
+      // The /update endpoint handles both filesystem and firmware updates
+      const body = rel ? { tag: rel.tag } : {};
+      const res  = await fetch('/api/module/' + name + '/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
         setMsg(name,
