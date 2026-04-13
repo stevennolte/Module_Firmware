@@ -243,6 +243,16 @@ uint8_t ESPdata::loadConfig(){
     steer.steerOffset = preferences.getFloat("wasOffset", 0.0);
     steer.useADS = preferences.getBool("useADS", true);
     steer.wirelessWAS = preferences.getBool("wirelessWAS", false);
+    
+    // Load motor current sensor calibration
+    steer.currentZero = preferences.getUShort("currentZero", 32767);
+    steer.currentScale = preferences.getFloat("currentScale", 2.0);
+    steer.currentFilterOld = preferences.getFloat("currentFilterOld", 0.7);
+    steer.currentFilterNew = preferences.getFloat("currentFilterNew", 0.3);
+    steer.currentScaler = preferences.getFloat("currentScaler", 1.0);
+    steer.enableCurrentLimit = preferences.getBool("enableCurrentLimit", false);
+    steer.currentLimit = preferences.getUChar("currentLimit", 200);
+    steer.enableCurrentDebug = preferences.getBool("enableCurrentDebug", false);
 
     // Load GPS configuration
     gps.externalGPS = preferences.getBool("externalGPS", false);
@@ -342,6 +352,16 @@ uint8_t ESPdata::saveConfig(){
     preferences.putFloat("wasOffset", steer.steerOffset);
     preferences.putBool("useADS", steer.useADS);
     preferences.putBool("wirelessWAS", steer.wirelessWAS);
+    preferences.putFloat("currentScaler", steer.currentScaler);
+    preferences.putBool("enableCurrentLimit", steer.enableCurrentLimit);
+    preferences.putUChar("currentLimit", steer.currentLimit);
+    preferences.putBool("enableCurrentDebug", steer.enableCurrentDebug);
+    
+    // Save motor current sensor calibration
+    preferences.putUShort("currentZero", steer.currentZero);
+    preferences.putFloat("currentScale", steer.currentScale);
+    preferences.putFloat("currentFilterOld", steer.currentFilterOld);
+    preferences.putFloat("currentFilterNew", steer.currentFilterNew);
 
     // Save GPS configuration
     preferences.putBool("externalGPS", gps.externalGPS);

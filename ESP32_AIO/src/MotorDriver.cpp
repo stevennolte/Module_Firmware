@@ -102,18 +102,21 @@ void MotorDriver::setOutput(float value){
         
         // value = max(value, minScalar);
         dirCmd = 1;
+        espData->steer.motorDirection = 1;  // CW
         enable();
         setCW();
     } else if (value < -0.001){
         
         value = abs(value);
         dirCmd = 2;
+        espData->steer.motorDirection = 2;  // CCW
         enable();
         setCCW();
     } else {
         disable();
         value = 0;
         dirCmd = 0;
+        espData->steer.motorDirection = 0;  // Stopped
     }
     
     // Scale value to range [minCMD, maxCMD]

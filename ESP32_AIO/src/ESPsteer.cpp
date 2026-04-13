@@ -73,7 +73,26 @@ void ESPsteer::continuousLoop() {
             espData->steer.settingsUpdated = 0;
         }
         was.loop();
-        // espData->steer.steerCurrent = getCurrent();
+        espData->steer.steerCurrent = getCurrent();
+        
+        // Current limit check - disable steering if current exceeds threshold
+        if (espData->steer.enableCurrentLimit) {
+            if (espData->steer.steerCurrent >= espData->steer.currentLimit) {
+                if (!espData->steer.currentLimitTripped) {
+                    // First time exceeding limit
+                    espData->steer.currentLimitTripped = true;
+                    espData->steer.status = 0; // Disable steering
+                    espData->steer.currentLimitResetTime = millis() + 3000; // 3 second cooldown
+                    Serial.println("*** CURRENT LIMIT EXCEEDED - STEERING DISABLED ***");
+                    Serial.printf("Current: %d, Limit: %d\n", espData->steer.steerCurrent, espData->steer.currentLimit);
+                }
+            } else if (espData->steer.currentLimitTripped && millis() > espData->steer.currentLimitResetTime) {
+                // Current below limit and cooldown expired - allow reset
+                espData->steer.currentLimitTripped = false;
+                Serial.println("Current limit reset - steering can re-engage");
+            }
+        }
+        
         espData->steer.testState = getTestState();
         // Serial.println(espData->steer.testState);
         // vTaskDelay(1000);
@@ -117,7 +136,7 @@ void ESPsteer::continuousLoop() {
             currentData[2] = espData->wifi.ips[3];
             currentData[3] = 250;
             currentData[4] = 8;
-            currentData[5] = static_cast<uint8_t>((espData->steer.steerCurrent * 255) / (65535/4));
+            currentData[5] = espData->steer.steerCurrent; // Already scaled to 1-254 range
             currentData[13] = espUdp->calcChecksum(currentData, sizeof(currentData));
             espUdp->udp.writeTo(currentData, sizeof(currentData), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);
         }
@@ -228,8 +247,43 @@ void ESPsteer::begin(ESPudp* espUdp) {
 }
 
 uint32_t ESPsteer::getCurrent() {
-    // TODO: Migrate to use i2cManager.getRawReading(2)
-    return 0; // Temporary return value until implementation is complete
+    // Read motor current from ADS1115 channel (configured in ESPdata)
+    uint16_t rawReading = i2cManager.getRawReading(espData->adsConfig.motorCurrentChannel);
+    
+    // Store raw reading for debug
+    espData->steer.rawCurrentADC = rawReading;
+    
+    // Simple linear scaling: map 16-bit ADC (0-65535) to 1-254 range
+    // Using map function: scaledValue = (rawADC * 253) / 65535 + 1
+    uint32_t scaledCurrent = map(rawReading, 0, 65535, 1, 254);
+    
+    // Apply scaler multiplier and constrain to 1-254 range
+    scaledCurrent = constrain((uint32_t)(scaledCurrent * espData->steer.currentScaler), 1, 254);
+    
+    // Store scaled value for debug
+    espData->steer.currentBeforeFilter = scaledCurrent;
+    
+    // Debug output if enabled
+    if (espData->steer.enableCurrentDebug) {
+        static uint32_t lastDebugTime = 0;
+        if (millis() - lastDebugTime > 500) {  // Print every 500ms to avoid spam
+            lastDebugTime = millis();
+            Serial.println("=== STEER CURRENT DEBUG ===");
+            Serial.printf("  Raw ADC:        %d\n", rawReading);
+            Serial.printf("  Scaler:         %.2f\n", espData->steer.currentScaler);
+            Serial.printf("  Scaled Current: %d (1-254 range)\n", scaledCurrent);
+            Serial.printf("  Limit Enabled:  %s\n", espData->steer.enableCurrentLimit ? "YES" : "NO");
+            Serial.printf("  Current Limit:  %d\n", espData->steer.currentLimit);
+            Serial.printf("  Limit Tripped:  %s\n", espData->steer.currentLimitTripped ? "YES" : "NO");
+            Serial.printf("  PWM Command:    %d\n", espData->steer.pwmCmd);
+            Serial.printf("  Motor Dir:      %d (0=stop, 1=CW, 2=CCW)\n", espData->steer.motorDirection);
+            Serial.printf("  Min/Max PWM:    %d / %d\n", espData->steer.minPWM, espData->steer.highPWM);
+            Serial.printf("  CALCULATION: map(%d, 0, 65535, 1, 254) = %d\n", rawReading, scaledCurrent);
+            Serial.println("==========================");
+        }
+    }
+    
+    return scaledCurrent;
 }
 
 uint8_t ESPsteer::getTestState(){

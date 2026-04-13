@@ -571,6 +571,21 @@ void updateDebugVars() {
   debugVars.push_back("..Raw ADS: " + String(espData.steer.rawADS));
   debugVars.push_back("..PWM Command: " + String(espData.steer.pwmCmd));
   debugVars.push_back("..Switch State: " + String(espData.steer.switchState));
+  debugVars.push_back("..Current Debug: " + String(espData.steer.enableCurrentDebug ? "ON" : "OFF"));
+  debugVars.push_back("..Motor Current: ");
+  debugVars.push_back("....Filtered Value: " + String(espData.steer.steerCurrent));
+  debugVars.push_back("....Raw ADC: " + String(espData.steer.rawCurrentADC));
+  debugVars.push_back("....Pre-Filter: " + String(espData.steer.currentBeforeFilter, 2));
+  debugVars.push_back("....Zero Point: " + String(espData.steer.currentZero));
+  debugVars.push_back("....Scale Factor: " + String(espData.steer.currentScale, 2));
+  debugVars.push_back("....Scaler: " + String(espData.steer.currentScaler, 2));
+  debugVars.push_back("....Filter Old: " + String(espData.steer.currentFilterOld, 2));
+  debugVars.push_back("....Filter New: " + String(espData.steer.currentFilterNew, 2));
+  debugVars.push_back("....Direction: " + String(espData.steer.motorDirection == 0 ? "STOP" : (espData.steer.motorDirection == 1 ? "CW" : "CCW")));
+  debugVars.push_back("..Current Limit Protection: ");
+  debugVars.push_back("....Enabled: " + String(espData.steer.enableCurrentLimit ? "YES" : "NO"));
+  debugVars.push_back("....Limit: " + String(espData.steer.currentLimit));
+  debugVars.push_back("....Tripped: " + String(espData.steer.currentLimitTripped ? "YES" : "NO"));
   
   // ADS readings - simplified
   debugVars.push_back("ADS1115 INFO");
@@ -841,6 +856,19 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='form-group'><label>Use ADS1115:</label><select id='useADS'><option value='1'>Yes</option><option value='0'>No</option></select></div>";
   html += "</div>";
   
+  // Motor Current Sensor Settings Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>Motor Current Sensor Calibration</div>";
+  html += "<p style='font-size:0.875rem;color:#555;margin-bottom:10px;'>Configure ADS1115 channel 2 current sensor. Output range: 1-254</p>";
+  html += "<div class='form-group'><label>Current Zero Point (ADC):</label><input type='number' id='currentZero' min='0' max='65535' step='1' title='ADC value at 0 amps, typically 32767 for mid-scale sensors'></div>";
+  html += "<div class='form-group'><label>Current Scale Factor:</label><input type='number' id='currentScale' min='0' max='10' step='0.1' title='Scaling factor to map ADC reading to 0-255 range'></div>";
+  html += "<div class='form-group'><label>Filter Old Weight:</label><input type='number' id='currentFilterOld' min='0' max='1' step='0.05' title='Filter weight for previous value (0.7 = 70%)'></div>";
+  html += "<div class='form-group'><label>Filter New Weight:</label><input type='number' id='currentFilterNew' min='0' max='1' step='0.05' title='Filter weight for new reading (0.3 = 30%)'></div>";
+  html += "<div class='form-group'><label>Current Scaler:</label><input type='number' id='currentScaler' min='0' max='5' step='0.1' title='Output multiplier (1.0 = no scaling)'></div>";
+  html += "<div class='form-group'><label>Enable Current Limit:</label><select id='enableCurrentLimit' title='Automatically disable steering when current exceeds limit'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
+  html += "<div class='form-group'><label>Current Limit (1-254):</label><input type='number' id='currentLimit' min='1' max='254' step='1' title='Current threshold to disable steering for overload protection'></div>";
+  html += "</div>";
+  
   // System Settings Section
   html += "<div class='section'>";
   html += "<div class='section-title'>System Configuration</div>";
@@ -920,6 +948,13 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.pidOutputFilt !== undefined) document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
   html += "      if (data.wasFilter !== undefined) document.getElementById('wasFilter').value = data.wasFilter;";
   html += "      if (data.useADS !== undefined) document.getElementById('useADS').value = data.useADS;";
+  html += "      if (data.currentZero !== undefined) document.getElementById('currentZero').value = data.currentZero;";
+  html += "      if (data.currentScale !== undefined) document.getElementById('currentScale').value = data.currentScale;";
+  html += "      if (data.currentFilterOld !== undefined) document.getElementById('currentFilterOld').value = data.currentFilterOld;";
+  html += "      if (data.currentFilterNew !== undefined) document.getElementById('currentFilterNew').value = data.currentFilterNew;";
+  html += "      if (data.currentScaler !== undefined) document.getElementById('currentScaler').value = data.currentScaler;";
+  html += "      if (data.enableCurrentLimit !== undefined) document.getElementById('enableCurrentLimit').value = String(data.enableCurrentLimit);";
+  html += "      if (data.currentLimit !== undefined) document.getElementById('currentLimit').value = data.currentLimit;";
   html += "      if (data.gpsSource !== undefined) document.getElementById('gpsSource').value = data.gpsSource;";
   html += "      if (data.pandaMode !== undefined) document.getElementById('pandaMode').value = data.pandaMode;";
   html += "      if (data.wasSource !== undefined) document.getElementById('wasSource').value = data.wasSource;";
@@ -952,6 +987,13 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('pidOutputFilt', parseFloat(document.getElementById('pidOutputFilt').value) || 0.1);";
   html += "  formData.append('wasFilter', parseFloat(document.getElementById('wasFilter').value) || 0.2);";
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
+  html += "  formData.append('currentZero', parseInt(document.getElementById('currentZero').value) || 32767);";
+  html += "  formData.append('currentScale', parseFloat(document.getElementById('currentScale').value) || 2.0);";
+  html += "  formData.append('currentFilterOld', parseFloat(document.getElementById('currentFilterOld').value) || 0.7);";
+  html += "  formData.append('currentFilterNew', parseFloat(document.getElementById('currentFilterNew').value) || 0.3);";
+  html += "  formData.append('currentScaler', parseFloat(document.getElementById('currentScaler').value) || 1.0);";
+  html += "  formData.append('enableCurrentLimit', document.getElementById('enableCurrentLimit').value);";
+  html += "  formData.append('currentLimit', parseInt(document.getElementById('currentLimit').value) || 200);";
   html += "  formData.append('gpsSource', document.getElementById('gpsSource').value);";
   html += "  formData.append('pandaMode', document.getElementById('pandaMode').value);";
   html += "  formData.append('wasSource', document.getElementById('wasSource').value);";
@@ -1033,6 +1075,15 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["pidOutputFilt"] = espData.steer.pidOutputFilt;
   doc["wasFilter"] = espData.steer.wasFilterValue;
   doc["useADS"] = espData.steer.useADS;
+  
+  // Motor current sensor settings
+  doc["currentZero"] = espData.steer.currentZero;
+  doc["currentScale"] = espData.steer.currentScale;
+  doc["currentFilterOld"] = espData.steer.currentFilterOld;
+  doc["currentFilterNew"] = espData.steer.currentFilterNew;
+  doc["currentScaler"] = espData.steer.currentScaler;
+  doc["enableCurrentLimit"] = espData.steer.enableCurrentLimit ? 1 : 0;
+  doc["currentLimit"] = (int)espData.steer.currentLimit;
   
   // System settings
   doc["gpsSource"] = espData.gps.externalGPS ? 1 : 0;
@@ -1132,6 +1183,29 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("useADS", true)) {
     espData.steer.useADS = request->getParam("useADS", true)->value().toInt();
+  }
+  
+  // Motor current sensor settings
+  if (request->hasParam("currentZero", true)) {
+    espData.steer.currentZero = request->getParam("currentZero", true)->value().toInt();
+  }
+  if (request->hasParam("currentScale", true)) {
+    espData.steer.currentScale = request->getParam("currentScale", true)->value().toFloat();
+  }
+  if (request->hasParam("currentFilterOld", true)) {
+    espData.steer.currentFilterOld = request->getParam("currentFilterOld", true)->value().toFloat();
+  }
+  if (request->hasParam("currentFilterNew", true)) {
+    espData.steer.currentFilterNew = request->getParam("currentFilterNew", true)->value().toFloat();
+  }
+  if (request->hasParam("currentScaler", true)) {
+    espData.steer.currentScaler = request->getParam("currentScaler", true)->value().toFloat();
+  }
+  if (request->hasParam("enableCurrentLimit", true)) {
+    espData.steer.enableCurrentLimit = request->getParam("enableCurrentLimit", true)->value().toInt();
+  }
+  if (request->hasParam("currentLimit", true)) {
+    espData.steer.currentLimit = request->getParam("currentLimit", true)->value().toInt();
   }
   
   // System settings
@@ -1922,15 +1996,34 @@ void normalboot(){
               return;
             }
             
+            String response = "";
+            bool hasFullDebug = false;
+            bool hasCurrentDebug = false;
+            
+            // Handle fullDebug parameter
             if (doc["fullDebug"].is<bool>()) {
               bool newMode = doc["fullDebug"].as<bool>();
               fullDebugMode = newMode;
-              String response = fullDebugMode ? "Full debug mode enabled" : "Minimal debug mode enabled";
+              response = fullDebugMode ? "Full debug mode enabled" : "Minimal debug mode enabled";
               Serial.println("Debug mode changed to: " + String(fullDebugMode ? "FULL" : "MINIMAL"));
+              hasFullDebug = true;
+            }
+            
+            // Handle currentDebug parameter
+            if (doc["currentDebug"].is<bool>()) {
+              bool newMode = doc["currentDebug"].as<bool>();
+              espData.steer.enableCurrentDebug = newMode;
+              if (hasFullDebug) response += "; ";
+              response += newMode ? "Current debug enabled" : "Current debug disabled";
+              Serial.println("Current debug changed to: " + String(newMode ? "ON" : "OFF"));
+              hasCurrentDebug = true;
+            }
+            
+            if (hasFullDebug || hasCurrentDebug) {
               request->send(200, "text/plain", response);
             } else {
-              Serial.println("Missing fullDebug parameter in JSON");
-              request->send(400, "text/plain", "Missing fullDebug parameter");
+              Serial.println("Missing fullDebug or currentDebug parameter in JSON");
+              request->send(400, "text/plain", "Missing fullDebug or currentDebug parameter");
             }
           }
         });

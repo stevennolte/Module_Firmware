@@ -261,6 +261,7 @@ public:
      * @details Configures the 16-bit ADC for high-precision analog measurements
      */
     struct ADSConfig {
+        uint8_t motorCurrentChannel = 2; ///< @brief ADS channel for steering motor current sensing
         uint8_t mainPowerISpin = 3;     ///< @brief ADS channel for main power current sensing
         uint16_t readings[4] = {0,0,0,0};
         float voltages[4] = {0.0,0.0,0.0,0.0};
@@ -565,6 +566,25 @@ public:
         uint32_t looptime = 0;   
         uint32_t looptimestamp = 0;
         float sensorVoltage = 0.0;      ///< @brief Voltage reading from analog wheel angle sensor
+        
+        // Motor current sensor calibration
+        uint16_t currentZero = 32767;   ///< @brief Current sensor zero point (ADC value at 0 amps, default 32767 for mid-scale)
+        float currentScale = 2.0;       ///< @brief Current sensor scaling factor (default 2.0)
+        float currentFilterOld = 0.7;   ///< @brief Current filter coefficient for old value (default 0.7)
+        float currentFilterNew = 0.3;   ///< @brief Current filter coefficient for new value (default 0.3)
+        float currentScaler = 1.0;      ///< @brief Current output scaler multiplier (default 1.0)
+        
+        // Current limit protection
+        bool enableCurrentLimit = false; ///< @brief Enable current-based steering shutoff
+        uint8_t currentLimit = 200;     ///< @brief Current threshold to disable steering (1-254, default 200)
+        bool currentLimitTripped = false; ///< @brief Flag indicating current limit was exceeded
+        uint32_t currentLimitResetTime = 0; ///< @brief Time when current limit can be reset (ms)
+        
+        // Debug variables for current measurement
+        uint16_t rawCurrentADC = 0;     ///< @brief Raw ADC reading from current sensor (debug)
+        float currentBeforeFilter = 0.0; ///< @brief Current value before filtering (debug)
+        uint8_t motorDirection = 0;     ///< @brief Motor direction (0=stopped, 1=CW, 2=CCW) (debug)
+        bool enableCurrentDebug = false; ///< @brief Enable serial debug output for current measurement
          
     } steer;
 

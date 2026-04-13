@@ -1,5 +1,6 @@
 #include "ESPudp.h"
 #include <Update.h>
+#include <WiFi.h>
 
 ESPudp::ESPudp(ESPconfig* vars) : udp(), udpSend() {
     espConfig = vars;
@@ -7,6 +8,7 @@ ESPudp::ESPudp(ESPconfig* vars) : udp(), udpSend() {
 
 void ESPudp::begin() {
     udp.listen(8888);
+    udpSend.listen(0);  // Initialize send socket on any available port
     udp.onPacket([this](AsyncUDPPacket packet) {
         // AgOpenGPS messages use the 0x80 0x81 header
         if (packet.length() < 4) return;
@@ -117,15 +119,22 @@ void ESPudp::sendPGN234() {
     // Byte 13: CRC checksum
     message[13] = calcCRC(message, 13);
     
-    // Send using beginPacket/write/endPacket pattern (official AgOpenGPS method)
-    IPAddress destIP(espConfig->wifiCfg.ips[0], 
-                     espConfig->wifiCfg.ips[1], 
-                     espConfig->wifiCfg.ips[2], 
-                     255);
+    // Determine broadcast IP based on module's actual IP address
+    IPAddress myIP;
+    if (WiFi.status() == WL_CONNECTED) {
+        // Module is connected as STA - use its STA IP
+        myIP = WiFi.localIP();
+    } else {
+        // Module is in AP mode - use AP IP
+        myIP = WiFi.softAPIP();
+    }
+    
+    // Create broadcast address using first 3 octets from module IP
+    IPAddress destIP(myIP[0], myIP[1], myIP[2], 255);
     
     AsyncUDPMessage udpMsg;
     udpMsg.write(message, sizeof(message));
-    udpSend.sendTo(udpMsg, destIP, 9999);
+    size_t sent = udpSend.sendTo(udpMsg, destIP, 9999);
     
     // Debug output
     static uint32_t lastDebug = 0;
@@ -134,5 +143,7 @@ void ESPudp::sendPGN234() {
         Serial.printf("PGN234: Mode=%s, Main=%02X, Relay=%02X %02X, ForceOff=%02X %02X, CRC=%02X\n",
                       autoMode ? "AUTO" : "OFF",
                       message[5], message[9], message[11], message[10], message[12], message[13]);
+        Serial.printf("  Module IP: %s, Broadcast to: %s:9999, bytes sent: %d\n", 
+                      myIP.toString().c_str(), destIP.toString().c_str(), sent);
     }
 }

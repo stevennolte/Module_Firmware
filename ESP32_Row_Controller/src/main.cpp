@@ -43,9 +43,9 @@ void updateRowOutputs() {
     if (sectionData.toolbarOverrideEnabled) {
         toolbarUp = sectionData.toolbarOverrideValue;
     } else {
-        // Check both toolbar sensors - if either is HIGH, toolbar is up
-        toolbarUp = (digitalRead(gpioDefs.toolbarPins[0]) == HIGH) || 
-                    (digitalRead(gpioDefs.toolbarPins[1]) == HIGH);
+        // Check both toolbar sensors - with pullups, LOW means switch pressed (toolbar up)
+        toolbarUp = (digitalRead(gpioDefs.toolbarPins[0]) == LOW) || 
+                    (digitalRead(gpioDefs.toolbarPins[1]) == LOW);
     }
     
     sectionData.toolbarUp = toolbarUp;
@@ -483,8 +483,8 @@ void setup() {
 
     // Setup row MOSFET outputs and toolbar inputs
     initRowOutputs();
-    pinMode(gpioDefs.toolbarPins[0], INPUT_PULLDOWN);
-    pinMode(gpioDefs.toolbarPins[1], INPUT_PULLDOWN);
+    pinMode(gpioDefs.toolbarPins[0], INPUT_PULLUP);
+    pinMode(gpioDefs.toolbarPins[1], INPUT_PULLUP);
     
     // Setup power relay (starts LOW, will turn on after boot)
     pinMode(gpioDefs.POWER_RELAY_PIN, OUTPUT);

@@ -745,6 +745,9 @@ static void readIMU() {
         roll = -roll;
     }
 
+    // Inverse heading
+    heading = -heading;
+
     // Normalise heading to 0 – 360
     while (heading <    0.0f) heading += 360.0f;
     while (heading >= 360.0f) heading -= 360.0f;
