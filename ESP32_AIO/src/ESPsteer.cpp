@@ -111,19 +111,28 @@ void ESPsteer::continuousLoop() {
             testdata[8] = 9999 >> 8;
             testdata[9] = 8888 & 0xFF;
             testdata[10] = 8888 >> 8;
+            
+            // Byte 11: Switch status byte
+            // Bit 0 = work switch (from joystick)
+            // Bit 1 = steer switch (1 = steering disabled, 0 = enabled)
+            // Bit 2 = remote (from joystick)
+            testdata[11] = 0; // Initialize to 0
+            
+            // Bit 0: Work switch from joystick
             if (espData->joystick.switchStates[6] == 1) {
-                testdata[11] |= 0x01; // Set the first bit to 1
-            } else {
-                testdata[11] &= ~0x01; // Clear the first bit to 0
+                testdata[11] |= 0x01;
             }
-                        
-            // Set the second bit of testdata[11] to switchStates[7]
+            
+            // Bit 1: Steer switch - indicates if steering is disabled
+            // Set to 1 when steering is off (status = 0) or current limit tripped
+            if (espData->steer.status == 0 || espData->steer.currentLimitTripped) {
+                testdata[11] |= 0x02;
+            }
+            
+            // Bit 2: Remote switch from joystick  
             if (espData->joystick.switchStates[7] == 1) {
-                testdata[11] |= 0x02; // Set the second bit to 1
-            } else {
-                testdata[11] &= ~0x02; // Clear the second bit to 0
+                testdata[11] |= 0x04;
             }
-            // testdata[11] = 0;
             testdata[12] = static_cast<uint8_t>((espData->steer.pwmCmd * 255) / 8109);
             testdata[13] = espUdp->calcChecksum(testdata, sizeof(testdata));
             espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);

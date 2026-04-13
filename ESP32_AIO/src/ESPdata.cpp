@@ -244,7 +244,7 @@ uint8_t ESPdata::loadConfig(){
     steer.useADS = preferences.getBool("useADS", true);
     steer.wirelessWAS = preferences.getBool("wirelessWAS", false);
     
-    // Load motor current sensor calibration
+    // Load motor current sensor settings
     steer.currentZero = preferences.getUShort("currentZero", 32767);
     steer.currentScale = preferences.getFloat("currentScale", 2.0);
     steer.currentFilterOld = preferences.getFloat("currentFilterOld", 0.7);
@@ -265,7 +265,7 @@ uint8_t ESPdata::loadConfig(){
     // Load server configuration
     ota.ipAddr = preferences.getUChar("serverAdr", 192);
     ota.port = preferences.getUShort("serverPort", 8080);
-    gps.externalGPS = preferences.getBool("externalGPS", false);
+    
     // Print entire configuration to serial monitor
     Serial.println("=== ESP32 Configuration ===");
     Serial.println("Program:");
@@ -288,6 +288,9 @@ uint8_t ESPdata::loadConfig(){
     Serial.println("  Use ADS: " + String(steer.useADS ? "true" : "false"));
     Serial.println("  PID Input Filter: " + String(steer.pidInputFilt));
     Serial.println("  PID Output Filter: " + String(steer.pidOutputFilt));
+    Serial.println("  Current Scaler: " + String(steer.currentScaler));
+    Serial.println("  Enable Current Limit: " + String(steer.enableCurrentLimit ? "true" : "false"));
+    Serial.println("  Current Limit: " + String(steer.currentLimit));
 
     Serial.println("OTA/Server:");
     Serial.println("  Server IP: " + String(ota.ipAddr));
@@ -374,7 +377,6 @@ uint8_t ESPdata::saveConfig(){
     // Save server configuration
     preferences.putUChar("serverAdr", ota.ipAddr);
     preferences.putUShort("serverPort", ota.port);
-    preferences.putBool("externalGPS", gps.externalGPS);
 
     Serial.println("=== CONFIG SAVED SUCCESSFULLY ===");
     return 1; // Success
