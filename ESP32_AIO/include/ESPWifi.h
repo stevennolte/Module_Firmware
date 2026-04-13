@@ -93,6 +93,8 @@ class ESPWifi
         void continuousLoop();
         
         ESPdata* espData;           ///< @brief Pointer to central data management system
+        uint32_t staConnectStartTime;   ///< @brief Timestamp when STA connection first attempted
+        bool staConnectionTimedOut;     ///< @brief Flag indicating STA connection gave up after timeout
 };
 
 #endif

@@ -226,6 +226,8 @@ void ESPudp::begin(ESPGPS* gps){
 
               this->espData->steer.set0 = packet.data()[5];
               this->espData->steer.pulseCount = packet.data()[6];
+              // AgOpenGPS sends current threshold in PGN 251 pulseCount byte.
+              this->espData->steer.currentLimit = packet.data()[6];
               this->espData->steer.minSpeed = packet.data()[7];
               this->espData->steer.set1 = packet.data()[8];
               this->espData->steer.settingsUpdated = 1;
@@ -249,7 +251,7 @@ void ESPudp::begin(ESPGPS* gps){
              
               espData->updateSteer();
               break;
-            case 254:  //GPS reply to Hello Message, disable AIO GPS
+            case 254: {  //GPS reply to Hello Message, disable AIO GPS
               // Serial.println("got steerdata");
               this->espData->steer.watchdog = millis();
                 union {
@@ -263,10 +265,13 @@ void ESPudp::begin(ESPGPS* gps){
                 } else {
                   this->espData->steer.targetSteerAngle = float(angleUnion.angle)/100.0;
                 }
+                
+                // Accept status from AgOpenGPS
                 this->espData->steer.status = packet.data()[7];
 
               break;
-            case 180:  //Wireless WAS 
+            }
+            case 180: {  //Wireless WAS 
             //TODO: change pgn
               espData->steer.lastWAStime = millis();
               union {
@@ -285,6 +290,7 @@ void ESPudp::begin(ESPGPS* gps){
               this->espData->steer.actSteerAngle = this->espData->steer.absAngle - this->espData->steer.wasZeroAngle;
               // this->espData->steerData.actSteerAngle = this->espData->steerData.actSteerAngle + float(espData->steerCfg.steerOffset/espData->steerCfg.countsPerDeg);
               break;
+            }
           }
         }
     });

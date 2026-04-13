@@ -137,6 +137,8 @@ class ESPsteer{
         MotorDriver motorDriver;
         
         AutoTunePID pid;
+        
+        bool currentLimitLatched;   ///< @brief Persistent overcurrent fault latch state
 
 };
 

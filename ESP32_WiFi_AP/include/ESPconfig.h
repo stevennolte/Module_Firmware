@@ -15,7 +15,7 @@ public:
 
     class GPIO_Definitions {
     public:
-        uint8_t LED_PIN = 48;
+        uint8_t LED_PIN = 2;  // ESP32 DevKitV1 compatible pin
         GPIO_Definitions() {}
     };
     GPIO_Definitions gpioDefs;

@@ -37,7 +37,7 @@
  *          control architecture for precision guidance applications.
  */
 ESPsteer::ESPsteer(ESPdata* vars) 
-    : motorDriver(vars), was(vars), pid(-1.0,1.0, TuningMethod::Manual), i2cManager(I2CManager::getInstance()) {
+    : motorDriver(vars), was(vars), pid(-1.0,1.0, TuningMethod::Manual), i2cManager(I2CManager::getInstance()), currentLimitLatched(false) {
     espData = vars;
 }
 
@@ -75,23 +75,65 @@ void ESPsteer::continuousLoop() {
         was.loop();
         espData->steer.steerCurrent = getCurrent();
         
-        // Current limit check - disable steering if current exceeds threshold
+        // Current limit check - LATCHED mode: once tripped, stays disabled until AgOpenGPS re-enables
+        static uint8_t lastStatus = 0;  // Track previous status for edge detection
+        static bool enableResetPending = false;  // Remember enable request if current is still high
+        
         if (espData->steer.enableCurrentLimit) {
             if (espData->steer.steerCurrent >= espData->steer.currentLimit) {
-                if (!espData->steer.currentLimitTripped) {
-                    // First time exceeding limit
+                if (!currentLimitLatched) {
+                    // First time exceeding limit - latch the fault
+                    currentLimitLatched = true;
                     espData->steer.currentLimitTripped = true;
-                    espData->steer.status = 0; // Disable steering
-                    espData->steer.currentLimitResetTime = millis() + 3000; // 3 second cooldown
-                    Serial.println("*** CURRENT LIMIT EXCEEDED - STEERING DISABLED ***");
-                    Serial.printf("Current: %d, Limit: %d\n", espData->steer.steerCurrent, espData->steer.currentLimit);
+                    Serial.println("*** CURRENT LIMIT EXCEEDED - LATCHED ***");
+                    Serial.printf("Current: %d >= Limit: %d\n", 
+                                  espData->steer.steerCurrent, espData->steer.currentLimit);
+                    Serial.println("*** Steering DISABLED - Operator must press ENABLE in AgOpenGPS to clear ***");
                 }
-            } else if (espData->steer.currentLimitTripped && millis() > espData->steer.currentLimitResetTime) {
-                // Current below limit and cooldown expired - allow reset
+            }
+            
+            // Capture enable request on rising edge (operator pressed ENABLE in AgOpenGPS).
+            if (espData->steer.status == 1 && lastStatus == 0 && currentLimitLatched) {
+                enableResetPending = true;
+                if (espData->steer.steerCurrent < espData->steer.currentLimit) {
+                    currentLimitLatched = false;
+                    espData->steer.currentLimitTripped = false;
+                    enableResetPending = false;
+                    Serial.println("*** CURRENT LIMIT LATCH CLEARED - AgOpenGPS enable command received ***");
+                } else {
+                    Serial.println("*** ENABLE QUEUED - Waiting for current to drop below threshold ***");
+                }
+            }
+
+            // If enable was requested while current was high, clear automatically once safe.
+            if (currentLimitLatched && enableResetPending &&
+                espData->steer.status == 1 &&
+                espData->steer.steerCurrent < espData->steer.currentLimit) {
+                currentLimitLatched = false;
                 espData->steer.currentLimitTripped = false;
-                Serial.println("Current limit reset - steering can re-engage");
+                enableResetPending = false;
+                Serial.println("*** CURRENT LIMIT LATCH CLEARED - queued ENABLE applied at safe current ***");
+            }
+
+            // If operator turns steering back off, require a fresh enable press later.
+            if (espData->steer.status == 0) {
+                enableResetPending = false;
+            }
+            
+            // Keep sending the disabled state while latched
+            espData->steer.currentLimitTripped = currentLimitLatched;
+        } else {
+            // Current limit monitoring disabled - clear latch
+            if (currentLimitLatched) {
+                currentLimitLatched = false;
+                espData->steer.currentLimitTripped = false;
+                enableResetPending = false;
+                Serial.println("*** CURRENT LIMIT LATCH RESET - Current monitoring disabled/re-enabled ***");
             }
         }
+        
+        // Update last status for next iteration
+        lastStatus = espData->steer.status;
         
         espData->steer.testState = getTestState();
         // Serial.println(espData->steer.testState);
@@ -102,40 +144,56 @@ void ESPsteer::continuousLoop() {
             uint8_t testdata[14];
             testdata[0] = 0x80;
             testdata[1] = 0x81;
-            testdata[2] = espData->wifi.ips[3];
-            testdata[3] = 253;
+            testdata[2] = 0x7F;  // MajorPGN: Steer module
+            testdata[3] = 0xFD;  // MinorPGN: PGN 253
             testdata[4] = 8;
-            testdata[5] = static_cast<uint16_t>(espData->steer.actSteerAngle*100) & 0xFF;
-            testdata[6] = static_cast<uint16_t>(espData->steer.actSteerAngle*100) >> 8;
+            int16_t steerAngleSend = static_cast<int16_t>(espData->steer.actSteerAngle * 100);
+            testdata[5] = static_cast<uint8_t>(steerAngleSend & 0xFF);
+            testdata[6] = static_cast<uint8_t>((steerAngleSend >> 8) & 0xFF);
             testdata[7] = 9999 & 0xFF;
             testdata[8] = 9999 >> 8;
             testdata[9] = 8888 & 0xFF;
             testdata[10] = 8888 >> 8;
             
-            // Byte 11: Switch status byte
-            // Bit 0 = work switch (from joystick)
-            // Bit 1 = steer switch (1 = steering disabled, 0 = enabled)
-            // Bit 2 = remote (from joystick)
-            testdata[11] = 0; // Initialize to 0
+            // Byte 11: Switch status byte - FLIPPED bit assignment
+            // Bit 0 = work switch (sections - joystick switchStates[6]): 1=ENABLED, 0=DISABLED
+            // Bit 1 = steer switch: 0=ENABLED, 1=DISABLED (set when current limit tripped)
+            // Bit 2 = remote switch (joystick switchStates[7])
+            testdata[11] = 0x00; // Initialize to 0 (bit 1 clear = steering enabled by default)
             
-            // Bit 0: Work switch from joystick
+            // Bit 0: Work switch (section control) from joystick
             if (espData->joystick.switchStates[6] == 1) {
                 testdata[11] |= 0x01;
             }
             
-            // Bit 1: Steer switch - indicates if steering is disabled
-            // Set to 1 when steering is off (status = 0) or current limit tripped
-            if (espData->steer.status == 0 || espData->steer.currentLimitTripped) {
-                testdata[11] |= 0x02;
+            // Bit 1: Steer switch - set when current limit trips to disable steering
+            // This tells AgOpenGPS to disable steering due to overcurrent protection
+            if (espData->steer.currentLimitTripped) {
+                testdata[11] |= 0x02; // Set bit 1 = steering DISABLED
             }
+            // Normal operation: bit 1 = 0 = steering ENABLED
             
             // Bit 2: Remote switch from joystick  
             if (espData->joystick.switchStates[7] == 1) {
                 testdata[11] |= 0x04;
             }
+            
+            // Debug output - always show when current limit is enabled for monitoring
+            if (espData->steer.enableCurrentLimit || espData->steer.enableCurrentDebug) {
+                static uint8_t lastByte11 = 0xFF;
+                if (testdata[11] != lastByte11) {
+                    Serial.printf("[PGN253] Byte11 CHANGED: 0x%02X | CurrentLimit: Tripped=%d Value=%d/%d | SteerSwitch=%s\n",
+                                  testdata[11], espData->steer.currentLimitTripped,
+                                  espData->steer.steerCurrent, espData->steer.currentLimit,
+                                  (testdata[11] & 0x02) ? "DISABLED" : "ENABLED");
+                    lastByte11 = testdata[11];
+                }
+            }
+            
             testdata[12] = static_cast<uint8_t>((espData->steer.pwmCmd * 255) / 8109);
             testdata[13] = espUdp->calcChecksum(testdata, sizeof(testdata));
             espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);
+            
             // espUdp->sendUDP(testdata, sizeof(testdata));
             vTaskDelay(10);
             // Current Message
@@ -202,6 +260,7 @@ void ESPsteer::steerTestLoop(){
 
 void ESPsteer::steerLoop(){
 
+    // Check watchdog timeout
     if (millis() - espData->steer.watchdog > 2000){
         espData->steer.status = 0;
     }
@@ -261,10 +320,15 @@ uint32_t ESPsteer::getCurrent() {
     
     // Store raw reading for debug
     espData->steer.rawCurrentADC = rawReading;
-    
+
+    // ADS1115 returns a signed value; negative readings (noise below zero-current)
+    // must be clamped to 0 before scaling to prevent uint16_t wrap-around overflow.
+    int16_t signedReading = static_cast<int16_t>(rawReading);
+    uint16_t clampedReading = (signedReading < 0) ? 0 : static_cast<uint16_t>(signedReading);
+
     // Simple linear scaling: map 16-bit ADC (0-65535) to 1-254 range
     // Using map function: scaledValue = (rawADC * 253) / 65535 + 1
-    uint32_t scaledCurrent = map(rawReading, 0, 65535, 1, 254);
+    uint32_t scaledCurrent = map(clampedReading, 0, 65535, 1, 254);
     
     // Apply scaler multiplier and constrain to 1-254 range
     scaledCurrent = constrain((uint32_t)(scaledCurrent * espData->steer.currentScaler), 1, 254);

@@ -179,23 +179,40 @@ uint8_t ESPdata::loadConfig(){
     }
 
     // WiFi operating mode (0=AP only, 1=AP+STA, 2=STA only)
-    wifiMode = (uint8_t)preferences.getInt("wifi_mode", 0);
+    // Default to AP+STA mode so it attempts to connect to configured network
+    wifiMode = (uint8_t)preferences.getInt("wifi_mode", 1);
     Serial.printf("Loaded wifi_mode from preferences: %d\n", wifiMode);
 
     // STA network list
     staCfg.count = (uint8_t)preferences.getInt("sta_count", 0);
     Serial.printf("Loaded sta_count from preferences: %d\n", staCfg.count);
-    if (staCfg.count > STAConfig::MAX_NETWORKS) staCfg.count = STAConfig::MAX_NETWORKS;
-    for (int i = 0; i < staCfg.count; i++) {
-        String keySSID = "sta_ssid_" + String(i);
-        String keyPass = "sta_pass_" + String(i);
-        String s = preferences.getString(keySSID.c_str(), "");
-        String p = preferences.getString(keyPass.c_str(), "");
-        Serial.printf("Loaded network %d: SSID=%s\n", i, s.c_str());
-        strncpy(staCfg.ssids[i],     s.c_str(), sizeof(staCfg.ssids[i]) - 1);
-        strncpy(staCfg.passwords[i], p.c_str(), sizeof(staCfg.passwords[i]) - 1);
-        staCfg.ssids[i][sizeof(staCfg.ssids[i]) - 1]         = '\0';
-        staCfg.passwords[i][sizeof(staCfg.passwords[i]) - 1] = '\0';
+    
+    // If no networks configured, set default to NOLTE_FARM
+    if (staCfg.count == 0) {
+        Serial.println("No STA networks configured - setting default to NOLTE_FARM");
+        staCfg.count = 1;
+        strncpy(staCfg.ssids[0], "NOLTE_FARM", sizeof(staCfg.ssids[0]) - 1);
+        strncpy(staCfg.passwords[0], "DontLoseMoney89", sizeof(staCfg.passwords[0]) - 1);
+        staCfg.ssids[0][sizeof(staCfg.ssids[0]) - 1] = '\0';
+        staCfg.passwords[0][sizeof(staCfg.passwords[0]) - 1] = '\0';
+        // Save default to preferences
+        preferences.putInt("sta_count", 1);
+        preferences.putString("sta_ssid_0", "NOLTE_FARM");
+        preferences.putString("sta_pass_0", "DontLoseMoney89");
+    } else {
+        // Load configured networks from preferences
+        if (staCfg.count > STAConfig::MAX_NETWORKS) staCfg.count = STAConfig::MAX_NETWORKS;
+        for (int i = 0; i < staCfg.count; i++) {
+            String keySSID = "sta_ssid_" + String(i);
+            String keyPass = "sta_pass_" + String(i);
+            String s = preferences.getString(keySSID.c_str(), "");
+            String p = preferences.getString(keyPass.c_str(), "");
+            Serial.printf("Loaded network %d: SSID=%s\n", i, s.c_str());
+            strncpy(staCfg.ssids[i],     s.c_str(), sizeof(staCfg.ssids[i]) - 1);
+            strncpy(staCfg.passwords[i], p.c_str(), sizeof(staCfg.passwords[i]) - 1);
+            staCfg.ssids[i][sizeof(staCfg.ssids[i]) - 1]         = '\0';
+            staCfg.passwords[i][sizeof(staCfg.passwords[i]) - 1] = '\0';
+        }
     }
 
     // Populate legacy wifi.ips from apCfg for display/debug code
@@ -247,12 +264,22 @@ uint8_t ESPdata::loadConfig(){
     // Load motor current sensor settings
     steer.currentZero = preferences.getUShort("currentZero", 32767);
     steer.currentScale = preferences.getFloat("currentScale", 2.0);
-    steer.currentFilterOld = preferences.getFloat("currentFilterOld", 0.7);
-    steer.currentFilterNew = preferences.getFloat("currentFilterNew", 0.3);
+    steer.currentFilterOld = preferences.getFloat("curFilterOld", 0.7);
+    steer.currentFilterNew = preferences.getFloat("curFilterNew", 0.3);
     steer.currentScaler = preferences.getFloat("currentScaler", 1.0);
-    steer.enableCurrentLimit = preferences.getBool("enableCurrentLimit", false);
+    
+    // Check if key exists first
+    bool keyExists = preferences.isKey("curLimitEnable");
+    Serial.printf("[LOAD] enableCurrentLimit key exists: %s\n", keyExists ? "YES" : "NO");
+    
+    steer.enableCurrentLimit = preferences.getBool("curLimitEnable", false);
+    Serial.printf("[LOAD] enableCurrentLimit from NVS: %d (bool=%s)\n", 
+                  steer.enableCurrentLimit, steer.enableCurrentLimit ? "true" : "false");
+    Serial.printf("[LOAD] Variable address: %p, size: %d\n", 
+                  &steer.enableCurrentLimit, sizeof(steer.enableCurrentLimit));
+    
     steer.currentLimit = preferences.getUChar("currentLimit", 200);
-    steer.enableCurrentDebug = preferences.getBool("enableCurrentDebug", false);
+    steer.enableCurrentDebug = preferences.getBool("curDebugEnable", false);
 
     // Load GPS configuration
     gps.externalGPS = preferences.getBool("externalGPS", false);
@@ -321,6 +348,12 @@ bool ESPdata::setState(uint8_t state){
 uint8_t ESPdata::saveConfig(){
     // Save all configuration to Preferences
     Serial.println("=== SAVING CONFIG TO PREFERENCES ===");
+    
+    // Ensure preferences are open (should already be from loadConfig)
+    if (!preferences.isKey("bootMode")) {
+        Serial.println("WARNING: Preferences may not be properly initialized!");
+        preferences.begin("agopen", false);
+    }
 
     preferences.putUChar("bootMode", program.bootMode);
     preferences.putULong("bootcount", program.bootcount);
@@ -356,15 +389,28 @@ uint8_t ESPdata::saveConfig(){
     preferences.putBool("useADS", steer.useADS);
     preferences.putBool("wirelessWAS", steer.wirelessWAS);
     preferences.putFloat("currentScaler", steer.currentScaler);
-    preferences.putBool("enableCurrentLimit", steer.enableCurrentLimit);
+    Serial.printf("[SAVE] enableCurrentLimit to NVS: %d (bool=%s)\n", 
+                  steer.enableCurrentLimit, steer.enableCurrentLimit ? "true" : "false");
+    Serial.printf("[SAVE] Variable address: %p, size: %d\n", 
+                  &steer.enableCurrentLimit, sizeof(steer.enableCurrentLimit));
+    
+    // Force explicit bool value
+    bool limitEnabled = steer.enableCurrentLimit;
+    size_t result = preferences.putBool("curLimitEnable", limitEnabled);
+    Serial.printf("[SAVE] putBool returned: %d bytes (0=failed, 1=success)\n", result);
+    
+    // Verify it was written by reading it back immediately
+    bool verify = preferences.getBool("curLimitEnable", false);
+    Serial.printf("[SAVE] Immediate readback: %d (should be %d)\n", verify, limitEnabled);
+    
     preferences.putUChar("currentLimit", steer.currentLimit);
-    preferences.putBool("enableCurrentDebug", steer.enableCurrentDebug);
+    preferences.putBool("curDebugEnable", steer.enableCurrentDebug);
     
     // Save motor current sensor calibration
     preferences.putUShort("currentZero", steer.currentZero);
     preferences.putFloat("currentScale", steer.currentScale);
-    preferences.putFloat("currentFilterOld", steer.currentFilterOld);
-    preferences.putFloat("currentFilterNew", steer.currentFilterNew);
+    preferences.putFloat("curFilterOld", steer.currentFilterOld);
+    preferences.putFloat("curFilterNew", steer.currentFilterNew);
 
     // Save GPS configuration
     preferences.putBool("externalGPS", gps.externalGPS);

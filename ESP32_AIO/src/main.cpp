@@ -586,6 +586,20 @@ void updateDebugVars() {
   debugVars.push_back("....Enabled: " + String(espData.steer.enableCurrentLimit ? "YES" : "NO"));
   debugVars.push_back("....Limit: " + String(espData.steer.currentLimit));
   debugVars.push_back("....Tripped: " + String(espData.steer.currentLimitTripped ? "YES" : "NO"));
+  debugVars.push_back("....Steer Status: " + String(espData.steer.status));
+  // PGN 253 Byte 11 bit states
+  uint8_t byte11 = 0x00;
+  if (espData.joystick.switchStates[6] == 1) byte11 |= 0x01;
+  if (espData.steer.currentLimitTripped) byte11 |= 0x02;
+  if (espData.joystick.switchStates[7] == 1) byte11 |= 0x04;
+  debugVars.push_back("....PGN 253 Byte 11: 0x" + String(byte11, HEX));
+  debugVars.push_back("......Bit 0 (Work Switch): " + String((byte11 & 0x01) ? "SET" : "CLEAR"));
+  debugVars.push_back("......Bit 1 (Steer Switch): " + String((byte11 & 0x02) ? "SET (DISABLED)" : "CLEAR (ENABLED)"));
+  debugVars.push_back("......Bit 2 (Remote Switch): " + String((byte11 & 0x04) ? "SET" : "CLEAR"));
+  if (espData.steer.currentLimitTripped) {
+    int timeRemaining = (int)(espData.steer.currentLimitResetTime - millis());
+    debugVars.push_back("....Reset In: " + String(timeRemaining > 0 ? timeRemaining/1000.0 : 0.0, 1) + "s");
+  }
   
   // ADS readings - simplified
   debugVars.push_back("ADS1115 INFO");
@@ -738,7 +752,15 @@ void handleDebugVars(AsyncWebServerRequest *request) {
   JsonArray array = doc.to<JsonArray>();
   
   for (const auto& var : debugVars) {
-    array.add(var);
+    String clean = var;
+    // Remove control characters that can break JSON parsing in the web client.
+    for (size_t i = 0; i < clean.length(); i++) {
+      unsigned char c = (unsigned char)clean[i];
+      if (c < 0x20 && c != '\t') {
+        clean.setCharAt(i, ' ');
+      }
+    }
+    array.add(clean);
   }
   
   String jsonResponse;
@@ -1082,7 +1104,11 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   doc["currentFilterOld"] = espData.steer.currentFilterOld;
   doc["currentFilterNew"] = espData.steer.currentFilterNew;
   doc["currentScaler"] = espData.steer.currentScaler;
-  doc["enableCurrentLimit"] = espData.steer.enableCurrentLimit ? 1 : 0;
+  int limitValue = espData.steer.enableCurrentLimit ? 1 : 0;
+  doc["enableCurrentLimit"] = limitValue;
+  Serial.printf("[GET] enableCurrentLimit returned to web: %d (bool value: %d, actual var: %s)\n", 
+                limitValue, espData.steer.enableCurrentLimit, 
+                espData.steer.enableCurrentLimit ? "true" : "false");
   doc["currentLimit"] = (int)espData.steer.currentLimit;
   
   // System settings
@@ -1202,7 +1228,13 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
     espData.steer.currentScaler = request->getParam("currentScaler", true)->value().toFloat();
   }
   if (request->hasParam("enableCurrentLimit", true)) {
-    espData.steer.enableCurrentLimit = request->getParam("enableCurrentLimit", true)->value().toInt();
+    String rawValue = request->getParam("enableCurrentLimit", true)->value();
+    int newValue = rawValue.toInt();
+    Serial.printf("[WEB] enableCurrentLimit received: raw='%s' int=%d (was: %d)\n", 
+                  rawValue.c_str(), newValue, espData.steer.enableCurrentLimit);
+    espData.steer.enableCurrentLimit = (bool)newValue;
+    Serial.printf("[WEB] enableCurrentLimit after assignment: %d (bool=%s)\n",
+                  espData.steer.enableCurrentLimit, espData.steer.enableCurrentLimit ? "true" : "false");
   }
   if (request->hasParam("currentLimit", true)) {
     espData.steer.currentLimit = request->getParam("currentLimit", true)->value().toInt();
@@ -1889,11 +1921,10 @@ void normalboot(){
   bnoSerial.begin(115200);
   String bnoDetails = "Pin: " + String(espData.pins.BNO_PIN) + ", 115200 baud";
   logStartupState("BNO Serial", "Initialized", bnoDetails.c_str());
-  
-  gpsSerial.setPins(espData.pins.GPS_RX, espData.pins.GPS_TX);
-  gpsSerial.begin(460800);
-  String gpsDetails = "RX: " + String(espData.pins.GPS_RX) + ", TX: " + String(espData.pins.GPS_TX) + ", 460800 baud";
-  logStartupState("GPS Serial", "Initialized", gpsDetails.c_str());
+
+  // External GPS is now authoritative; disable onboard GPS serial path.
+  espData.gps.externalGPS = true;
+  logStartupState("GPS Serial", "Skipped", "External GPS mode forced");
   
   // Initialize I2C Manager for centralized bus management
   I2Csetup();
@@ -1939,9 +1970,7 @@ void normalboot(){
   mainPower.startTask();
 
   Serial.println("Initializing GPS...");
-  logStartupState("GPS", "Starting", "Initialization with UDP");
-  gps.init(&espUdp);  // Now UDP is ready
-  logStartupState("GPS", "Complete", "Initialization successful");
+  logStartupState("GPS", "Skipped", "External GPS mode forced");
   
   Serial.println("Initializing steering...");
   logStartupState("Steering", "Starting", "System initialization");

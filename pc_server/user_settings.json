@@ -2,6 +2,7 @@
   "visible_modules": [
     "ESP32_AIO",
     "ESP32_Row_Controller",
+    "ESP32_WiFi_AP",
     "ESP32_GPS"
   ]
 }

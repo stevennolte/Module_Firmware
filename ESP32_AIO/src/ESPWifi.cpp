@@ -5,6 +5,8 @@
 
 ESPWifi::ESPWifi(ESPdata* vars) {
     espData = vars;
+    staConnectStartTime = 0;
+    staConnectionTimedOut = false;
 }
 
 void ESPWifi::startAP() {
@@ -58,6 +60,12 @@ void ESPWifi::connectSTA() {
         return;
     }
 
+    // Set start time on first connection attempt
+    if (staConnectStartTime == 0) {
+        staConnectStartTime = millis();
+        Serial.println("STA: Starting connection attempts (120 second timeout)");
+    }
+
     Serial.printf("STA: scanning for %d configured network(s)...\n", espData->staCfg.count);
 
     // Scan available networks and find the first configured one
@@ -109,6 +117,7 @@ void ESPWifi::continuousLoop() {
             if (WiFi.status() == WL_CONNECTED) {
                 if (!mdnsStarted) {
                     mdnsStarted = true;
+                    staConnectionTimedOut = false;  // Reset timeout flag on successful connection
                     espData->staCfg.state = 1;
                     espData->wifi.state = 1;
                     // Update legacy wifi.ips with STA IP
@@ -131,8 +140,27 @@ void ESPWifi::continuousLoop() {
                     espData->wifi.ips[2] = espData->apCfg.ips[2];
                     espData->wifi.ips[3] = espData->apCfg.ips[3];
                     Serial.println("STA disconnected – reconnecting...");
+                    // Reset timeout on disconnect so we retry
+                    staConnectStartTime = 0;
+                    staConnectionTimedOut = false;
                 }
-                connectSTA();
+                
+                // Check if we've exceeded the 120 second timeout
+                if (!staConnectionTimedOut) {
+                    if (staConnectStartTime > 0 && (millis() - staConnectStartTime > 120000)) {
+                        staConnectionTimedOut = true;
+                        Serial.println("*** STA connection timeout (120s) - falling back to AP-only mode ***");
+                        espData->wifi.state = 3;  // AP only
+                        espData->staCfg.state = 0;
+                        // Restore AP IP in wifi.ips for display
+                        espData->wifi.ips[0] = espData->apCfg.ips[0];
+                        espData->wifi.ips[1] = espData->apCfg.ips[1];
+                        espData->wifi.ips[2] = espData->apCfg.ips[2];
+                        espData->wifi.ips[3] = espData->apCfg.ips[3];
+                    } else {
+                        connectSTA();
+                    }
+                }
             }
         }
         vTaskDelay(5000 / portTICK_PERIOD_MS);
