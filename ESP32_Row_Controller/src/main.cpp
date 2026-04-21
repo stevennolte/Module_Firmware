@@ -44,7 +44,7 @@ void updateRowOutputs() {
         toolbarUp = sectionData.toolbarOverrideValue;
     } else {
         // Check both toolbar sensors - with pullups, LOW means switch pressed (toolbar up)
-        toolbarUp = (digitalRead(gpioDefs.toolbarPins[0]) == LOW) || 
+        toolbarUp = (digitalRead(gpioDefs.toolbarPins[0]) == LOW) && 
                     (digitalRead(gpioDefs.toolbarPins[1]) == LOW);
     }
     
