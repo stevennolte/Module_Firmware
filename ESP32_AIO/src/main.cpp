@@ -579,8 +579,7 @@ void updateDebugVars() {
   debugVars.push_back("....Zero Point: " + String(espData.steer.currentZero));
   debugVars.push_back("....Scale Factor: " + String(espData.steer.currentScale, 2));
   debugVars.push_back("....Scaler: " + String(espData.steer.currentScaler, 2));
-  debugVars.push_back("....Filter Old: " + String(espData.steer.currentFilterOld, 2));
-  debugVars.push_back("....Filter New: " + String(espData.steer.currentFilterNew, 2));
+  debugVars.push_back("....Current Filter: " + String(espData.steer.currentFilter, 2));
   debugVars.push_back("....Direction: " + String(espData.steer.motorDirection == 0 ? "STOP" : (espData.steer.motorDirection == 1 ? "CW" : "CCW")));
   debugVars.push_back("..Current Limit Protection: ");
   debugVars.push_back("....Enabled: " + String(espData.steer.enableCurrentLimit ? "YES" : "NO"));
@@ -884,8 +883,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<p style='font-size:0.875rem;color:#555;margin-bottom:10px;'>Configure ADS1115 channel 2 current sensor. Output range: 1-254</p>";
   html += "<div class='form-group'><label>Current Zero Point (ADC):</label><input type='number' id='currentZero' min='0' max='65535' step='1' title='ADC value at 0 amps, typically 32767 for mid-scale sensors'></div>";
   html += "<div class='form-group'><label>Current Scale Factor:</label><input type='number' id='currentScale' min='0' max='10' step='0.1' title='Scaling factor to map ADC reading to 0-255 range'></div>";
-  html += "<div class='form-group'><label>Filter Old Weight:</label><input type='number' id='currentFilterOld' min='0' max='1' step='0.05' title='Filter weight for previous value (0.7 = 70%)'></div>";
-  html += "<div class='form-group'><label>Filter New Weight:</label><input type='number' id='currentFilterNew' min='0' max='1' step='0.05' title='Filter weight for new reading (0.3 = 30%)'></div>";
+  html += "<div class='form-group'><label>Current Filter (0-1):</label><input type='number' id='currentFilter' min='0' max='1' step='0.05' title='Weight given to new sample (e.g. 0.3 = 30% new, 70% old)'></div>";
   html += "<div class='form-group'><label>Current Scaler:</label><input type='number' id='currentScaler' min='0' max='5' step='0.1' title='Output multiplier (1.0 = no scaling)'></div>";
   html += "<div class='form-group'><label>Enable Current Limit:</label><select id='enableCurrentLimit' title='Automatically disable steering when current exceeds limit'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
   html += "<div class='form-group'><label>Current Limit (1-254):</label><input type='number' id='currentLimit' min='1' max='254' step='1' title='Current threshold to disable steering for overload protection'></div>";
@@ -972,8 +970,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.useADS !== undefined) document.getElementById('useADS').value = data.useADS;";
   html += "      if (data.currentZero !== undefined) document.getElementById('currentZero').value = data.currentZero;";
   html += "      if (data.currentScale !== undefined) document.getElementById('currentScale').value = data.currentScale;";
-  html += "      if (data.currentFilterOld !== undefined) document.getElementById('currentFilterOld').value = data.currentFilterOld;";
-  html += "      if (data.currentFilterNew !== undefined) document.getElementById('currentFilterNew').value = data.currentFilterNew;";
+  html += "      if (data.currentFilter !== undefined) document.getElementById('currentFilter').value = data.currentFilter;";
   html += "      if (data.currentScaler !== undefined) document.getElementById('currentScaler').value = data.currentScaler;";
   html += "      if (data.enableCurrentLimit !== undefined) document.getElementById('enableCurrentLimit').value = String(data.enableCurrentLimit);";
   html += "      if (data.currentLimit !== undefined) document.getElementById('currentLimit').value = data.currentLimit;";
@@ -1011,8 +1008,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
   html += "  formData.append('currentZero', parseInt(document.getElementById('currentZero').value) || 32767);";
   html += "  formData.append('currentScale', parseFloat(document.getElementById('currentScale').value) || 2.0);";
-  html += "  formData.append('currentFilterOld', parseFloat(document.getElementById('currentFilterOld').value) || 0.7);";
-  html += "  formData.append('currentFilterNew', parseFloat(document.getElementById('currentFilterNew').value) || 0.3);";
+  html += "  formData.append('currentFilter', parseFloat(document.getElementById('currentFilter').value) || 0.3);";
   html += "  formData.append('currentScaler', parseFloat(document.getElementById('currentScaler').value) || 1.0);";
   html += "  formData.append('enableCurrentLimit', document.getElementById('enableCurrentLimit').value);";
   html += "  formData.append('currentLimit', parseInt(document.getElementById('currentLimit').value) || 200);";
@@ -1101,8 +1097,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   // Motor current sensor settings
   doc["currentZero"] = espData.steer.currentZero;
   doc["currentScale"] = espData.steer.currentScale;
-  doc["currentFilterOld"] = espData.steer.currentFilterOld;
-  doc["currentFilterNew"] = espData.steer.currentFilterNew;
+  doc["currentFilter"] = espData.steer.currentFilter;
   doc["currentScaler"] = espData.steer.currentScaler;
   int limitValue = espData.steer.enableCurrentLimit ? 1 : 0;
   doc["enableCurrentLimit"] = limitValue;
@@ -1218,11 +1213,8 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   if (request->hasParam("currentScale", true)) {
     espData.steer.currentScale = request->getParam("currentScale", true)->value().toFloat();
   }
-  if (request->hasParam("currentFilterOld", true)) {
-    espData.steer.currentFilterOld = request->getParam("currentFilterOld", true)->value().toFloat();
-  }
-  if (request->hasParam("currentFilterNew", true)) {
-    espData.steer.currentFilterNew = request->getParam("currentFilterNew", true)->value().toFloat();
+  if (request->hasParam("currentFilter", true)) {
+    espData.steer.currentFilter = request->getParam("currentFilter", true)->value().toFloat();
   }
   if (request->hasParam("currentScaler", true)) {
     espData.steer.currentScaler = request->getParam("currentScaler", true)->value().toFloat();

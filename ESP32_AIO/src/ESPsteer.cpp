@@ -337,9 +337,9 @@ uint32_t ESPsteer::getCurrent() {
     espData->steer.currentBeforeFilter = scaledCurrent;
     
     // Apply exponential moving average filter.
-    // currentFilterOld + currentFilterNew should equal 1.0 for standard EMA behaviour.
-    filteredCurrent = (filteredCurrent * espData->steer.currentFilterOld)
-                    + (scaledCurrent  * espData->steer.currentFilterNew);
+    // currentFilter is the weight given to the new sample; (1 - currentFilter) weights the old value.
+    filteredCurrent = (filteredCurrent * (1.0f - espData->steer.currentFilter))
+                    + (scaledCurrent   * espData->steer.currentFilter);
     scaledCurrent = constrain((uint32_t)roundf(filteredCurrent), 1, 254);
     
     // Debug output if enabled
@@ -351,7 +351,7 @@ uint32_t ESPsteer::getCurrent() {
             Serial.printf("  Raw ADC:          %d\n", rawReading);
             Serial.printf("  Scaler:           %.2f\n", espData->steer.currentScaler);
             Serial.printf("  Before Filter:    %d (1-254 range)\n", (int)espData->steer.currentBeforeFilter);
-            Serial.printf("  Filter Old/New:   %.2f / %.2f\n", espData->steer.currentFilterOld, espData->steer.currentFilterNew);
+            Serial.printf("  Filter:           new=%.2f old=%.2f\n", espData->steer.currentFilter, 1.0f - espData->steer.currentFilter);
             Serial.printf("  Filtered Current: %d (1-254 range)\n", scaledCurrent);
             Serial.printf("  Limit Enabled:  %s\n", espData->steer.enableCurrentLimit ? "YES" : "NO");
             Serial.printf("  Current Limit:  %d\n", espData->steer.currentLimit);
