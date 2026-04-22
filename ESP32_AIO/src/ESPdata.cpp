@@ -264,8 +264,7 @@ uint8_t ESPdata::loadConfig(){
     // Load motor current sensor settings
     steer.currentZero = preferences.getUShort("currentZero", 32767);
     steer.currentScale = preferences.getFloat("currentScale", 2.0);
-    steer.currentFilterOld = preferences.getFloat("curFilterOld", 0.7);
-    steer.currentFilterNew = preferences.getFloat("curFilterNew", 0.3);
+    steer.currentFilter = preferences.getFloat("currentFilter", 0.3);
     steer.currentScaler = preferences.getFloat("currentScaler", 1.0);
     
     // Check if key exists first
@@ -409,8 +408,7 @@ uint8_t ESPdata::saveConfig(){
     // Save motor current sensor calibration
     preferences.putUShort("currentZero", steer.currentZero);
     preferences.putFloat("currentScale", steer.currentScale);
-    preferences.putFloat("curFilterOld", steer.currentFilterOld);
-    preferences.putFloat("curFilterNew", steer.currentFilterNew);
+    preferences.putFloat("currentFilter", steer.currentFilter);
 
     // Save GPS configuration
     preferences.putBool("externalGPS", gps.externalGPS);

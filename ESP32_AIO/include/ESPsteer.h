@@ -139,6 +139,7 @@ class ESPsteer{
         AutoTunePID pid;
         
         bool currentLimitLatched;   ///< @brief Persistent overcurrent fault latch state
+        float filteredCurrent = 0.0f; ///< @brief Exponential moving average filtered motor current
 
 };
 
