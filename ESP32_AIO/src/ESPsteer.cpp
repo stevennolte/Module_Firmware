@@ -336,22 +336,29 @@ uint32_t ESPsteer::getCurrent() {
     // Store scaled value for debug
     espData->steer.currentBeforeFilter = scaledCurrent;
     
+    // Apply exponential moving average filter.
+    // currentFilterOld + currentFilterNew should equal 1.0 for standard EMA behaviour.
+    filteredCurrent = (filteredCurrent * espData->steer.currentFilterOld)
+                    + (scaledCurrent  * espData->steer.currentFilterNew);
+    scaledCurrent = constrain((uint32_t)roundf(filteredCurrent), 1, 254);
+    
     // Debug output if enabled
     if (espData->steer.enableCurrentDebug) {
         static uint32_t lastDebugTime = 0;
         if (millis() - lastDebugTime > 500) {  // Print every 500ms to avoid spam
             lastDebugTime = millis();
             Serial.println("=== STEER CURRENT DEBUG ===");
-            Serial.printf("  Raw ADC:        %d\n", rawReading);
-            Serial.printf("  Scaler:         %.2f\n", espData->steer.currentScaler);
-            Serial.printf("  Scaled Current: %d (1-254 range)\n", scaledCurrent);
+            Serial.printf("  Raw ADC:          %d\n", rawReading);
+            Serial.printf("  Scaler:           %.2f\n", espData->steer.currentScaler);
+            Serial.printf("  Before Filter:    %d (1-254 range)\n", (int)espData->steer.currentBeforeFilter);
+            Serial.printf("  Filter Old/New:   %.2f / %.2f\n", espData->steer.currentFilterOld, espData->steer.currentFilterNew);
+            Serial.printf("  Filtered Current: %d (1-254 range)\n", scaledCurrent);
             Serial.printf("  Limit Enabled:  %s\n", espData->steer.enableCurrentLimit ? "YES" : "NO");
             Serial.printf("  Current Limit:  %d\n", espData->steer.currentLimit);
             Serial.printf("  Limit Tripped:  %s\n", espData->steer.currentLimitTripped ? "YES" : "NO");
             Serial.printf("  PWM Command:    %d\n", espData->steer.pwmCmd);
             Serial.printf("  Motor Dir:      %d (0=stop, 1=CW, 2=CCW)\n", espData->steer.motorDirection);
             Serial.printf("  Min/Max PWM:    %d / %d\n", espData->steer.minPWM, espData->steer.highPWM);
-            Serial.printf("  CALCULATION: map(%d, 0, 65535, 1, 254) = %d\n", rawReading, scaledCurrent);
             Serial.println("==========================");
         }
     }
