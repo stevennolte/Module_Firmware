@@ -253,6 +253,7 @@ uint8_t ESPdata::loadConfig(){
     // Load steering configuration
     // preferences.putFloat("Kp", 50.0); // Ensure Kp has a default value if not set   
     steer.gainP = preferences.getFloat("Kp", 50.0);
+    steer.gainI = preferences.getFloat("Ki", 0.0);
     steer.highPWM = preferences.getUChar("highPWM", 255);
     steer.lowPWM = preferences.getUChar("lowPWM", 10);
     steer.minPWM = preferences.getUChar("minPWM", 5);
@@ -380,6 +381,7 @@ uint8_t ESPdata::saveConfig(){
 
     // Save steering configuration
     preferences.putFloat("Kp", steer.gainP);
+    preferences.putFloat("Ki", steer.gainI);
     preferences.putUChar("highPWM", steer.highPWM);
     preferences.putUChar("lowPWM", steer.lowPWM);
     preferences.putUChar("minPWM", steer.minPWM);
@@ -444,6 +446,7 @@ uint8_t ESPdata::updateServer(){
 
 uint8_t ESPdata::updateSteer(){
     preferences.putFloat("Kp", steer.gainP);
+    preferences.putFloat("Ki", steer.gainI);
     preferences.putUChar("highPWM", steer.highPWM);
     preferences.putUChar("lowPWM", steer.lowPWM);
     preferences.putUChar("minPWM", steer.minPWM);
