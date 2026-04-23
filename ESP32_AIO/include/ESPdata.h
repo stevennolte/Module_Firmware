@@ -569,7 +569,6 @@ public:
         
         // Motor current sensor calibration
         uint16_t currentZero = 32767;   ///< @brief Current sensor zero point (ADC value at 0 amps, default 32767 for mid-scale)
-        float currentScale = 2.0;       ///< @brief Current sensor scaling factor (default 2.0)
         float currentFilter = 0.3;       ///< @brief EMA filter weight for new sample (0.0–1.0, default 0.3; old weight = 1 - currentFilter)
         float currentScaler = 1.0;      ///< @brief Current output scaler multiplier (default 1.0)
         

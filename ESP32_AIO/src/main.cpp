@@ -577,7 +577,6 @@ void updateDebugVars() {
   debugVars.push_back("....Raw ADC: " + String(espData.steer.rawCurrentADC));
   debugVars.push_back("....Pre-Filter: " + String(espData.steer.currentBeforeFilter, 2));
   debugVars.push_back("....Zero Point: " + String(espData.steer.currentZero));
-  debugVars.push_back("....Scale Factor: " + String(espData.steer.currentScale, 2));
   debugVars.push_back("....Scaler: " + String(espData.steer.currentScaler, 2));
   debugVars.push_back("....Current Filter: " + String(espData.steer.currentFilter, 2));
   debugVars.push_back("....Direction: " + String(espData.steer.motorDirection == 0 ? "STOP" : (espData.steer.motorDirection == 1 ? "CW" : "CCW")));
@@ -882,7 +881,6 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='section-title'>Motor Current Sensor Calibration</div>";
   html += "<p style='font-size:0.875rem;color:#555;margin-bottom:10px;'>Configure ADS1115 channel 2 current sensor. Output range: 1-254</p>";
   html += "<div class='form-group'><label>Current Zero Point (ADC):</label><input type='number' id='currentZero' min='0' max='65535' step='1' title='ADC value at 0 amps, typically 32767 for mid-scale sensors'></div>";
-  html += "<div class='form-group'><label>Current Scale Factor:</label><input type='number' id='currentScale' min='0' max='10' step='0.1' title='Scaling factor to map ADC reading to 0-255 range'></div>";
   html += "<div class='form-group'><label>Current Filter (0-1):</label><input type='number' id='currentFilter' min='0' max='1' step='0.05' title='Weight given to new sample (e.g. 0.3 = 30% new, 70% old)'></div>";
   html += "<div class='form-group'><label>Current Scaler:</label><input type='number' id='currentScaler' min='0' max='5' step='0.1' title='Output multiplier (1.0 = no scaling)'></div>";
   html += "<div class='form-group'><label>Enable Current Limit:</label><select id='enableCurrentLimit' title='Automatically disable steering when current exceeds limit'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
@@ -900,6 +898,20 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='form-group'><label>Flip Pitch/Roll:</label><select id='flipPitchRoll'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
   html += "<div class='form-group'><label>Invert Roll:</label><select id='invertRoll'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
   html += "<div class='form-group'><label>Disable Heading Output:</label><select id='disableHeading'><option value='0'>No (Send Heading)</option><option value='1'>Yes (Pitch/Roll Only)</option></select></div>";
+  html += "</div>";
+  
+  // Settings Import/Export Section
+  html += "<div class='section'>";
+  html += "<div class='section-title'>Backup & Restore</div>";
+  html += "<p style='font-size:0.875rem;color:#555;margin-bottom:10px;'>Export settings to backup or transfer to another module. Import to restore settings.</p>";
+  html += "<div style='display: flex; gap: 10px; flex-wrap: wrap;'>";
+  html += "<button class='button' onclick='exportSettings()'>📥 Download Settings</button>";
+  html += "<div>";
+  html += "<input type='file' id='importFile' accept='.json' style='display:none' onchange='importSettings()'>";
+  html += "<button class='button' onclick='document.getElementById(\"importFile\").click()'>📤 Upload Settings</button>";
+  html += "</div>";
+  html += "</div>";
+  html += "<p id='importStatus' style='margin-top:8px; color:#666;'></p>";
   html += "</div>";
   
   // Action buttons
@@ -969,7 +981,6 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.wasFilter !== undefined) document.getElementById('wasFilter').value = data.wasFilter;";
   html += "      if (data.useADS !== undefined) document.getElementById('useADS').value = data.useADS;";
   html += "      if (data.currentZero !== undefined) document.getElementById('currentZero').value = data.currentZero;";
-  html += "      if (data.currentScale !== undefined) document.getElementById('currentScale').value = data.currentScale;";
   html += "      if (data.currentFilter !== undefined) document.getElementById('currentFilter').value = data.currentFilter;";
   html += "      if (data.currentScaler !== undefined) document.getElementById('currentScaler').value = data.currentScaler;";
   html += "      if (data.enableCurrentLimit !== undefined) document.getElementById('enableCurrentLimit').value = String(data.enableCurrentLimit);";
@@ -1007,7 +1018,6 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('wasFilter', parseFloat(document.getElementById('wasFilter').value) || 0.2);";
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
   html += "  formData.append('currentZero', parseInt(document.getElementById('currentZero').value) || 32767);";
-  html += "  formData.append('currentScale', parseFloat(document.getElementById('currentScale').value) || 2.0);";
   html += "  formData.append('currentFilter', parseFloat(document.getElementById('currentFilter').value) || 0.3);";
   html += "  formData.append('currentScaler', parseFloat(document.getElementById('currentScaler').value) || 1.0);";
   html += "  formData.append('enableCurrentLimit', document.getElementById('enableCurrentLimit').value);";
@@ -1048,6 +1058,48 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "    .then(r => r.text())";
   html += "    .then(msg => { msgEl.textContent = msg; msgEl.style.color = msg.includes('removed') ? 'green' : 'red'; })";
   html += "    .catch(e => { msgEl.textContent = 'Error: ' + e; msgEl.style.color = 'red'; });";
+  html += "}";
+  
+  html += "function exportSettings() {";
+  html += "  fetch('/exportSettings')";
+  html += "    .then(response => response.blob())";
+  html += "    .then(blob => {";
+  html += "      const url = window.URL.createObjectURL(blob);";
+  html += "      const a = document.createElement('a');";
+  html += "      a.href = url;";
+  html += "      a.download = 'esp32_settings_' + new Date().toISOString().slice(0,10) + '.json';";
+  html += "      document.body.appendChild(a);";
+  html += "      a.click();";
+  html += "      window.URL.revokeObjectURL(url);";
+  html += "      document.body.removeChild(a);";
+  html += "      showStatus('Settings downloaded successfully', false);";
+  html += "    })";
+  html += "    .catch(e => { showStatus('Error downloading settings: ' + e, true); });";
+  html += "}";
+  
+  html += "function importSettings() {";
+  html += "  const fileInput = document.getElementById('importFile');";
+  html += "  const statusEl = document.getElementById('importStatus');";
+  html += "  if (!fileInput.files.length) { statusEl.textContent = 'No file selected'; return; }";
+  html += "  const file = fileInput.files[0];";
+  html += "  if (!file.name.endsWith('.json')) { statusEl.textContent = 'Please select a JSON file'; statusEl.style.color = 'red'; return; }";
+  html += "  statusEl.textContent = 'Uploading settings...';";
+  html += "  statusEl.style.color = '#666';";
+  html += "  const formData = new FormData();";
+  html += "  formData.append('file', file);";
+  html += "  fetch('/importSettings', { method: 'POST', body: formData })";
+  html += "    .then(r => r.text())";
+  html += "    .then(msg => {";
+  html += "      statusEl.textContent = msg;";
+  html += "      statusEl.style.color = msg.includes('success') ? 'green' : 'red';";
+  html += "      if (msg.includes('Rebooting')) {";
+  html += "        setTimeout(() => { window.location.href = '/'; }, 3000);";
+  html += "      } else {";
+  html += "        setTimeout(() => { loadSettings(); }, 1000);";
+  html += "      }";
+  html += "    })";
+  html += "    .catch(e => { statusEl.textContent = 'Upload error: ' + e; statusEl.style.color = 'red'; });";
+  html += "  fileInput.value = '';";
   html += "}";
   
   html += "window.onload = loadSettings;";
@@ -1096,7 +1148,6 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   
   // Motor current sensor settings
   doc["currentZero"] = espData.steer.currentZero;
-  doc["currentScale"] = espData.steer.currentScale;
   doc["currentFilter"] = espData.steer.currentFilter;
   doc["currentScaler"] = espData.steer.currentScaler;
   int limitValue = espData.steer.enableCurrentLimit ? 1 : 0;
@@ -1209,9 +1260,6 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   // Motor current sensor settings
   if (request->hasParam("currentZero", true)) {
     espData.steer.currentZero = request->getParam("currentZero", true)->value().toInt();
-  }
-  if (request->hasParam("currentScale", true)) {
-    espData.steer.currentScale = request->getParam("currentScale", true)->value().toFloat();
   }
   if (request->hasParam("currentFilter", true)) {
     espData.steer.currentFilter = request->getParam("currentFilter", true)->value().toFloat();
@@ -1372,6 +1420,226 @@ void handleRemoveNetwork(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", "Network removed. Rebooting...");
   delay(500);
   ESP.restart();
+}
+
+// Export settings as downloadable JSON file
+void handleExportSettings(AsyncWebServerRequest *request) {
+  Serial.println("=== EXPORT SETTINGS REQUEST ===");
+  
+  JsonDocument doc;
+  
+  // WiFi settings
+  doc["wifi_mode"] = espData.wifiMode;
+  doc["ap_ssid"]   = espData.apCfg.ssid;
+  doc["ap_pass"]   = espData.apCfg.password;
+  doc["ap_ch"]     = espData.apCfg.channel;
+  doc["ap_ip3"]    = espData.apCfg.ips[3];
+  JsonArray networks = doc.createNestedArray("sta_networks");
+  for (int i = 0; i < espData.staCfg.count; i++) {
+    JsonObject net = networks.createNestedObject();
+    net["ssid"] = espData.staCfg.ssids[i];
+    net["pass"] = espData.staCfg.passwords[i];
+  }
+
+  // Steering settings
+  doc["kp"] = espData.steer.gainP;
+  doc["highPWM"] = espData.steer.highPWM;
+  doc["lowPWM"] = espData.steer.lowPWM;
+  doc["minPWM"] = espData.steer.minPWM;
+  doc["countsPerDeg"] = espData.steer.countsPerDeg;
+  doc["wasOffset"] = espData.steer.steerOffset;
+  doc["pidInputFilt"] = espData.steer.pidInputFilt;
+  doc["pidOutputFilt"] = espData.steer.pidOutputFilt;
+  doc["wasFilter"] = espData.steer.wasFilterValue;
+  doc["useADS"] = espData.steer.useADS;
+  
+  // Motor current sensor settings
+  doc["currentZero"] = espData.steer.currentZero;
+  doc["currentFilter"] = espData.steer.currentFilter;
+  doc["currentScaler"] = espData.steer.currentScaler;
+  doc["enableCurrentLimit"] = espData.steer.enableCurrentLimit ? 1 : 0;
+  doc["currentLimit"] = (int)espData.steer.currentLimit;
+  
+  // System settings
+  doc["gpsSource"] = espData.gps.externalGPS ? 1 : 0;
+  doc["wasSource"] = espData.steer.wirelessWAS ? 1 : 0;
+  doc["ledBrightness"] = espData.program.ledBrht;
+  doc["adsAddress"] = "0x48";
+  doc["pandaMode"] = espData.gps.ntripPandaMode ? 1 : 0;
+  doc["flipPitchRoll"] = espData.gps.flipPitchRoll ? 1 : 0;
+  doc["invertRoll"] = espData.gps.invertRoll ? 1 : 0;
+  doc["disableHeading"] = espData.gps.disableHeading ? 1 : 0;
+  
+  String response;
+  serializeJson(doc, response);
+  
+  AsyncWebServerResponse *downloadResponse = request->beginResponse(200, "application/json", response);
+  downloadResponse->addHeader("Content-Disposition", "attachment; filename=\"esp32_settings.json\"");
+  request->send(downloadResponse);
+  
+  Serial.println("Settings exported successfully");
+}
+
+// Import settings from uploaded JSON file
+void handleImportSettings(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  static String jsonBuffer;
+  
+  if (!index) {
+    Serial.println("=== IMPORT SETTINGS REQUEST ===");
+    jsonBuffer = "";
+  }
+  
+  // Accumulate data
+  for (size_t i = 0; i < len; i++) {
+    jsonBuffer += (char)data[i];
+  }
+  
+  if (final) {
+    Serial.println("Received JSON:");
+    Serial.println(jsonBuffer);
+    
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonBuffer);
+    
+    if (error) {
+      Serial.print("JSON parse error: ");
+      Serial.println(error.c_str());
+      request->send(400, "text/plain", "Invalid JSON file");
+      return;
+    }
+    
+    bool doReboot = false;
+    
+    // WiFi / AP settings
+    if (doc.containsKey("wifi_mode")) {
+      espData.wifiMode = doc["wifi_mode"];
+      doReboot = true;
+    }
+    if (doc.containsKey("ap_ssid")) {
+      String v = doc["ap_ssid"].as<String>();
+      if (v.length() > 0 && v.length() < 64) {
+        snprintf(espData.apCfg.ssid, sizeof(espData.apCfg.ssid), "%s", v.c_str());
+        doReboot = true;
+      }
+    }
+    if (doc.containsKey("ap_pass")) {
+      String v = doc["ap_pass"].as<String>();
+      if (v.length() > 0 && v.length() < 64) {
+        snprintf(espData.apCfg.password, sizeof(espData.apCfg.password), "%s", v.c_str());
+        doReboot = true;
+      }
+    }
+    if (doc.containsKey("ap_ip3")) {
+      int ip3 = doc["ap_ip3"];
+      if (ip3 >= 1 && ip3 <= 254) {
+        espData.apCfg.ips[3] = ip3;
+        doReboot = true;
+      }
+    }
+    
+    // STA networks
+    if (doc.containsKey("sta_networks")) {
+      JsonArray networks = doc["sta_networks"];
+      int count = min((int)networks.size(), (int)ESPdata::STAConfig::MAX_NETWORKS);
+      
+      for (int i = 0; i < count; i++) {
+        JsonObject net = networks[i];
+        String ssid = net["ssid"].as<String>();
+        String pass = net["pass"].as<String>();
+        
+        snprintf(espData.staCfg.ssids[i], sizeof(espData.staCfg.ssids[i]), "%s", ssid.c_str());
+        snprintf(espData.staCfg.passwords[i], sizeof(espData.staCfg.passwords[i]), "%s", pass.c_str());
+      }
+      
+      espData.staCfg.count = count;
+      doReboot = true;
+    }
+    
+    // Steering settings
+    if (doc.containsKey("kp")) {
+      espData.steer.gainP = doc["kp"];
+    }
+    if (doc.containsKey("highPWM")) {
+      espData.steer.highPWM = doc["highPWM"];
+    }
+    if (doc.containsKey("lowPWM")) {
+      espData.steer.lowPWM = doc["lowPWM"];
+    }
+    if (doc.containsKey("minPWM")) {
+      espData.steer.minPWM = doc["minPWM"];
+    }
+    if (doc.containsKey("countsPerDeg")) {
+      espData.steer.countsPerDeg = doc["countsPerDeg"];
+    }
+    if (doc.containsKey("wasOffset")) {
+      espData.steer.steerOffset = doc["wasOffset"];
+    }
+    if (doc.containsKey("pidInputFilt")) {
+      espData.steer.pidInputFilt = doc["pidInputFilt"];
+    }
+    if (doc.containsKey("pidOutputFilt")) {
+      espData.steer.pidOutputFilt = doc["pidOutputFilt"];
+    }
+    if (doc.containsKey("wasFilter")) {
+      espData.steer.wasFilterValue = doc["wasFilter"];
+    }
+    if (doc.containsKey("useADS")) {
+      espData.steer.useADS = doc["useADS"];
+    }
+    
+    // Motor current sensor settings
+    if (doc.containsKey("currentZero")) {
+      espData.steer.currentZero = doc["currentZero"];
+    }
+    if (doc.containsKey("currentFilter")) {
+      espData.steer.currentFilter = doc["currentFilter"];
+    }
+    if (doc.containsKey("currentScaler")) {
+      espData.steer.currentScaler = doc["currentScaler"];
+    }
+    if (doc.containsKey("enableCurrentLimit")) {
+      espData.steer.enableCurrentLimit = doc["enableCurrentLimit"].as<int>() != 0;
+    }
+    if (doc.containsKey("currentLimit")) {
+      espData.steer.currentLimit = doc["currentLimit"];
+    }
+    
+    // System settings
+    if (doc.containsKey("gpsSource")) {
+      espData.gps.externalGPS = doc["gpsSource"].as<int>() != 0;
+    }
+    if (doc.containsKey("wasSource")) {
+      espData.steer.wirelessWAS = doc["wasSource"].as<int>() != 0;
+    }
+    if (doc.containsKey("ledBrightness")) {
+      espData.program.ledBrht = doc["ledBrightness"];
+    }
+    if (doc.containsKey("pandaMode")) {
+      espData.gps.ntripPandaMode = doc["pandaMode"].as<int>() != 0;
+    }
+    if (doc.containsKey("flipPitchRoll")) {
+      espData.gps.flipPitchRoll = doc["flipPitchRoll"].as<int>() != 0;
+    }
+    if (doc.containsKey("invertRoll")) {
+      espData.gps.invertRoll = doc["invertRoll"].as<int>() != 0;
+    }
+    if (doc.containsKey("disableHeading")) {
+      espData.gps.disableHeading = doc["disableHeading"].as<int>() != 0;
+    }
+    
+    // Save all settings to NVS
+    espData.saveConfig();
+    
+    Serial.println("Settings imported and saved successfully");
+    
+    if (doReboot) {
+      request->send(200, "text/plain", "Settings imported successfully. Rebooting...");
+      delay(500);
+      ESP.restart();
+    } else {
+      request->send(200, "text/plain", "Settings imported successfully");
+    }
+  }
 }
 
 // File download handler
@@ -1849,9 +2117,11 @@ void recoveryBoot() {
   server.on("/settings", HTTP_GET, handleSettingsPage);
   server.on("/getSettings", HTTP_GET, handleGetSettings);
   server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+  server.on("/exportSettings", HTTP_GET, handleExportSettings);
+  server.on("/importSettings", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleImportSettings);
   server.on("/addNetwork",    HTTP_POST, handleAddNetwork);
   server.on("/removeNetwork", HTTP_POST, handleRemoveNetwork);
-  Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings");
+  Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings, /exportSettings, /importSettings");
   server.on("/getFiles", HTTP_GET, handleFileList);
   server.on("/download", HTTP_GET, handleFileDownload);
   server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleFileUpload);
@@ -2054,9 +2324,11 @@ void normalboot(){
         server.on("/settings", HTTP_GET, handleSettingsPage);
         server.on("/getSettings", HTTP_GET, handleGetSettings);
         server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+        server.on("/exportSettings", HTTP_GET, handleExportSettings);
+        server.on("/importSettings", HTTP_POST, [](AsyncWebServerRequest *request) {}, handleImportSettings);
         server.on("/addNetwork",    HTTP_POST, handleAddNetwork);
         server.on("/removeNetwork", HTTP_POST, handleRemoveNetwork);
-        Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings");
+        Serial.println("Settings endpoints registered: /settings, /getSettings, /saveSettings, /exportSettings, /importSettings");
         server.on("/getFiles", HTTP_GET, handleFileList);
         // Route to download files
         server.on("/download", HTTP_GET, handleFileDownload);
