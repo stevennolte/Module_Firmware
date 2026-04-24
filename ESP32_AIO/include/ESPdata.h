@@ -544,6 +544,8 @@ public:
         float absAngle = 0.0;             ///< @brief Absolute steering angle (degrees)
         uint8_t settingsUpdated = 0;    ///< @brief Flag indicating steering settings have been updated
         uint8_t gainP = 1;          ///< @brief PID proportional gain value
+        float gainI = 0.0;          ///< @brief PID integral gain value (Ki)
+        float steerDeadband = 0.0;  ///< @brief Steering angle deadband (degrees); command set to 0 when error <= this value
         uint8_t highPWM = 255;      ///< @brief High-speed PWM limit for motor control
         uint8_t lowPWM = 0;         ///< @brief Low-speed PWM limit for motor control
         uint8_t minPWM = 0;             ///< @brief Minimum PWM threshold for motor activation
