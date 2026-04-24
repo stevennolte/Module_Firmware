@@ -3,7 +3,7 @@ import os
 Import("env", "projenv")
 
 version_path = r"./include/Version.h"
-bin_path = r"./.pio/build/esp32-s3-devkitc-1/firmware.bin"
+bin_path = r"./.pio/build/esp32doit-devkit-v1/firmware.bin"
 program = ""
 newVersion = ""
 
