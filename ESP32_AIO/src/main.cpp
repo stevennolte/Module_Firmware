@@ -790,6 +790,73 @@ void handleDebugVars(AsyncWebServerRequest *request) {
 //   Serial.println("Sent File List");
 // }
 
+// Steering debug data endpoint - returns all steering-related runtime values as JSON
+void handleGetSteerData(AsyncWebServerRequest *request) {
+  JsonDocument doc;
+
+  // Control state
+  doc["status"]           = espData.steer.status;
+  doc["testState"]        = espData.steer.testState;
+  doc["steerSwitch"]      = espData.steer.steerSwitch;
+  doc["switchState"]      = espData.steer.switchState;
+  doc["watchdog"]         = espData.steer.watchdog;
+
+  // Steering angles
+  doc["targetAngle"]      = espData.steer.targetSteerAngle;
+  doc["actAngle"]         = espData.steer.actSteerAngle;
+  doc["rawADS"]           = espData.steer.rawADS;
+  doc["sensorVoltage"]    = espData.steer.sensorVoltage;
+  doc["wasZeroAngle"]     = espData.steer.wasZeroAngle;
+  doc["absAngle"]         = espData.steer.absAngle;
+
+  // PID
+  doc["gainP"]            = espData.steer.gainP;
+  doc["pidInputFilt"]     = espData.steer.pidInputFilt;
+  doc["pidOutputFilt"]    = espData.steer.pidOutputFilt;
+  doc["pidCmd"]           = espData.steer.pidCmd;
+  doc["pidOutput"]        = espData.steer.pidOutput;
+  doc["pidInput"]         = espData.steer.pidInput;
+
+  // Motor / PWM
+  doc["pwmCmd"]           = espData.steer.pwmCmd;
+  doc["motorDirection"]   = espData.steer.motorDirection;
+  doc["highPWM"]          = espData.steer.highPWM;
+  doc["lowPWM"]           = espData.steer.lowPWM;
+  doc["minPWM"]           = espData.steer.minPWM;
+  doc["minCmd"]           = espData.steer.minCmd;
+  doc["maxCmd"]           = espData.steer.maxCmd;
+  doc["minScalar"]        = espData.steer.minScalar;
+  doc["maxScalar"]        = espData.steer.maxScalar;
+
+  // Current monitoring
+  doc["steerCurrent"]       = espData.steer.steerCurrent;
+  doc["rawCurrentADC"]      = espData.steer.rawCurrentADC;
+  doc["currentBeforeFilter"]= espData.steer.currentBeforeFilter;
+  doc["currentZero"]        = espData.steer.currentZero;
+  doc["currentScaler"]      = espData.steer.currentScaler;
+  doc["currentFilter"]      = espData.steer.currentFilter;
+  doc["enableCurrentLimit"] = espData.steer.enableCurrentLimit;
+  doc["currentLimit"]       = espData.steer.currentLimit;
+  doc["currentLimitTripped"]= espData.steer.currentLimitTripped;
+  doc["enableCurrentDebug"] = espData.steer.enableCurrentDebug;
+
+  // WAS configuration
+  doc["countsPerDeg"]     = espData.steer.countsPerDeg;
+  doc["steerOffset"]      = espData.steer.steerOffset;
+  doc["ackermanFix"]      = espData.steer.ackermanFix;
+  doc["invertWAS"]        = espData.steer.invertWAS;
+  doc["wirelessWAS"]      = espData.steer.wirelessWAS;
+  doc["wasFilterValue"]   = espData.steer.wasFilterValue;
+
+  // Performance
+  doc["looptime"]         = espData.steer.looptime;
+  doc["steerMsgRate"]     = espData.steer.steerMsgRate;
+
+  String response;
+  serializeJson(doc, response);
+  request->send(200, "application/json", response);
+}
+
 // Reboot handler
 void handleReboot(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", "Rebooting...");
@@ -2257,6 +2324,15 @@ void normalboot(){
         });
         // Route to get debug variables as JSON
         server.on("/getDebugVars", HTTP_GET, handleDebugVars);
+        // Steering debug page and data endpoint
+        server.on("/steering_debug", HTTP_GET, [](AsyncWebServerRequest *request){
+          if (LittleFS.exists("/steering_debug.html")) {
+            request->send(LittleFS, "/steering_debug.html");
+          } else {
+            request->send(404, "text/plain", "steering_debug.html not found");
+          }
+        });
+        server.on("/getSteerData", HTTP_GET, handleGetSteerData);
         
         // Route to set debug mode (minimal vs full)
         server.on("/setDebugMode", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
