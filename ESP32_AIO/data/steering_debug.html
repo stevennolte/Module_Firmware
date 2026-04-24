@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Steering Debug – ESP32_AIO</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+    header {
+      background: #1565c0;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.4rem; }
+    #connStatus { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; background: #90a4ae; }
+    #connStatus.ok  { background: #43a047; }
+    #connStatus.err { background: #e53935; }
+    nav {
+      margin-bottom: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      text-decoration: none;
+      color: white;
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      background: #1565c0;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: #0d47a1; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #1565c0;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e3f2fd;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    td { padding: 5px 4px; }
+    td:first-child { color: #555; width: 55%; }
+    td:last-child  { font-weight: bold; text-align: right; font-family: monospace; }
+    tr:nth-child(even) { background: #f8f9fa; }
+
+    /* Angle visualiser */
+    #angleVis {
+      position: relative;
+      width: 100%;
+      margin: 12px 0 4px;
+    }
+    #angleTrack {
+      height: 12px;
+      background: #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    #angleCentre {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      background: #9e9e9e;
+    }
+    #angleTarget {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 6px;
+      background: #ff9800;
+      border-radius: 3px;
+      transform: translateX(-50%);
+      transition: left 0.15s;
+    }
+    #angleActual {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 6px;
+      background: #1565c0;
+      border-radius: 3px;
+      transform: translateX(-50%);
+      transition: left 0.15s;
+    }
+    .angle-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: #777;
+      margin-top: 2px;
+    }
+    .legend { display: flex; gap: 16px; font-size: 0.75rem; margin-top: 6px; }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      color: white;
+    }
+    .badge-ok      { background: #43a047; }
+    .badge-warn    { background: #ff9800; }
+    .badge-error   { background: #e53935; }
+    .badge-neutral { background: #78909c; }
+
+    /* PID bar */
+    .pid-bar-wrap {
+      height: 10px;
+      background: #e0e0e0;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .pid-bar {
+      height: 100%;
+      background: #1565c0;
+      border-radius: 5px;
+      transition: width 0.15s;
+    }
+    .pid-bar.negative { background: #e53935; }
+
+    /* Controls row */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .controls label { font-size: 0.875rem; }
+    .controls input[type=number] {
+      width: 80px;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+    .controls button {
+      padding: 7px 16px;
+      font-size: 0.875rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1565c0;
+      color: white;
+      transition: background 0.2s;
+    }
+    .controls button:hover { background: #0d47a1; }
+    .controls button.pause { background: #ff9800; }
+    .controls button.pause:hover { background: #e65100; }
+    #lastUpdate { font-size: 0.75rem; color: #888; margin-left: auto; }
+
+    /* Current bar */
+    .current-bar-wrap {
+      height: 14px;
+      background: #e0e0e0;
+      border-radius: 7px;
+      overflow: hidden;
+      margin-top: 6px;
+      position: relative;
+    }
+    .current-bar {
+      height: 100%;
+      background: #43a047;
+      border-radius: 7px;
+      transition: width 0.2s, background 0.2s;
+    }
+    .current-limit-line {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 2px;
+      background: #e53935;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🚗 Steering Debug</h1>
+    <span id="connStatus">●&nbsp;Connecting</span>
+  </header>
+
+  <nav>
+    <a href="/">🏠 Home</a>
+    <a href="/settings">⚙️ Settings</a>
+    <a href="/serialmonitor">📡 Serial Monitor</a>
+  </nav>
+
+  <div class="controls">
+    <label for="intervalInput">Refresh&nbsp;(ms):</label>
+    <input type="number" id="intervalInput" value="300" min="100" step="100">
+    <button onclick="applyInterval()">Set</button>
+    <button id="pauseBtn" class="pause" onclick="togglePause()">⏸ Pause</button>
+    <span id="lastUpdate"></span>
+  </div>
+
+  <!-- Angle visualiser (full-width card) -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>Steering Angle</h2>
+    <div id="angleVis">
+      <div id="angleTrack">
+        <div id="angleCentre"></div>
+        <div id="angleTarget"></div>
+        <div id="angleActual"></div>
+      </div>
+      <div class="angle-labels">
+        <span id="angleLabelLeft">-40°</span>
+        <span>0°</span>
+        <span id="angleLabelRight">+40°</span>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:#1565c0"></span>Actual: <strong id="actAngleLabel">—</strong></span>
+      <span><span class="dot" style="background:#ff9800"></span>Target: <strong id="tgtAngleLabel">—</strong></span>
+      <span>Error: <strong id="errAngleLabel">—</strong></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Control Status -->
+    <div class="card">
+      <h2>Control Status</h2>
+      <table>
+        <tr><td>Steer Status</td>    <td><span id="s_status" class="badge badge-neutral">—</span></td></tr>
+        <tr><td>Test State</td>      <td><span id="s_testState" class="badge badge-neutral">—</span></td></tr>
+        <tr><td>Steer Switch</td>    <td id="s_steerSwitch">—</td></tr>
+        <tr><td>Switch State</td>    <td id="s_switchState">—</td></tr>
+        <tr><td>Watchdog (ms ago)</td><td id="s_watchdog">—</td></tr>
+        <tr><td>Loop Time</td>       <td id="s_looptime">—</td></tr>
+        <tr><td>Msg Rate</td>        <td id="s_steerMsgRate">—</td></tr>
+      </table>
+    </div>
+
+    <!-- PID Controller -->
+    <div class="card">
+      <h2>PID Controller</h2>
+      <table>
+        <tr><td>Gain P (Kp)</td>         <td id="s_gainP">—</td></tr>
+        <tr><td>Input Filter (α)</td>    <td id="s_pidInputFilt">—</td></tr>
+        <tr><td>Output Filter (α)</td>   <td id="s_pidOutputFilt">—</td></tr>
+        <tr><td>PID Input (error)</td>   <td id="s_pidInput">—</td></tr>
+        <tr><td>PID Output (−1…+1)</td>  <td id="s_pidOutput">—</td></tr>
+        <tr><td>PID Command</td>         <td id="s_pidCmd">—</td></tr>
+      </table>
+      <div style="margin-top:8px; font-size:0.75rem; color:#555;">PID Output</div>
+      <div class="pid-bar-wrap">
+        <div class="pid-bar" id="pidBar" style="width:50%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#777;margin-top:2px;">
+        <span>−1.0</span><span>0</span><span>+1.0</span>
+      </div>
+    </div>
+
+    <!-- Motor / PWM -->
+    <div class="card">
+      <h2>Motor / PWM</h2>
+      <table>
+        <tr><td>Direction</td>     <td><span id="s_motorDir" class="badge badge-neutral">—</span></td></tr>
+        <tr><td>PWM Command</td>   <td id="s_pwmCmd">—</td></tr>
+        <tr><td>Min PWM</td>       <td id="s_minPWM">—</td></tr>
+        <tr><td>High PWM</td>      <td id="s_highPWM">—</td></tr>
+        <tr><td>Low PWM</td>       <td id="s_lowPWM">—</td></tr>
+        <tr><td>Min Cmd (counts)</td><td id="s_minCmd">—</td></tr>
+        <tr><td>Max Cmd (counts)</td><td id="s_maxCmd">—</td></tr>
+        <tr><td>Min Scalar</td>    <td id="s_minScalar">—</td></tr>
+        <tr><td>Max Scalar</td>    <td id="s_maxScalar">—</td></tr>
+      </table>
+    </div>
+
+    <!-- WAS / Angle Sensor -->
+    <div class="card">
+      <h2>Wheel Angle Sensor (WAS)</h2>
+      <table>
+        <tr><td>Actual Angle (°)</td>  <td id="s_actAngle">—</td></tr>
+        <tr><td>Abs Angle (°)</td>     <td id="s_absAngle">—</td></tr>
+        <tr><td>WAS Zero Angle</td>    <td id="s_wasZeroAngle">—</td></tr>
+        <tr><td>Raw ADS</td>           <td id="s_rawADS">—</td></tr>
+        <tr><td>Sensor Voltage (V)</td><td id="s_sensorVoltage">—</td></tr>
+        <tr><td>Counts / Deg</td>      <td id="s_countsPerDeg">—</td></tr>
+        <tr><td>Steer Offset</td>      <td id="s_steerOffset">—</td></tr>
+        <tr><td>Ackerman Fix</td>      <td id="s_ackermanFix">—</td></tr>
+        <tr><td>Invert WAS</td>        <td id="s_invertWAS">—</td></tr>
+        <tr><td>Wireless WAS</td>      <td id="s_wirelessWAS">—</td></tr>
+        <tr><td>WAS Filter (α)</td>    <td id="s_wasFilterValue">—</td></tr>
+      </table>
+    </div>
+
+    <!-- Current Monitoring -->
+    <div class="card">
+      <h2>Motor Current</h2>
+      <table>
+        <tr><td>Filtered Current (1–254)</td><td id="s_steerCurrent">—</td></tr>
+        <tr><td>Pre-Filter Value</td>         <td id="s_currentBeforeFilter">—</td></tr>
+        <tr><td>Raw ADC</td>                  <td id="s_rawCurrentADC">—</td></tr>
+        <tr><td>Zero Point</td>               <td id="s_currentZero">—</td></tr>
+        <tr><td>Scaler</td>                   <td id="s_currentScaler">—</td></tr>
+        <tr><td>Filter (α)</td>               <td id="s_currentFilter">—</td></tr>
+      </table>
+      <div style="margin-top:8px;">
+        <div class="current-bar-wrap" id="currentBarWrap">
+          <div class="current-bar" id="currentBar" style="width:0%"></div>
+          <div class="current-limit-line" id="currentLimitLine" style="left:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#777;margin-top:2px;">
+          <span>0</span><span>127</span><span>254</span>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <table>
+          <tr><td>Limit Enabled</td>  <td><span id="s_enableCurrentLimit" class="badge badge-neutral">—</span></td></tr>
+          <tr><td>Limit Value</td>    <td id="s_currentLimit">—</td></tr>
+          <tr><td>Limit Tripped</td>  <td><span id="s_currentLimitTripped" class="badge badge-neutral">—</span></td></tr>
+          <tr><td>Current Debug</td>  <td id="s_enableCurrentDebug">—</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ANGLE_RANGE = 40; // ° half-range for the visualiser
+    let pollInterval = 300;
+    let intervalId = null;
+    let paused = false;
+
+    function applyInterval() {
+      const v = parseInt(document.getElementById('intervalInput').value, 10);
+      if (isNaN(v) || v < 100) return alert('Minimum interval is 100 ms');
+      pollInterval = v;
+      if (!paused) restartPoll();
+    }
+
+    function togglePause() {
+      paused = !paused;
+      const btn = document.getElementById('pauseBtn');
+      if (paused) {
+        clearInterval(intervalId);
+        btn.textContent = '▶ Resume';
+        btn.style.background = '#43a047';
+      } else {
+        btn.textContent = '⏸ Pause';
+        btn.style.background = '';
+        restartPoll();
+      }
+    }
+
+    function restartPoll() {
+      clearInterval(intervalId);
+      intervalId = setInterval(fetchData, pollInterval);
+    }
+
+    function setStatus(ok) {
+      const el = document.getElementById('connStatus');
+      if (ok) { el.textContent = '● Connected';    el.className = 'ok'; }
+      else    { el.textContent = '● Disconnected'; el.className = 'err'; }
+    }
+
+    function badge(el, text, cls) {
+      el.textContent = text;
+      el.className = 'badge ' + cls;
+    }
+
+    function pct(val, min, max) {
+      return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+    }
+
+    function angleToLeft(deg) {
+      return pct(deg, -ANGLE_RANGE, ANGLE_RANGE) + '%';
+    }
+
+    function fmtDir(d) {
+      return d === 0 ? ['STOP','badge-neutral'] : d === 1 ? ['CW','badge-ok'] : ['CCW','badge-warn'];
+    }
+
+    function fetchData() {
+      fetch('/getSteerData', { signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined })
+        .then(r => r.json())
+        .then(d => {
+          setStatus(true);
+          document.getElementById('lastUpdate').textContent =
+            'Last update: ' + new Date().toLocaleTimeString();
+
+          // --- Angle visualiser ---
+          const tgt = parseFloat(d.targetAngle) || 0;
+          const act = parseFloat(d.actAngle)    || 0;
+          const err = act - tgt;
+          document.getElementById('angleTarget').style.left = angleToLeft(tgt);
+          document.getElementById('angleActual').style.left = angleToLeft(act);
+          document.getElementById('actAngleLabel').textContent = act.toFixed(2) + '°';
+          document.getElementById('tgtAngleLabel').textContent = tgt.toFixed(2) + '°';
+          document.getElementById('errAngleLabel').textContent = err.toFixed(2) + '°';
+          document.getElementById('angleLabelLeft').textContent  = '-' + ANGLE_RANGE + '°';
+          document.getElementById('angleLabelRight').textContent = '+' + ANGLE_RANGE + '°';
+
+          // --- Control Status ---
+          const stEl = document.getElementById('s_status');
+          if (d.status === 1) badge(stEl, 'ACTIVE', 'badge-ok');
+          else                badge(stEl, 'INACTIVE', 'badge-neutral');
+
+          const tsEl = document.getElementById('s_testState');
+          const tsMap = { 0: ['NONE','badge-neutral'], 1: ['TEST LEFT','badge-warn'], 2: ['TEST RIGHT','badge-warn'] };
+          const ts = tsMap[d.testState] || ['?','badge-neutral'];
+          badge(tsEl, ts[0], ts[1]);
+
+          document.getElementById('s_steerSwitch').textContent  = d.steerSwitch ? 'ON' : 'OFF';
+          document.getElementById('s_switchState').textContent  = d.switchState;
+          document.getElementById('s_watchdog').textContent     = d.watchdog;
+          document.getElementById('s_looptime').textContent     = d.looptime + ' ms';
+          document.getElementById('s_steerMsgRate').textContent = d.steerMsgRate + ' ms';
+
+          // --- PID ---
+          document.getElementById('s_gainP').textContent         = d.gainP;
+          document.getElementById('s_pidInputFilt').textContent  = parseFloat(d.pidInputFilt).toFixed(3);
+          document.getElementById('s_pidOutputFilt').textContent = parseFloat(d.pidOutputFilt).toFixed(3);
+          document.getElementById('s_pidInput').textContent      = parseFloat(d.pidInput).toFixed(3);
+          document.getElementById('s_pidOutput').textContent     = parseFloat(d.pidOutput).toFixed(3);
+          document.getElementById('s_pidCmd').textContent        = parseFloat(d.pidCmd).toFixed(3);
+
+          // PID bar (map -1..+1 to 0..100%)
+          const pidVal = parseFloat(d.pidOutput) || 0;
+          const barEl = document.getElementById('pidBar');
+          barEl.style.width = Math.abs(pidVal) * 50 + '%';
+          if (pidVal >= 0) {
+            barEl.style.marginLeft = '50%';
+            barEl.classList.remove('negative');
+          } else {
+            barEl.style.marginLeft = (50 - Math.abs(pidVal) * 50) + '%';
+            barEl.classList.add('negative');
+          }
+
+          // --- Motor / PWM ---
+          const [dirText, dirCls] = fmtDir(d.motorDirection);
+          badge(document.getElementById('s_motorDir'), dirText, dirCls);
+          document.getElementById('s_pwmCmd').textContent    = d.pwmCmd;
+          document.getElementById('s_minPWM').textContent    = d.minPWM;
+          document.getElementById('s_highPWM').textContent   = d.highPWM;
+          document.getElementById('s_lowPWM').textContent    = d.lowPWM;
+          document.getElementById('s_minCmd').textContent    = d.minCmd;
+          document.getElementById('s_maxCmd').textContent    = d.maxCmd;
+          document.getElementById('s_minScalar').textContent = parseFloat(d.minScalar).toFixed(3);
+          document.getElementById('s_maxScalar').textContent = parseFloat(d.maxScalar).toFixed(3);
+
+          // --- WAS ---
+          document.getElementById('s_actAngle').textContent       = parseFloat(d.actAngle).toFixed(3) + '°';
+          document.getElementById('s_absAngle').textContent       = parseFloat(d.absAngle).toFixed(3) + '°';
+          document.getElementById('s_wasZeroAngle').textContent   = parseFloat(d.wasZeroAngle).toFixed(3) + '°';
+          document.getElementById('s_rawADS').textContent         = d.rawADS;
+          document.getElementById('s_sensorVoltage').textContent  = parseFloat(d.sensorVoltage).toFixed(4) + ' V';
+          document.getElementById('s_countsPerDeg').textContent   = d.countsPerDeg;
+          document.getElementById('s_steerOffset').textContent    = d.steerOffset;
+          document.getElementById('s_ackermanFix').textContent    = d.ackermanFix;
+          document.getElementById('s_invertWAS').textContent      = d.invertWAS   ? 'YES' : 'NO';
+          document.getElementById('s_wirelessWAS').textContent    = d.wirelessWAS ? 'YES' : 'NO';
+          document.getElementById('s_wasFilterValue').textContent = parseFloat(d.wasFilterValue).toFixed(3);
+
+          // --- Current monitoring ---
+          const cur = parseInt(d.steerCurrent) || 0;
+          document.getElementById('s_steerCurrent').textContent        = cur;
+          document.getElementById('s_currentBeforeFilter').textContent = parseFloat(d.currentBeforeFilter).toFixed(2);
+          document.getElementById('s_rawCurrentADC').textContent       = d.rawCurrentADC;
+          document.getElementById('s_currentZero').textContent         = d.currentZero;
+          document.getElementById('s_currentScaler').textContent       = parseFloat(d.currentScaler).toFixed(3);
+          document.getElementById('s_currentFilter').textContent       = parseFloat(d.currentFilter).toFixed(3);
+
+          // Current bar
+          const curPct = pct(cur, 0, 254);
+          const barC = document.getElementById('currentBar');
+          barC.style.width = curPct + '%';
+          const limitPct = pct(parseInt(d.currentLimit) || 200, 0, 254);
+          document.getElementById('currentLimitLine').style.left = limitPct + '%';
+          if (d.currentLimitTripped) {
+            barC.style.background = '#e53935';
+          } else if (cur > (d.currentLimit * 0.8)) {
+            barC.style.background = '#ff9800';
+          } else {
+            barC.style.background = '#43a047';
+          }
+
+          const enLimEl = document.getElementById('s_enableCurrentLimit');
+          badge(enLimEl, d.enableCurrentLimit ? 'ENABLED' : 'DISABLED',
+                d.enableCurrentLimit ? 'badge-warn' : 'badge-neutral');
+          document.getElementById('s_currentLimit').textContent = d.currentLimit;
+
+          const trippedEl = document.getElementById('s_currentLimitTripped');
+          badge(trippedEl, d.currentLimitTripped ? 'TRIPPED' : 'OK',
+                d.currentLimitTripped ? 'badge-error' : 'badge-ok');
+
+          document.getElementById('s_enableCurrentDebug').textContent =
+            d.enableCurrentDebug ? 'ON' : 'OFF';
+        })
+        .catch(() => setStatus(false));
+    }
+
+    // Start polling on load
+    window.onload = function () {
+      fetchData();
+      restartPoll();
+    };
+  </script>
+</body>
+</html>
