@@ -932,6 +932,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='section'>";
   html += "<div class='section-title'>Steering Configuration</div>";
   html += "<div class='form-group'><label>PID Gain (Kp):</label><input type='number' id='kp' step='0.1' min='0' max='255'></div>";
+  html += "<div class='form-group'><label>PID Integral (Ki):</label><input type='number' id='ki' step='0.001' min='0' max='10'></div>";
+  html += "<div class='form-group'><label>Steering Deadband (deg):</label><input type='number' id='steerDeadband' step='0.1' min='0' max='10' title='Angle error within this range sets motor command to 0'></div>";
   html += "<div class='form-group'><label>High PWM:</label><input type='number' id='highPWM' min='0' max='255'></div>";
   html += "<div class='form-group'><label>Low PWM:</label><input type='number' id='lowPWM' min='0' max='255'></div>";
   html += "<div class='form-group'><label>Min PWM:</label><input type='number' id='minPWM' min='0' max='255'></div>";
@@ -1038,6 +1040,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.ap_ip3  !== undefined) document.getElementById('ap_ip3').value  = data.ap_ip3;";
   html += "      renderNetworkList(data.sta_networks || []);";
   html += "      if (data.kp !== undefined) document.getElementById('kp').value = data.kp;";
+  html += "      if (data.ki !== undefined) document.getElementById('ki').value = data.ki;";
+  html += "      if (data.steerDeadband !== undefined) document.getElementById('steerDeadband').value = data.steerDeadband;";
   html += "      if (data.highPWM !== undefined) document.getElementById('highPWM').value = data.highPWM;";
   html += "      if (data.lowPWM !== undefined) document.getElementById('lowPWM').value = data.lowPWM;";
   html += "      if (data.minPWM !== undefined) document.getElementById('minPWM').value = data.minPWM;";
@@ -1075,6 +1079,8 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('ap_pass', document.getElementById('ap_pass').value);";
   html += "  formData.append('ap_ip3', document.getElementById('ap_ip3').value);";
   html += "  formData.append('kp', parseFloat(document.getElementById('kp').value) || 50);";
+  html += "  formData.append('ki', parseFloat(document.getElementById('ki').value) || 0);";
+  html += "  formData.append('steerDeadband', parseFloat(document.getElementById('steerDeadband').value) || 0);";
   html += "  formData.append('highPWM', parseInt(document.getElementById('highPWM').value) || 255);";
   html += "  formData.append('lowPWM', parseInt(document.getElementById('lowPWM').value) || 10);";
   html += "  formData.append('minPWM', parseInt(document.getElementById('minPWM').value) || 5);";
@@ -1203,6 +1209,8 @@ void handleGetSettings(AsyncWebServerRequest *request) {
 
   // Steering settings
   doc["kp"] = espData.steer.gainP;
+  doc["ki"] = espData.steer.gainI;
+  doc["steerDeadband"] = espData.steer.steerDeadband;
   doc["highPWM"] = espData.steer.highPWM;
   doc["lowPWM"] = espData.steer.lowPWM;
   doc["minPWM"] = espData.steer.minPWM;
@@ -1294,6 +1302,12 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   if (request->hasParam("kp", true)) {
     espData.steer.gainP = request->getParam("kp", true)->value().toFloat();
   }
+  if (request->hasParam("ki", true)) {
+    espData.steer.gainI = request->getParam("ki", true)->value().toFloat();
+  }
+  if (request->hasParam("steerDeadband", true)) {
+    espData.steer.steerDeadband = request->getParam("steerDeadband", true)->value().toFloat();
+  }
   if (request->hasParam("highPWM", true)) {
     espData.steer.highPWM = request->getParam("highPWM", true)->value().toInt();
   }
@@ -1371,6 +1385,8 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
     espData.gps.disableHeading = request->getParam("disableHeading", true)->value().toInt();
   }
   
+  espData.steer.settingsUpdated = 1;
+
   bool saveResult = espData.saveConfig();
   if (saveResult) {
     String msg = doReboot ? "Settings saved. Rebooting..." : "Settings saved successfully!";
@@ -1510,6 +1526,8 @@ void handleExportSettings(AsyncWebServerRequest *request) {
 
   // Steering settings
   doc["kp"] = espData.steer.gainP;
+  doc["ki"] = espData.steer.gainI;
+  doc["steerDeadband"] = espData.steer.steerDeadband;
   doc["highPWM"] = espData.steer.highPWM;
   doc["lowPWM"] = espData.steer.lowPWM;
   doc["minPWM"] = espData.steer.minPWM;
@@ -1625,6 +1643,12 @@ void handleImportSettings(AsyncWebServerRequest *request, String filename, size_
     // Steering settings
     if (doc.containsKey("kp")) {
       espData.steer.gainP = doc["kp"];
+    }
+    if (doc.containsKey("ki")) {
+      espData.steer.gainI = doc["ki"];
+    }
+    if (doc.containsKey("steerDeadband")) {
+      espData.steer.steerDeadband = doc["steerDeadband"];
     }
     if (doc.containsKey("highPWM")) {
       espData.steer.highPWM = doc["highPWM"];

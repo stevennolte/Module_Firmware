@@ -266,10 +266,20 @@ void ESPsteer::steerLoop(){
     }
     
     if (espData->steer.status == 1){
-        pid.setSetpoint(espData->steer.targetSteerAngle);
-        pid.update(espData->steer.actSteerAngle);
-        espData->steer.pidCmd = pid.getOutput();
-        motorDriver.setOutput(espData->steer.pidCmd);
+        float angleError = espData->steer.targetSteerAngle - espData->steer.actSteerAngle;
+        if (espData->steer.steerDeadband > 0.0f && fabsf(angleError) <= espData->steer.steerDeadband) {
+            // Within deadband: set motor to 0. Setpoint is held at actual angle so the
+            // PID sees zero error and the integral term does not accumulate (windup prevention).
+            pid.setSetpoint(espData->steer.actSteerAngle);
+            pid.update(espData->steer.actSteerAngle);
+            espData->steer.pidCmd = 0.0f;
+            motorDriver.setOutput(0.0f);
+        } else {
+            pid.setSetpoint(espData->steer.targetSteerAngle);
+            pid.update(espData->steer.actSteerAngle);
+            espData->steer.pidCmd = pid.getOutput();
+            motorDriver.setOutput(espData->steer.pidCmd);
+        }
     } else {
         pid.setSetpoint(0);
         pid.update(0);
@@ -285,7 +295,7 @@ void ESPsteer::taskHandler(void *param) {
 }
 
 void ESPsteer::setPIDgains(){
-    pid.setManualGains(float(espData->steer.gainP)/200.0, 0, 0);
+    pid.setManualGains(float(espData->steer.gainP)/200.0, espData->steer.gainI, 0);
 }
 
 void ESPsteer::begin(ESPudp* espUdp) {
