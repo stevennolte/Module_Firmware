@@ -276,17 +276,17 @@ jobs:
 
       - name: Build ESP32_WiFi_AP firmware
         working-directory: ESP32_WiFi_AP
-        run: pio run --environment esp32-s3-devkitc-1
+        run: pio run --environment esp32doit-devkit-v1
 
       - name: Build ESP32_WiFi_AP filesystem image
         working-directory: ESP32_WiFi_AP
-        run: pio run --target buildfs --environment esp32-s3-devkitc-1
+        run: pio run --target buildfs --environment esp32doit-devkit-v1
 
       - name: Rename firmware and filesystem binaries
         run: |
-          cp ESP32_WiFi_AP/.pio/build/esp32-s3-devkitc-1/firmware.bin \
+          cp ESP32_WiFi_AP/.pio/build/esp32doit-devkit-v1/firmware.bin \
              "${{ steps.info.outputs.binary }}"
-          cp ESP32_WiFi_AP/.pio/build/esp32-s3-devkitc-1/littlefs.bin \
+          cp ESP32_WiFi_AP/.pio/build/esp32doit-devkit-v1/littlefs.bin \
              "${{ steps.info.outputs.fs_binary }}"
 
       - name: Commit and push version bump
