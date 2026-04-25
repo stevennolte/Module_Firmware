@@ -819,6 +819,7 @@ void handleGetSteerData(AsyncWebServerRequest *request) {
 
   // Motor / PWM
   doc["pwmCmd"]           = espData.steer.pwmCmd;
+  doc["ledcOutput"]       = espData.steer.pwmCmd; // Actual LEDC duty cycle value
   doc["motorDirection"]   = espData.steer.motorDirection;
   doc["highPWM"]          = espData.steer.highPWM;
   doc["lowPWM"]           = espData.steer.lowPWM;
@@ -933,6 +934,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='section-title'>Steering Configuration</div>";
   html += "<div class='form-group'><label>PID Gain (Kp):</label><input type='number' id='kp' step='0.1' min='0' max='255'></div>";
   html += "<div class='form-group'><label>PID Integral (Ki):</label><input type='number' id='ki' step='0.001' min='0' max='10'></div>";
+  html += "<div class='form-group'><label>Kp Scalar (divisor):</label><input type='number' id='kpScalar' step='0.1' min='1' max='1000' title='Kp is divided by this value (default 200.0)'></div>";
   html += "<div class='form-group'><label>Steering Deadband (deg):</label><input type='number' id='steerDeadband' step='0.1' min='0' max='10' title='Angle error within this range sets motor command to 0'></div>";
   html += "<div class='form-group'><label>High PWM:</label><input type='number' id='highPWM' min='0' max='255'></div>";
   html += "<div class='form-group'><label>Low PWM:</label><input type='number' id='lowPWM' min='0' max='255'></div>";
@@ -1041,6 +1043,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      renderNetworkList(data.sta_networks || []);";
   html += "      if (data.kp !== undefined) document.getElementById('kp').value = data.kp;";
   html += "      if (data.ki !== undefined) document.getElementById('ki').value = data.ki;";
+  html += "      if (data.kpScalar !== undefined) document.getElementById('kpScalar').value = data.kpScalar;";
   html += "      if (data.steerDeadband !== undefined) document.getElementById('steerDeadband').value = data.steerDeadband;";
   html += "      if (data.highPWM !== undefined) document.getElementById('highPWM').value = data.highPWM;";
   html += "      if (data.lowPWM !== undefined) document.getElementById('lowPWM').value = data.lowPWM;";
@@ -1080,6 +1083,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('ap_ip3', document.getElementById('ap_ip3').value);";
   html += "  formData.append('kp', parseFloat(document.getElementById('kp').value) || 50);";
   html += "  formData.append('ki', parseFloat(document.getElementById('ki').value) || 0);";
+  html += "  formData.append('kpScalar', parseFloat(document.getElementById('kpScalar').value) || 200);";
   html += "  formData.append('steerDeadband', parseFloat(document.getElementById('steerDeadband').value) || 0);";
   html += "  formData.append('highPWM', parseInt(document.getElementById('highPWM').value) || 255);";
   html += "  formData.append('lowPWM', parseInt(document.getElementById('lowPWM').value) || 10);";
@@ -1210,6 +1214,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   // Steering settings
   doc["kp"] = espData.steer.gainP;
   doc["ki"] = espData.steer.gainI;
+  doc["kpScalar"] = espData.steer.gainPScalar;
   doc["steerDeadband"] = espData.steer.steerDeadband;
   doc["highPWM"] = espData.steer.highPWM;
   doc["lowPWM"] = espData.steer.lowPWM;
@@ -1264,35 +1269,46 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   
   bool doReboot = false;
 
-  // WiFi / AP settings (require reboot)
+  // WiFi / AP settings (require reboot ONLY if changed)
   if (request->hasParam("ap_ssid", true)) {
     String v = request->getParam("ap_ssid", true)->value();
     if (v.length() > 0 && v.length() < 64) {
-      snprintf(espData.apCfg.ssid, sizeof(espData.apCfg.ssid), "%s", v.c_str());
-      doReboot = true;
+      if (v != String(espData.apCfg.ssid)) {
+        snprintf(espData.apCfg.ssid, sizeof(espData.apCfg.ssid), "%s", v.c_str());
+        doReboot = true;
+        Serial.println("AP SSID changed - reboot required");
+      }
     }
   }
   if (request->hasParam("ap_pass", true)) {
     String v = request->getParam("ap_pass", true)->value();
     if (v.length() > 0 && v.length() < 64) {
-      snprintf(espData.apCfg.password, sizeof(espData.apCfg.password), "%s", v.c_str());
-      doReboot = true;
+      if (v != String(espData.apCfg.password)) {
+        snprintf(espData.apCfg.password, sizeof(espData.apCfg.password), "%s", v.c_str());
+        doReboot = true;
+        Serial.println("AP password changed - reboot required");
+      }
     }
   }
   if (request->hasParam("ap_ip3", true)) {
     int ip3 = request->getParam("ap_ip3", true)->value().toInt();
     if (ip3 >= 1 && ip3 <= 254) {
-      espData.apCfg.ips[3] = ip3;
-      doReboot = true;
+      if (ip3 != espData.apCfg.ips[3]) {
+        espData.apCfg.ips[3] = ip3;
+        doReboot = true;
+        Serial.println("AP IP changed - reboot required");
+      }
     }
   }
   if (request->hasParam("wifi_mode", true)) {
     int mode = request->getParam("wifi_mode", true)->value().toInt();
     Serial.println("Received wifi_mode: " + String(mode));
     if (mode >= 0 && mode <= 2) {
-      espData.wifiMode = mode;
-      Serial.println("Set wifiMode to: " + String(espData.wifiMode));
-      doReboot = true;
+      if (mode != espData.wifiMode) {
+        espData.wifiMode = mode;
+        doReboot = true;
+        Serial.println("WiFi mode changed to: " + String(espData.wifiMode) + " - reboot required");
+      }
     } else {
       Serial.println("Invalid wifi_mode value: " + String(mode));
     }
@@ -1304,6 +1320,9 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("ki", true)) {
     espData.steer.gainI = request->getParam("ki", true)->value().toFloat();
+  }
+  if (request->hasParam("kpScalar", true)) {
+    espData.steer.gainPScalar = request->getParam("kpScalar", true)->value().toFloat();
   }
   if (request->hasParam("steerDeadband", true)) {
     espData.steer.steerDeadband = request->getParam("steerDeadband", true)->value().toFloat();
@@ -1527,6 +1546,7 @@ void handleExportSettings(AsyncWebServerRequest *request) {
   // Steering settings
   doc["kp"] = espData.steer.gainP;
   doc["ki"] = espData.steer.gainI;
+  doc["kpScalar"] = espData.steer.gainPScalar;
   doc["steerDeadband"] = espData.steer.steerDeadband;
   doc["highPWM"] = espData.steer.highPWM;
   doc["lowPWM"] = espData.steer.lowPWM;
@@ -1646,6 +1666,9 @@ void handleImportSettings(AsyncWebServerRequest *request, String filename, size_
     }
     if (doc.containsKey("ki")) {
       espData.steer.gainI = doc["ki"];
+    }
+    if (doc.containsKey("kpScalar")) {
+      espData.steer.gainPScalar = doc["kpScalar"];
     }
     if (doc.containsKey("steerDeadband")) {
       espData.steer.steerDeadband = doc["steerDeadband"];

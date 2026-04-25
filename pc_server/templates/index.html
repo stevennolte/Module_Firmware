@@ -192,6 +192,12 @@
 
   // Track which diag panels are open so they keep refreshing
   const openDiagPanels = new Set();
+  
+  // Track which modules have had GitHub data fetched (to avoid repeated requests)
+  const githubDataFetched = new Set();
+  
+  // Track previous online status to detect transitions
+  const previousOnlineStatus = {};
 
   // ── Utilities ──────────────────────────────────────────────────────────
   function setMsg(name, text, type) {
@@ -245,6 +251,8 @@
 
   function updateModuleUI(mod) {
     const name = mod.name;
+    const wasOffline = previousOnlineStatus[name] === false;
+    previousOnlineStatus[name] = mod.online;
     
     setOnline(name, mod.online);
     document.getElementById('ip-'      + name).textContent = mod.ip      || '—';
@@ -264,8 +272,19 @@
       if (fwBtn) fwBtn.disabled = true;
       if (fsBtn) fsBtn.disabled = true;
     } else {
-      setMsg(name, 'Module online. Checking GitHub for latest firmware…', 'info');
-      refreshLatestFirmware(name, mod.current_version);
+      // Only fetch GitHub data if:
+      // 1. Never fetched before, OR
+      // 2. Module just came back online (wasOffline is true)
+      const shouldFetchGithub = !githubDataFetched.has(name) || wasOffline;
+      
+      if (shouldFetchGithub) {
+        setMsg(name, 'Module online. Checking GitHub for latest firmware…', 'info');
+        refreshLatestFirmware(name, mod.current_version);
+        githubDataFetched.add(name);
+      } else {
+        // Just update button states based on cached GitHub data
+        updateButtonStates(name, mod.current_version);
+      }
     }
   }
 
@@ -312,6 +331,41 @@
     } catch (e) {
       document.getElementById('gh-ver-' + name).textContent = 'Error';
       setMsg(name, 'Failed to fetch GitHub release info.', 'error');
+    }
+  }
+
+  function updateButtonStates(name, currentVersion) {
+    // Update button states based on cached GitHub data (no API calls)
+    const ghVersion = document.getElementById('gh-ver-' + name).textContent;
+    const fwBtn = document.getElementById('btn-update-fw-' + name);
+    const fsBtn = document.getElementById('btn-update-fs-' + name);
+    
+    if (!ghVersion || ghVersion === '—' || ghVersion === 'checking…' || ghVersion === 'Not found' || ghVersion === 'Error') {
+      // No valid GitHub data yet
+      if (fwBtn) fwBtn.disabled = true;
+      if (fsBtn) fsBtn.disabled = true;
+      setMsg(name, 'Module online.', 'info');
+      return;
+    }
+    
+    // Check if filesystem is available from cached release data
+    const rel = getSelectedRelease(name);
+    const hasFilesystem = rel && rel.fs_download_url;
+    
+    if (ghVersion && currentVersion) {
+      if (ghVersion !== currentVersion) {
+        if (fwBtn) fwBtn.disabled = false;
+        if (fsBtn) fsBtn.disabled = !hasFilesystem;
+        setMsg(name, `Update available: ${currentVersion} → ${ghVersion}`, 'info');
+      } else {
+        if (fwBtn) fwBtn.disabled = true;
+        if (fsBtn) fsBtn.disabled = true;
+        setMsg(name, `Firmware is up to date (v${currentVersion}).`, 'success');
+      }
+    } else {
+      if (fwBtn) fwBtn.disabled = true;
+      if (fsBtn) fsBtn.disabled = true;
+      setMsg(name, 'Module online.', 'info');
     }
   }
 
@@ -397,6 +451,9 @@
       // Reload the version selector with fresh data
       await loadVersionSelector(name, rel.tag);
 
+      // Mark GitHub data as fetched for this module
+      githubDataFetched.add(name);
+
       // Refresh module status to update comparison
       const currentVersion = document.getElementById('dev-ver-' + name).textContent;
       if (rel.version && currentVersion && currentVersion !== '—') {
@@ -457,27 +514,41 @@
     btn.disabled = true;
     const rel = getSelectedRelease(name);
     const tagDesc = rel ? `v${rel.version}` : 'latest';
-    setMsg(name, `Downloading firmware ${tagDesc} from GitHub and pushing to module…`, 'info');
+    setMsg(name, `Downloading firmware ${tagDesc} from GitHub and pushing to module (firmware only)…`, 'info');
 
     try {
+      // Build request body - firmware button pushes ONLY firmware, not filesystem
       const body = rel ? { tag: rel.tag } : {};
+      // Do NOT set include_filesystem (defaults to false on server)
+      
+      // Add 150-second timeout for firmware updates
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 150000);
+      
       const res  = await fetch('/api/module/' + name + '/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+      
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
-        const fsNote = data.filesystem_updated ? ' (filesystem + firmware updated)' : '';
+        const warnNote = data.warning ? ` ${data.warning}` : '';
         setMsg(name,
-          `✓ Firmware v${data.firmware_version} pushed successfully${fsNote}. Module is rebooting…`,
-          'success');
+          `✓ Firmware v${data.firmware_version} pushed successfully. Module is rebooting…${warnNote}`,
+          data.warning ? 'warn' : 'success');
       } else {
         setMsg(name, 'Error: ' + (data.error || data.message || 'Unknown error'), 'error');
         btn.disabled = false;
       }
     } catch (e) {
-      setMsg(name, 'Network error: ' + e, 'error');
+      if (e.name === 'AbortError') {
+        setMsg(name, 'Update timeout - module may still be updating. Check status in 30 seconds.', 'warn');
+      } else {
+        setMsg(name, 'Network error: ' + e, 'error');
+      }
       btn.disabled = false;
     }
   }
@@ -490,24 +561,37 @@
     setMsg(name, `Downloading filesystem image ${tagDesc} from GitHub and pushing to module…`, 'info');
 
     try {
-      // The /update endpoint handles both filesystem and firmware updates
-      const body = rel ? { tag: rel.tag } : {};
+      // Build request body - filesystem button pushes BOTH filesystem AND firmware
+      const body = rel ? { tag: rel.tag, include_filesystem: true } : { include_filesystem: true };
+      
+      // Add 150-second timeout for filesystem updates
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 150000);
+      
       const res  = await fetch('/api/module/' + name + '/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+      
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
+        const warnNote = data.warning ? ` ${data.warning}` : '';
         setMsg(name,
-          `✓ Filesystem + firmware pushed successfully. Module is rebooting…`,
-          'success');
+          `✓ Filesystem + firmware pushed successfully. Module is rebooting…${warnNote}`,
+          data.warning ? 'warn' : 'success');
       } else {
         setMsg(name, 'Error: ' + (data.error || data.message || 'Unknown error'), 'error');
         btn.disabled = false;
       }
     } catch (e) {
-      setMsg(name, 'Network error: ' + e, 'error');
+      if (e.name === 'AbortError') {
+        setMsg(name, 'Update timeout - module may still be updating. Check status in 30 seconds.', 'warn');
+      } else {
+        setMsg(name, 'Network error: ' + e, 'error');
+      }
       btn.disabled = false;
     }
   }

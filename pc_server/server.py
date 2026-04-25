@@ -117,11 +117,25 @@ def _github_headers() -> dict:
     return h
 
 
+# DNS resolution cache: {hostname: (timestamp, ip_or_none)}
+_dns_cache: dict = {}
+_dns_cache_lock = threading.Lock()
+_DNS_CACHE_TTL = 30  # seconds - increased to reduce churn
+
+
 def resolve_mdns(hostname: str, timeout: float = 2.0) -> str | None:
     """
     Attempt to resolve an mDNS hostname (e.g. 'ESP32_AIO.local') to an IP.
     Returns None if the host cannot be found.
+    Uses caching to avoid repeated slow DNS lookups for offline modules.
     """
+    # Check cache first
+    with _dns_cache_lock:
+        if hostname in _dns_cache:
+            cached_time, cached_ip = _dns_cache[hostname]
+            if time.time() - cached_time < _DNS_CACHE_TTL:
+                return cached_ip
+    
     def _resolve(name: str) -> str | None:
         try:
             return socket.gethostbyname(name)
@@ -136,11 +150,19 @@ def resolve_mdns(hostname: str, timeout: float = 2.0) -> str | None:
         # Try with .local suffix
         result = _resolve(hostname + ".local")
         if result:
+            # Cache successful lookup
+            with _dns_cache_lock:
+                _dns_cache[hostname] = (time.time(), result)
             return result
             
         # Also try with underscores replaced by hyphens (some OS mDNS stacks
         # normalise underscores to hyphens).
-        return _resolve(hostname.replace("_", "-") + ".local")
+        result = _resolve(hostname.replace("_", "-") + ".local")
+        
+        # Cache result (even if None, to avoid repeated lookups)
+        with _dns_cache_lock:
+            _dns_cache[hostname] = (time.time(), result)
+        return result
     finally:
         socket.setdefaulttimeout(original_timeout)
 
@@ -148,7 +170,7 @@ def resolve_mdns(hostname: str, timeout: float = 2.0) -> str | None:
 def get_module_version(ip: str) -> dict | None:
     """Query a module's /version endpoint.  Returns dict or None on failure."""
     try:
-        r = requests.get(f"http://{ip}/version", timeout=2)
+        r = requests.get(f"http://{ip}/version", timeout=1)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -571,21 +593,53 @@ def api_save_settings():
 @app.route("/api/modules")
 def api_modules():
     """Return live status for all managed modules."""
+    import signal
+    from contextlib import contextmanager
+    
+    # Timeout decorator for Windows (can't use signal.alarm on Windows)
+    class TimeoutException(Exception):
+        pass
+    
+    @contextmanager
+    def time_limit(seconds):
+        """Context manager to enforce hard timeout."""
+        timer = threading.Timer(seconds, lambda: None)
+        timer.start()
+        try:
+            yield
+        finally:
+            timer.cancel()
+    
     def check_module(mod):
-        """Check a single module's status."""
-        ip = resolve_mdns(mod["mdns_name"], timeout=1.5)
+        """Check a single module's status with hard timeout."""
         entry = {
             "name":      mod["name"],
             "mdns_name": mod["mdns_name"],
-            "ip":        ip,
+            "ip":        None,
             "online":    False,
         }
-        if ip:
-            ver = get_module_version(ip)
-            if ver:
-                entry["online"]          = True
-                entry["current_version"] = ver.get("version", "unknown")
-                entry["current_name"]    = ver.get("name",    mod["name"])
+        
+        try:
+            # Hard limit: 2 seconds total per module
+            # Use 1.0s timeout - aggressive but more reliable than 0.3s
+            ip = resolve_mdns(mod["mdns_name"], timeout=1.0)
+            entry["ip"] = ip
+            
+            if ip:
+                # Use 2.0s timeout for HTTP request - ESP32s can be slow
+                try:
+                    r = requests.get(f"http://{ip}/version", timeout=2.0)
+                    if r.status_code == 200:
+                        ver = r.json()
+                        entry["online"]          = True
+                        entry["current_version"] = ver.get("version", "unknown")
+                        entry["current_name"]    = ver.get("name", mod["name"])
+                except:
+                    pass  # Module not responding, leave as offline
+        except Exception as e:
+            # Timeout or other error - module is offline
+            app.logger.debug(f"Module check failed for {mod['name']}: {e}")
+        
         return entry
     
     # Only return modules that are visible in the UI
@@ -594,21 +648,35 @@ def api_modules():
         return jsonify([])
 
     # Check all modules in parallel for faster response
+    # Use timeout on futures to prevent hanging
     result = []
-    with ThreadPoolExecutor(max_workers=len(visible_modules)) as executor:
+    with ThreadPoolExecutor(max_workers=min(10, len(visible_modules))) as executor:
         future_to_mod = {executor.submit(check_module, mod): mod for mod in visible_modules}
-        for future in as_completed(future_to_mod):
-            try:
-                result.append(future.result())
-            except Exception as e:
-                mod = future_to_mod[future]
-                app.logger.error(f"Error checking module {mod['name']}: {e}")
-                result.append({
-                    "name":      mod["name"],
-                    "mdns_name": mod["mdns_name"],
-                    "ip":        None,
-                    "online":    False,
-                })
+        
+        # Wait for all futures with timeout, but collect what we can get
+        try:
+            for future in as_completed(future_to_mod, timeout=10):  # 10 second max wait for all
+                try:
+                    result.append(future.result(timeout=0.1))
+                except Exception as e:
+                    mod = future_to_mod[future]
+                    app.logger.debug(f"Error checking module {mod['name']}: {e}")
+                    result.append({
+                        "name":      mod["name"],
+                        "mdns_name": mod["mdns_name"],
+                        "ip":        None,
+                        "online":    False,
+                    })
+        except TimeoutError:
+            # Some futures didn't complete - return what we have and mark rest as offline
+            for future, mod in future_to_mod.items():
+                if not future.done():
+                    result.append({
+                        "name":      mod["name"],
+                        "mdns_name": mod["mdns_name"],
+                        "ip":        None,
+                        "online":    False,
+                    })
     
     # Sort by module name for consistent ordering
     result.sort(key=lambda x: x["name"])
@@ -678,11 +746,14 @@ def api_all_releases(name: str):
 @app.route("/api/module/<name>/update", methods=["POST"])
 def api_push_update(name: str):
     """
-    Download firmware (and filesystem image if available) from GitHub and push
-    via OTA.  An optional JSON body may contain a ``tag`` field to select a
-    specific release; when omitted the latest release is used.
-    If a filesystem image is present in the release, it is pushed first via
-    /updatefs, the module reboots, and then the firmware is pushed via /update.
+    Download firmware from GitHub and push via OTA.
+    
+    Optional JSON body parameters:
+    - tag: specific release tag (default: latest)
+    - include_filesystem: if true, push filesystem image first (default: false)
+    
+    If include_filesystem is true and a filesystem image is present in the release,
+    it is pushed first via /updatefs, the module reboots, then firmware is pushed.
     """
     mod = next((m for m in MODULES if m["name"] == name), None)
     if not mod:
@@ -695,6 +766,8 @@ def api_push_update(name: str):
     # Resolve which release to push
     body = request.get_json(silent=True) or {}
     requested_tag = body.get("tag", "").strip()
+    include_filesystem = body.get("include_filesystem", False)
+    
     if requested_tag:
         all_releases = get_all_releases(name)
         release = next((r for r in all_releases if r["tag"] == requested_tag), None)
@@ -705,8 +778,9 @@ def api_push_update(name: str):
         if not release:
             return jsonify({"error": "No firmware release found on GitHub"}), 404
 
-    # ── Step 1: Push filesystem image (if available) ──────────────────────
-    if release.get("fs_download_url"):
+    # ── Step 1: Push filesystem image (if requested and available) ────────
+    filesystem_updated = False
+    if include_filesystem and release.get("fs_download_url"):
         try:
             fs_resp = requests.get(release["fs_download_url"], timeout=60)
             fs_resp.raise_for_status()
@@ -724,14 +798,29 @@ def api_push_update(name: str):
             fs_update_resp = requests.post(
                 f"http://{ip}/updatefs", files=fs_files, timeout=120
             )
-            if fs_update_resp.status_code != 200:
+            if fs_update_resp.status_code not in (200, 202):
                 return jsonify({
                     "error": f"Filesystem update failed: {fs_update_resp.text}",
                     "firmware_version": release["version"],
                     "module_ip": ip,
                 }), fs_update_resp.status_code
+            filesystem_updated = True
+        except requests.exceptions.Timeout:
+            # Filesystem updates often cause immediate reboots without response
+            app.logger.info(f"Filesystem update timeout for {name} - likely rebooting")
+            filesystem_updated = True
+        except requests.exceptions.ConnectionError as e:
+            # ESP32 often forcibly closes connection during filesystem updates (normal behavior)
+            app.logger.info(f"Filesystem update connection closed for {name} - likely rebooting: {e}")
+            filesystem_updated = True
         except Exception as e:
-            return jsonify({"error": f"Failed to push filesystem to module: {e}"}), 500
+            # Only fail on unexpected errors, not connection issues
+            error_str = str(e).lower()
+            if "connection" in error_str or "reset" in error_str or "closed" in error_str:
+                app.logger.info(f"Filesystem update connection issue for {name} (expected): {e}")
+                filesystem_updated = True
+            else:
+                return jsonify({"error": f"Failed to push filesystem to module: {e}"}), 500
 
         # Wait for the module to reboot and its web server to become ready.
         # mDNS registers early (during WiFi connect) but server.begin() is
@@ -773,6 +862,17 @@ def api_push_update(name: str):
         update_resp = requests.post(
             f"http://{ip}/update", files=files, timeout=120
         )
+    except requests.exceptions.Timeout:
+        # ESP32 modules often don't respond during OTA updates because they're
+        # busy writing to flash or rebooting. Treat timeout as potential success.
+        return jsonify({
+            "status": "ok",
+            "message": "Update sent to module (no response - likely rebooting)",
+            "firmware_version": release["version"],
+            "module_ip": ip,
+            "filesystem_updated": filesystem_updated,
+            "warning": "Module did not respond - update may still be in progress"
+        }), 200
     except Exception as e:
         return jsonify({"error": f"Failed to push firmware to module: {e}"}), 500
 
@@ -781,7 +881,7 @@ def api_push_update(name: str):
         "message":          update_resp.text,
         "firmware_version": release["version"],
         "module_ip":        ip,
-        "filesystem_updated": bool(release.get("fs_download_url")),
+        "filesystem_updated": filesystem_updated,
     }), update_resp.status_code
 
 

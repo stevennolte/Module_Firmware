@@ -292,6 +292,7 @@
       <table>
         <tr><td>Direction</td>     <td><span id="s_motorDir" class="badge badge-neutral">—</span></td></tr>
         <tr><td>PWM Command</td>   <td id="s_pwmCmd">—</td></tr>
+        <tr><td>LEDC Output</td>   <td id="s_ledcOutput">—</td></tr>
         <tr><td>Min PWM</td>       <td id="s_minPWM">—</td></tr>
         <tr><td>High PWM</td>      <td id="s_highPWM">—</td></tr>
         <tr><td>Low PWM</td>       <td id="s_lowPWM">—</td></tr>
@@ -466,6 +467,7 @@
           const [dirText, dirCls] = fmtDir(d.motorDirection);
           badge(document.getElementById('s_motorDir'), dirText, dirCls);
           document.getElementById('s_pwmCmd').textContent    = d.pwmCmd;
+          document.getElementById('s_ledcOutput').textContent = d.pwmCmd + ' / 8000';
           document.getElementById('s_minPWM').textContent    = d.minPWM;
           document.getElementById('s_highPWM').textContent   = d.highPWM;
           document.getElementById('s_lowPWM').textContent    = d.lowPWM;

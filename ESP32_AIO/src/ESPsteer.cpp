@@ -295,7 +295,7 @@ void ESPsteer::taskHandler(void *param) {
 }
 
 void ESPsteer::setPIDgains(){
-    pid.setManualGains(float(espData->steer.gainP)/200.0, espData->steer.gainI, 0);
+    pid.setManualGains(float(espData->steer.gainP)/espData->steer.gainPScalar, espData->steer.gainI, 0);
 }
 
 void ESPsteer::begin(ESPudp* espUdp) {
