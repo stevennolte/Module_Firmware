@@ -1,0 +1,7 @@
+{
+    "Name": "ESP32_IMU_CAN",
+    "ipAddress": [192, 168, 5, 20],
+    "canTxID": 256,
+    "canTxFreq": 50,
+    "bnoAddress": 75
+}
