@@ -74,11 +74,13 @@ public:
 
     class IMUData {
         public:
-            float roll  = 0.0f;
-            float pitch = 0.0f;
-            float yaw   = 0.0f;
-            uint8_t accuracy = 0;
-            uint32_t lastUpdate = 0;
+            float roll           = 0.0f;
+            float pitch          = 0.0f;
+            float yaw            = 0.0f;   // magnetic heading (deg, 0-360)
+            float headingTrue    = 0.0f;   // true north heading (deg, 0-360)
+            float magDeclination = 0.0f;   // magnetic declination (deg, + east / - west)
+            uint8_t accuracy     = 0;
+            uint32_t lastUpdate  = 0;
             uint16_t reportInterval = 10;  // ms between BNO reports
             IMUData() {}
     };
@@ -86,10 +88,23 @@ public:
 
     class CANConfig {
         public:
-            uint32_t txID    = 0x100;   // 11-bit standard CAN ID for IMU data
-            bool     extFrame = false;  // false = standard 11-bit frame
-            uint32_t txFreq  = 50;      // ms between CAN transmits
+            // J1939 address claiming
+            uint8_t  j1939SA  = 0x80;   // source address (0x00-0xFD; 0xFE = cannot claim)
+            uint32_t txFreq   = 50;     // ms between CAN transmits
             uint32_t txTimestamp = 0;
+            bool     addressClaimed = false;
+            // J1939 NAME fields (used to build the 8-byte NAME for address claiming)
+            //   Manufacturer Code 0x7FF = undefined/proprietary
+            //   Function  0x7C = Inclination/Angle Sensor
+            //   Industry Group 2 = Agricultural
+            //   Arbitrary Address Capable = true
+            uint32_t identityNumber   = 0;      // 21 bits; filled from MAC at runtime
+            uint16_t manufacturerCode = 0x7FF;  // 11 bits
+            uint8_t  ecuInstance      = 0;
+            uint8_t  functionInstance = 0;
+            uint8_t  function         = 0x7C;   // Inclination Sensor
+            uint8_t  vehicleSystem    = 0;
+            uint8_t  industryGroup    = 2;      // Agriculture
             CANConfig() {}
     };
     CANConfig canCfg;

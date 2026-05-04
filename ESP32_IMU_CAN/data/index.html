@@ -72,10 +72,12 @@
           // Update gauges
           const roll  = extractFloat(data, 'Roll:  ');
           const pitch = extractFloat(data, 'Pitch: ');
-          const yaw   = extractFloat(data, 'Yaw:   ');
+          const magH  = extractFloat(data, 'Heading (magnetic): ');
+          const trueH = extractFloat(data, 'Heading (true N):   ');
           if (roll  !== null) document.getElementById('rollVal').textContent  = roll.toFixed(1);
           if (pitch !== null) document.getElementById('pitchVal').textContent = pitch.toFixed(1);
-          if (yaw   !== null) document.getElementById('yawVal').textContent   = yaw.toFixed(1);
+          if (magH  !== null) document.getElementById('magHVal').textContent  = magH.toFixed(1);
+          if (trueH !== null) document.getElementById('trueHVal').textContent = trueH.toFixed(1);
 
           // Module name hint for FW upload
           for (const item of data) {
@@ -136,8 +138,13 @@
         <div class="unit">degrees</div>
       </div>
       <div class="gauge">
-        <div class="label">Yaw</div>
-        <div class="value" id="yawVal">--</div>
+        <div class="label">Heading (Magnetic)</div>
+        <div class="value" id="magHVal">--</div>
+        <div class="unit">degrees</div>
+      </div>
+      <div class="gauge">
+        <div class="label">Heading (True North)</div>
+        <div class="value" id="trueHVal">--</div>
         <div class="unit">degrees</div>
       </div>
     </div>

@@ -54,11 +54,19 @@ void IMUSensor::continuousLoop() {
             float roll, pitch, yaw;
             quaternionToEuler(qi, qj, qk, qr, roll, pitch, yaw);
 
-            espConfig->imuData.roll     = roll;
-            espConfig->imuData.pitch    = pitch;
-            espConfig->imuData.yaw      = yaw;
-            espConfig->imuData.accuracy = acc;
-            espConfig->imuData.lastUpdate = millis();
+            // Apply magnetic declination to obtain true-north heading
+            // Rotation Vector already fuses magnetometer → magnetic heading
+            // True heading = magnetic heading + declination (+ east, - west)
+            float headingTrue = yaw + espConfig->imuData.magDeclination;
+            while (headingTrue < 0.0f)    headingTrue += 360.0f;
+            while (headingTrue >= 360.0f) headingTrue -= 360.0f;
+
+            espConfig->imuData.roll         = roll;
+            espConfig->imuData.pitch        = pitch;
+            espConfig->imuData.yaw          = yaw;
+            espConfig->imuData.headingTrue  = headingTrue;
+            espConfig->imuData.accuracy     = acc;
+            espConfig->imuData.lastUpdate   = millis();
         }
         vTaskDelay(5 / portTICK_PERIOD_MS);
     }

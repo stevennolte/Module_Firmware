@@ -10,6 +10,7 @@
 #include "WiFi.h"
 #include "driver/temp_sensor.h"
 #include <vector>
+#include <Update.h>
 
 ESPconfig  espConfig;
 MyLED      myLED(&espConfig);
@@ -168,11 +169,16 @@ void updateDebugVars() {
     debugVars.push_back("--- IMU Data ---");
     debugVars.push_back("Roll:  " + String(imuData.roll,  2) + " deg");
     debugVars.push_back("Pitch: " + String(imuData.pitch, 2) + " deg");
-    debugVars.push_back("Yaw:   " + String(imuData.yaw,   2) + " deg");
+    debugVars.push_back("Heading (magnetic): " + String(imuData.yaw, 2) + " deg");
+    debugVars.push_back("Heading (true N):   " + String(imuData.headingTrue, 2) + " deg");
+    debugVars.push_back("Mag Declination: " + String(imuData.magDeclination, 2) + " deg");
     debugVars.push_back("Accuracy: " + String(imuData.accuracy));
     debugVars.push_back("Last Update: " + String(imuData.lastUpdate) + " ms");
-    debugVars.push_back("--- CAN Config ---");
-    debugVars.push_back("CAN TX ID: 0x" + String(canCfg.txID, HEX));
+    debugVars.push_back("--- J1939 / CAN Config ---");
+    debugVars.push_back("J1939 SA: 0x" + String(canCfg.j1939SA, HEX));
+    debugVars.push_back("Addr Claimed: " + String(canCfg.addressClaimed ? "YES" : "NO"));
+    debugVars.push_back("CAN TX PGN: 0xFF04 (Proprietary B)");
+    debugVars.push_back("CAN TX ID: 0x" + String(J1939_IMU_DATA_ID(canCfg.j1939SA), HEX));
     debugVars.push_back("CAN TX Freq: " + String(canCfg.txFreq) + " ms");
 }
 
@@ -190,19 +196,20 @@ void handleDebugVars(AsyncWebServerRequest *request) {
 
 void handleGetSettings(AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(512);
-    doc["canTxID"]   = canCfg.txID;
-    doc["canTxFreq"] = canCfg.txFreq;
-    doc["bnoAddress"] = espConfig.i2cDefs.BNO_ADDRESS;
-    doc["ipOctet4"]  = wifiCfg.ips[3];
+    doc["j1939SA"]       = canCfg.j1939SA;
+    doc["canTxFreq"]     = canCfg.txFreq;
+    doc["magDeclination"] = imuData.magDeclination;
+    doc["ipOctet4"]      = wifiCfg.ips[3];
     String json;
     serializeJson(doc, json);
     request->send(200, "application/json", json);
 }
 
 void handleSaveSettings(AsyncWebServerRequest *request) {
-    if (request->hasParam("canTxID",   true)) canCfg.txID   = strtoul(request->getParam("canTxID",   true)->value().c_str(), nullptr, 0);
-    if (request->hasParam("canTxFreq", true)) canCfg.txFreq = request->getParam("canTxFreq", true)->value().toInt();
-    if (request->hasParam("ipOctet4",  true)) wifiCfg.ips[3] = request->getParam("ipOctet4",  true)->value().toInt();
+    if (request->hasParam("j1939SA",   true)) canCfg.j1939SA  = (uint8_t)strtoul(request->getParam("j1939SA", true)->value().c_str(), nullptr, 0);
+    if (request->hasParam("canTxFreq", true)) canCfg.txFreq   = request->getParam("canTxFreq", true)->value().toInt();
+    if (request->hasParam("magDeclination", true)) imuData.magDeclination = request->getParam("magDeclination", true)->value().toFloat();
+    if (request->hasParam("ipOctet4",  true)) wifiCfg.ips[3]  = request->getParam("ipOctet4",  true)->value().toInt();
     espConfig.saveConfig();
     request->send(200, "text/plain", "Settings saved. Rebooting...");
     delay(500);
@@ -301,17 +308,17 @@ void loop() {
     // Debug print
     if (millis() - progData.debugTimestamp > progCfg.debugPrintDelay) {
         progData.debugTimestamp = millis();
-        Serial.printf("[%lu] Roll=%.2f  Pitch=%.2f  Yaw=%.2f  acc=%d  imu=%d  can=%d\n",
+        Serial.printf("[%lu] Roll=%.2f  Pitch=%.2f  Mag=%.2f  TrueN=%.2f  acc=%d  imu=%d  can=%d  SA=0x%02X\n",
                       millis(),
-                      imuData.roll, imuData.pitch, imuData.yaw, imuData.accuracy,
-                      progData.imuState, progData.canState);
+                      imuData.roll, imuData.pitch, imuData.yaw, imuData.headingTrue,
+                      imuData.accuracy, progData.imuState, progData.canState, canCfg.j1939SA);
     }
 
     // Send IMU data over CAN bus at configured frequency
-    if (progData.imuState == 1 && progData.canState == 1) {
+    if (progData.imuState == 1 && progData.canState == 1 && canCfg.addressClaimed) {
         if (millis() - canCfg.txTimestamp >= canCfg.txFreq) {
             canCfg.txTimestamp = millis();
-            canBus.sendIMUData(imuData.roll, imuData.pitch, imuData.yaw, imuData.accuracy);
+            canBus.sendIMUData(imuData.roll, imuData.pitch, imuData.headingTrue, imuData.accuracy);
         }
     }
 

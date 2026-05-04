@@ -38,12 +38,12 @@ uint8_t ESPconfig::loadConfig() {
         wifiCfg.ips[i] = uint8_t(doc["ipAddress"][i]);
     }
 
-    // CAN settings
-    canCfg.txID   = doc["canTxID"]  | (uint32_t)0x100;
-    canCfg.txFreq = doc["canTxFreq"] | (uint32_t)50;
+    // CAN / J1939 settings
+    canCfg.j1939SA  = doc["j1939SA"]        | (uint8_t)0x80;
+    canCfg.txFreq   = doc["canTxFreq"]       | (uint32_t)50;
 
-    // I2C / BNO address
-    i2cDefs.BNO_ADDRESS = doc["bnoAddress"] | (uint8_t)0x4B;
+    // Magnetic declination for true-north heading
+    imuData.magDeclination = doc["magDeclination"] | 0.0f;
 
     // Parse version from VERSION string
     char version[64];
@@ -96,9 +96,10 @@ uint8_t ESPconfig::saveConfig() {
     for (int i = 0; i < 4; i++) {
         doc["ipAddress"][i] = wifiCfg.ips[i];
     }
-    doc["canTxID"]   = canCfg.txID;
-    doc["canTxFreq"] = canCfg.txFreq;
-    doc["bnoAddress"] = i2cDefs.BNO_ADDRESS;
+    doc["j1939SA"]       = canCfg.j1939SA;
+    doc["canTxFreq"]     = canCfg.txFreq;
+    doc["magDeclination"] = imuData.magDeclination;
+    doc["bnoAddress"]    = i2cDefs.BNO_ADDRESS;
 
     File out = LittleFS.open("/config.json", "w");
     if (!out) return 3;
