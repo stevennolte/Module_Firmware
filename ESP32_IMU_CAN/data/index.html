@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 IMU CAN – Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 20px; }
+    header { background: #1565c0; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; }
+    header h1 { font-size: 1.4rem; }
+    nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0d47a1; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    button, input[type="submit"] { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: #1565c0; color: white; transition: background 0.2s; }
+    button:hover, input[type="submit"]:hover { background: #0d47a1; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-danger:hover { background: #c62828; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    ul { background: #f8f9fa; border-radius: 6px; padding: 12px 12px 12px 36px; margin: 8px 0; }
+    li { margin: 4px 0; font-size: 0.875rem; }
+    .gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 12px; }
+    .gauge { background: #e8eaf6; border-radius: 10px; padding: 16px; text-align: center; }
+    .gauge .label { font-size: 0.75rem; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .gauge .value { font-size: 2rem; font-weight: bold; color: #1565c0; }
+    .gauge .unit  { font-size: 0.75rem; color: #777; }
+    input[type="file"] { padding: 4px; }
+  </style>
+  <script>
+    let debugLog = [];
+
+    function reboot() {
+      fetch('/reboot').then(() => alert('Rebooting…')).catch(console.error);
+    }
+
+    function downloadLog() {
+      if (!debugLog.length) { alert('No log yet.'); return; }
+      const blob = new Blob([JSON.stringify(debugLog, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'imu_debug_log.json';
+      a.click();
+    }
+
+    function extractFloat(data, prefix) {
+      for (const item of data) {
+        if (item.startsWith(prefix)) {
+          return parseFloat(item.replace(prefix, ''));
+        }
+      }
+      return null;
+    }
+
+    function fetchDebugVars() {
+      fetch('/getDebugVars')
+        .then(r => r.json())
+        .then(data => {
+          debugLog.push({ ts: new Date().toISOString(), data });
+
+          // Update list
+          const ul = document.getElementById('debugList');
+          ul.innerHTML = '';
+          data.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            ul.appendChild(li);
+          });
+
+          // Update gauges
+          const roll  = extractFloat(data, 'Roll:  ');
+          const pitch = extractFloat(data, 'Pitch: ');
+          const magH  = extractFloat(data, 'Heading (magnetic): ');
+          const trueH = extractFloat(data, 'Heading (true N):   ');
+          if (roll  !== null) document.getElementById('rollVal').textContent  = roll.toFixed(1);
+          if (pitch !== null) document.getElementById('pitchVal').textContent = pitch.toFixed(1);
+          if (magH  !== null) document.getElementById('magHVal').textContent  = magH.toFixed(1);
+          if (trueH !== null) document.getElementById('trueHVal').textContent = trueH.toFixed(1);
+
+          // Module name hint for FW upload
+          for (const item of data) {
+            if (item.startsWith('Program: ')) {
+              const name = item.replace('Program: ', '').trim();
+              const hint = document.getElementById('fwModuleHint');
+              if (hint) hint.textContent = 'Expected file: ' + name + '.bin';
+              const inp = document.getElementById('fwFile');
+              if (inp) inp.dataset.moduleName = name;
+              break;
+            }
+          }
+        })
+        .catch(console.error);
+    }
+
+    function uploadFirmware() {
+      const inp = document.getElementById('fwFile');
+      const status = document.getElementById('fwStatus');
+      if (!inp.files.length) { status.textContent = 'Select a file first.'; status.style.color = 'red'; return; }
+      const file = inp.files[0];
+      const module = inp.dataset.moduleName || '';
+      if (module && !file.name.startsWith(module)) {
+        status.textContent = 'Wrong file! Expected: ' + module; status.style.color = 'red'; return;
+      }
+      const fd = new FormData();
+      fd.append('firmware', file);
+      status.textContent = 'Uploading…'; status.style.color = '#333';
+      fetch('/update', { method: 'POST', body: fd })
+        .then(r => r.text())
+        .then(msg => { status.textContent = msg; status.style.color = msg.includes('complete') || msg.includes('Reboot') ? 'green' : 'red'; })
+        .catch(err => { status.textContent = 'Error: ' + err; status.style.color = 'red'; });
+    }
+
+    setInterval(fetchDebugVars, 500);
+    window.onload = fetchDebugVars;
+  </script>
+</head>
+<body>
+  <header><h1>ESP32 IMU CAN – Dashboard</h1></header>
+
+  <nav>
+    <a href="settings.html">Settings</a>
+  </nav>
+
+  <!-- Live IMU gauges -->
+  <div class="card">
+    <h1>Live IMU Data</h1>
+    <div class="gauge-grid">
+      <div class="gauge">
+        <div class="label">Roll</div>
+        <div class="value" id="rollVal">--</div>
+        <div class="unit">degrees</div>
+      </div>
+      <div class="gauge">
+        <div class="label">Pitch</div>
+        <div class="value" id="pitchVal">--</div>
+        <div class="unit">degrees</div>
+      </div>
+      <div class="gauge">
+        <div class="label">Heading (Magnetic)</div>
+        <div class="value" id="magHVal">--</div>
+        <div class="unit">degrees</div>
+      </div>
+      <div class="gauge">
+        <div class="label">Heading (True North)</div>
+        <div class="value" id="trueHVal">--</div>
+        <div class="unit">degrees</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="card">
+    <h1>Actions</h1>
+    <div class="action-row">
+      <button onclick="reboot()">Reboot ESP32</button>
+      <button onclick="downloadLog()">Download Debug Log</button>
+    </div>
+  </div>
+
+  <!-- Debug vars -->
+  <div class="card">
+    <h1>Debug Variables</h1>
+    <ul id="debugList"></ul>
+  </div>
+
+  <!-- Files -->
+  <div class="card">
+    <h1>Files on Device</h1>
+    <ul id="fileList"></ul>
+    <h2 style="margin-top:12px;">Upload File</h2>
+    <form method="POST" action="/upload" enctype="multipart/form-data">
+      <div class="action-row" style="margin-top:8px;">
+        <input type="file" name="upload">
+        <input type="submit" value="Upload">
+      </div>
+    </form>
+  </div>
+
+  <!-- Firmware update -->
+  <div class="card">
+    <h1>Firmware Update</h1>
+    <p id="fwModuleHint" style="color:#666; font-size:0.875rem; margin-bottom:10px;">Expected file: loading…</p>
+    <div class="action-row">
+      <input type="file" id="fwFile" accept=".bin">
+      <button onclick="uploadFirmware()">Flash Firmware</button>
+    </div>
+    <p id="fwStatus" style="margin-top:8px;"></p>
+  </div>
+
+</body>
+</html>

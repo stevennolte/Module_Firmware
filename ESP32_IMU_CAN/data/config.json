@@ -1,0 +1,8 @@
+{
+    "Name": "ESP32_IMU_CAN",
+    "ipAddress": [192, 168, 5, 20],
+    "j1939SA": 128,
+    "canTxFreq": 50,
+    "magDeclination": 0.0,
+    "bnoAddress": 75
+}

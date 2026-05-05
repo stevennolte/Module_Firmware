@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings – ESP32 IMU CAN</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; padding: 20px; }
+    header { background: #1565c0; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; }
+    header h1 { font-size: 1.4rem; }
+    nav { margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: white; padding: 9px 18px; font-size: 0.875rem; font-weight: bold; background: #1565c0; border-radius: 6px; transition: background 0.2s; }
+    nav a:hover { background: #0d47a1; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+    h1 { font-size: 1.2rem; margin: 0 0 16px 0; color: #1565c0; }
+    h2 { font-size: 1rem; margin: 0 0 12px 0; color: #333; }
+    label { display: block; font-size: 0.875rem; margin-bottom: 4px; color: #555; }
+    input[type="text"], input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; width: 100%; max-width: 260px; margin-bottom: 12px; }
+    button, input[type="submit"] { padding: 9px 18px; font-size: 0.875rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; background: #1565c0; color: white; transition: background 0.2s; }
+    button:hover, input[type="submit"]:hover { background: #0d47a1; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    p.hint { font-size: 0.8rem; color: #888; margin-bottom: 8px; }
+  </style>
+  <script>
+    function loadSettings() {
+      fetch('/getSettings')
+        .then(r => r.json())
+        .then(cfg => {
+          document.getElementById('j1939SA').value     = '0x' + cfg.j1939SA.toString(16).toUpperCase();
+          document.getElementById('canTxFreq').value   = cfg.canTxFreq;
+          document.getElementById('magDeclination').value = cfg.magDeclination;
+          document.getElementById('ipOctet4').value    = cfg.ipOctet4;
+        })
+        .catch(console.error);
+    }
+
+    function saveSettings() {
+      const rawSA = document.getElementById('j1939SA').value.trim();
+      const sa = parseInt(rawSA, rawSA.startsWith('0x') || rawSA.startsWith('0X') ? 16 : 10);
+      if (isNaN(sa) || sa < 0 || sa > 0xFD) { alert('J1939 SA must be 0x00–0xFD (0–253)'); return; }
+
+      const freq = parseInt(document.getElementById('canTxFreq').value);
+      if (isNaN(freq) || freq < 10 || freq > 10000) { alert('TX Freq must be 10–10000 ms'); return; }
+
+      const decl = parseFloat(document.getElementById('magDeclination').value);
+      if (isNaN(decl) || decl < -90 || decl > 90) { alert('Magnetic declination must be -90 to +90°'); return; }
+
+      const ip4 = parseInt(document.getElementById('ipOctet4').value);
+      if (isNaN(ip4) || ip4 < 1 || ip4 > 254) { alert('IP last octet must be 1–254'); return; }
+
+      const fd = new FormData();
+      fd.append('j1939SA',        sa);
+      fd.append('canTxFreq',      freq);
+      fd.append('magDeclination', decl);
+      fd.append('ipOctet4',       ip4);
+
+      document.getElementById('saveStatus').textContent = 'Saving…';
+      fetch('/saveSettings', { method: 'POST', body: fd })
+        .then(r => r.text())
+        .then(msg => { document.getElementById('saveStatus').textContent = msg; })
+        .catch(err => { document.getElementById('saveStatus').textContent = 'Error: ' + err; });
+    }
+
+    function fetchFwModuleName() {
+      fetch('/getDebugVars')
+        .then(r => r.json())
+        .then(data => {
+          for (const item of data) {
+            if (item.startsWith('Program: ')) {
+              const name = item.replace('Program: ', '').trim();
+              const hint = document.getElementById('fwModuleHint');
+              if (hint) hint.textContent = 'Expected file: ' + name + '.bin';
+              const inp = document.getElementById('fwFile');
+              if (inp) inp.dataset.moduleName = name;
+              break;
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    function uploadFirmware() {
+      const inp = document.getElementById('fwFile');
+      const status = document.getElementById('fwStatus');
+      if (!inp.files.length) { status.textContent = 'Select a firmware file.'; status.style.color = 'red'; return; }
+      const file = inp.files[0];
+      const module = inp.dataset.moduleName || '';
+      if (module && !file.name.startsWith(module)) {
+        status.textContent = 'Wrong file! Expected: ' + module; status.style.color = 'red'; return;
+      }
+      const fd = new FormData();
+      fd.append('firmware', file);
+      status.textContent = 'Uploading…'; status.style.color = '#333';
+      fetch('/update', { method: 'POST', body: fd })
+        .then(r => r.text())
+        .then(msg => { status.textContent = msg; status.style.color = msg.includes('complete') || msg.includes('Reboot') ? 'green' : 'red'; })
+        .catch(err => { status.textContent = 'Error: ' + err; status.style.color = 'red'; });
+    }
+
+    function uploadFilesystem() {
+      const inp = document.getElementById('fsFile');
+      const status = document.getElementById('fsStatus');
+      if (!inp.files.length) { status.textContent = 'Select a filesystem image.'; status.style.color = 'red'; return; }
+      const fd = new FormData();
+      fd.append('update', inp.files[0]);
+      status.textContent = 'Uploading…'; status.style.color = '#333';
+      fetch('/updatefs', { method: 'POST', body: fd })
+        .then(r => r.text())
+        .then(msg => { status.textContent = msg; status.style.color = msg.includes('complete') || msg.includes('Reboot') ? 'green' : 'red'; })
+        .catch(err => { status.textContent = 'Error: ' + err; status.style.color = 'red'; });
+    }
+
+    window.onload = function() { loadSettings(); fetchFwModuleName(); };
+  </script>
+</head>
+<body>
+  <header><h1>Settings – ESP32 IMU CAN</h1></header>
+
+  <nav>
+    <a href="index.html">Dashboard</a>
+  </nav>
+
+  <!-- CAN / Network settings -->
+  <div class="card">
+    <h1>Module Settings</h1>
+    <p class="hint">Changes take effect after save &amp; reboot.</p>
+
+    <label for="j1939SA">J1939 Source Address (hex, 0x00–0xFD)</label>
+    <input type="text" id="j1939SA" placeholder="0x80">
+    <p class="hint">The module will claim this address on the J1939 bus at startup using the address claiming procedure (PGN 0xEE00). If the address is already taken by a higher-priority device, the next available address is automatically selected.</p>
+
+    <label for="canTxFreq">CAN TX Interval (ms, 10–10000)</label>
+    <input type="number" id="canTxFreq" min="10" max="10000" placeholder="50">
+
+    <label for="magDeclination">Magnetic Declination (degrees, + east / − west)</label>
+    <input type="number" id="magDeclination" step="0.1" min="-90" max="90" placeholder="0.0">
+    <p class="hint">Look up your local value at <a href="https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml" target="_blank">NOAA Magnetic Declination</a>. Example: -5.2 = 5.2 degrees west.</p>
+
+    <label for="ipOctet4">IP Address – Last Octet (1–254)</label>
+    <input type="number" id="ipOctet4" min="1" max="254" placeholder="20">
+
+    <div class="action-row">
+      <button onclick="saveSettings()">Save &amp; Reboot</button>
+    </div>
+    <p id="saveStatus" style="margin-top:8px; font-size:0.875rem;"></p>
+  </div>
+
+  <!-- Firmware OTA -->
+  <div class="card">
+    <h2>Firmware OTA Update</h2>
+    <p id="fwModuleHint" style="color:#666; font-size:0.875rem; margin-bottom:10px;">Expected file: loading…</p>
+    <div class="action-row">
+      <input type="file" id="fwFile" accept=".bin">
+      <button onclick="uploadFirmware()">Flash Firmware</button>
+    </div>
+    <p id="fwStatus" style="margin-top:8px;"></p>
+  </div>
+
+  <!-- Filesystem OTA -->
+  <div class="card">
+    <h2>Filesystem OTA Update</h2>
+    <div class="action-row">
+      <input type="file" id="fsFile" accept=".bin">
+      <button onclick="uploadFilesystem()">Flash Filesystem</button>
+    </div>
+    <p id="fsStatus" style="margin-top:8px;"></p>
+  </div>
+
+</body>
+</html>
