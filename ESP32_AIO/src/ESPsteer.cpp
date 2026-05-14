@@ -195,7 +195,7 @@ void ESPsteer::continuousLoop() {
             espUdp->udp.writeTo(testdata, sizeof(testdata), IPAddress(espData->wifi.ips[0], espData->wifi.ips[1], espData->wifi.ips[2], 255), 9999);
             
             // espUdp->sendUDP(testdata, sizeof(testdata));
-            vTaskDelay(10);
+            vTaskDelay(1);  // Reduced from 10ms to 1ms for consistent loop timing
             // Current Message
             uint8_t currentData[14];
             currentData[0] = 0x80;
@@ -295,7 +295,7 @@ void ESPsteer::taskHandler(void *param) {
 }
 
 void ESPsteer::setPIDgains(){
-    pid.setManualGains(float(espData->steer.gainP)/espData->steer.gainPScalar, espData->steer.gainI, 0);
+    pid.setManualGains(float(espData->steer.gainP)/espData->steer.gainPScalar, espData->steer.gainI, espData->steer.gainD);
 }
 
 void ESPsteer::begin(ESPudp* espUdp) {

@@ -28,9 +28,17 @@
     .gauge .value { font-size: 2rem; font-weight: bold; color: #1565c0; }
     .gauge .unit  { font-size: 0.75rem; color: #777; }
     input[type="file"] { padding: 4px; }
+    #magChart { width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; }
+    .mag-legend { display: flex; gap: 20px; justify-content: center; margin-top: 10px; font-size: 0.875rem; }
+    .mag-legend span { display: inline-flex; align-items: center; }
+    .mag-legend .dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
   </style>
   <script>
     let debugLog = [];
+    let magXData = [];
+    let magYData = [];
+    let magZData = [];
+    const maxDataPoints = 100;
 
     function reboot() {
       fetch('/reboot').then(() => alert('Rebooting…')).catch(console.error);
@@ -52,6 +60,81 @@
         }
       }
       return null;
+    }
+
+    function drawMagChart() {
+      const canvas = document.getElementById('magChart');
+      if (!canvas || !canvas.getContext) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = canvas.offsetWidth;
+      const h = canvas.height = 300;
+      
+      ctx.clearRect(0, 0, w, h);
+      
+      if (magXData.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Waiting for magnetometer data...', w/2, h/2);
+        return;
+      }
+      
+      // Find min/max for scaling
+      const allData = [...magXData, ...magYData, ...magZData];
+      const minVal = Math.min(...allData);
+      const maxVal = Math.max(...allData);
+      const range = maxVal - minVal || 1;
+      const padding = 40;
+      
+      // Draw axes
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, h - padding);
+      ctx.lineTo(w - padding, h - padding);
+      ctx.stroke();
+      
+      // Draw grid
+      ctx.strokeStyle = '#eee';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 5; i++) {
+        const y = padding + (h - 2*padding) * i / 5;
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(w - padding, y);
+        ctx.stroke();
+      }
+      
+      // Draw Y-axis labels
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'right';
+      for (let i = 0; i <= 5; i++) {
+        const val = maxVal - (range * i / 5);
+        const y = padding + (h - 2*padding) * i / 5;
+        ctx.fillText(val.toFixed(1), padding - 5, y + 3);
+      }
+      
+      // Function to draw a line
+      function drawLine(data, color) {
+        if (data.length < 2) return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const xStep = (w - 2*padding) / (maxDataPoints - 1);
+        data.forEach((val, i) => {
+          const x = padding + i * xStep;
+          const y = h - padding - ((val - minVal) / range) * (h - 2*padding);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      
+      drawLine(magXData, '#e53935'); // Red
+      drawLine(magYData, '#43a047'); // Green
+      drawLine(magZData, '#1e88e5'); // Blue
     }
 
     function fetchDebugVars() {
@@ -78,6 +161,25 @@
           if (pitch !== null) document.getElementById('pitchVal').textContent = pitch.toFixed(1);
           if (magH  !== null) document.getElementById('magHVal').textContent  = magH.toFixed(1);
           if (trueH !== null) document.getElementById('trueHVal').textContent = trueH.toFixed(1);
+
+          // Extract and plot magnetometer data
+          const magX = extractFloat(data, 'Raw Mag X: ');
+          const magY = extractFloat(data, 'Raw Mag Y: ');
+          const magZ = extractFloat(data, 'Raw Mag Z: ');
+          if (magX !== null && magY !== null && magZ !== null) {
+            document.getElementById('magXVal').textContent = magX.toFixed(1);
+            document.getElementById('magYVal').textContent = magY.toFixed(1);
+            document.getElementById('magZVal').textContent = magZ.toFixed(1);
+            magXData.push(magX);
+            magYData.push(magY);
+            magZData.push(magZ);
+            if (magXData.length > maxDataPoints) {
+              magXData.shift();
+              magYData.shift();
+              magZData.shift();
+            }
+            drawMagChart();
+          }
 
           // Module name hint for FW upload
           for (const item of data) {
@@ -113,7 +215,10 @@
     }
 
     setInterval(fetchDebugVars, 500);
-    window.onload = fetchDebugVars;
+    window.onload = function() {
+      fetchDebugVars();
+      drawMagChart();
+    };
   </script>
 </head>
 <body>
@@ -147,6 +252,32 @@
         <div class="value" id="trueHVal">--</div>
         <div class="unit">degrees</div>
       </div>
+      <div class="gauge">
+        <div class="label">Mag X</div>
+        <div class="value" id="magXVal">--</div>
+        <div class="unit">µT</div>
+      </div>
+      <div class="gauge">
+        <div class="label">Mag Y</div>
+        <div class="value" id="magYVal">--</div>
+        <div class="unit">µT</div>
+      </div>
+      <div class="gauge">
+        <div class="label">Mag Z</div>
+        <div class="value" id="magZVal">--</div>
+        <div class="unit">µT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Magnetometer Plot -->
+  <div class="card">
+    <h1>Magnetometer Data (µT)</h1>
+    <canvas id="magChart"></canvas>
+    <div class="mag-legend">
+      <span><div class="dot" style="background: #e53935;"></div>Mag X</span>
+      <span><div class="dot" style="background: #43a047;"></div>Mag Y</span>
+      <span><div class="dot" style="background: #1e88e5;"></div>Mag Z</span>
     </div>
   </div>
 

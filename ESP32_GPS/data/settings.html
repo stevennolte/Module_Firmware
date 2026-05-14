@@ -115,6 +115,24 @@
     </div>
   </div>
 
+  <!-- IMU Heading Calibration -->
+  <div class="card">
+    <h2>IMU Heading Calibration</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <span style="font-size: 0.875rem; color: #444;">Status:</span>
+      <span id="calStatus" style="padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">Loading...</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <span style="font-size: 0.875rem; color: #444;">Heading Offset:</span>
+      <span id="calOffset" style="font-weight: bold; color: #1565c0;">--</span>
+    </div>
+    <p class="hint" style="margin-bottom: 12px;">Move the device 20+ meters at 0.5+ m/s to calibrate IMU heading to GPS true north.</p>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="btn btn-primary" style="flex: 1;" onclick="triggerRecalibration()">Recalibrate</button>
+      <button type="button" class="btn" style="flex: 1; background: #757575;" onclick="resetCalibration()">Reset</button>
+    </div>
+  </div>
+
   <button type="button" class="btn btn-primary" onclick="saveSettings()">Save &amp; Reboot</button>
   <div id="status" class="status"></div>
 
@@ -144,6 +162,57 @@
       .catch(e => showStatus('Failed to load settings: ' + e, true));
   }
 
+  function updateCalibrationStatus() {
+    fetch('/getGpsPos')
+      .then(r => r.json())
+      .then(d => {
+        const state = d.calibrationState || 0;
+        const offset = d.headingOffset || 0.0;
+        const statusEl = document.getElementById('calStatus');
+        const offsetEl = document.getElementById('calOffset');
+
+        // Update status badge
+        if (state === 0) {
+          statusEl.textContent = 'Uncalibrated';
+          statusEl.style.background = '#ffb74d';
+          statusEl.style.color = '#fff';
+        } else if (state === 1) {
+          statusEl.textContent = 'Calibrating...';
+          statusEl.style.background = '#64b5f6';
+          statusEl.style.color = '#fff';
+        } else if (state === 2) {
+          statusEl.textContent = 'Calibrated';
+          statusEl.style.background = '#81c784';
+          statusEl.style.color = '#fff';
+        }
+
+        // Update offset display
+        offsetEl.textContent = offset.toFixed(1) + '°';
+      })
+      .catch(e => console.error('Failed to load calibration status:', e));
+  }
+
+  function triggerRecalibration() {
+    fetch('/triggerRecalibration', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        showStatus(d.message || 'Recalibration started', false);
+        updateCalibrationStatus();
+      })
+      .catch(e => showStatus('Failed to trigger recalibration: ' + e, true));
+  }
+
+  function resetCalibration() {
+    if (!confirm('Reset heading calibration to 0 degrees?')) return;
+    fetch('/resetCalibration', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        showStatus(d.message || 'Calibration reset', false);
+        updateCalibrationStatus();
+      })
+      .catch(e => showStatus('Failed to reset calibration: ' + e, true));
+  }
+
   function saveSettings() {
     const apPwd = document.getElementById('apPassword').value;
     const apEnabled = document.getElementById('apEnabled').checked;
@@ -167,7 +236,12 @@
       .catch(e  => showStatus('Save failed: ' + e, true));
   }
 
-  window.onload = loadSettings;
+  window.onload = function() {
+    loadSettings();
+    updateCalibrationStatus();
+    // Update calibration status every 2 seconds
+    setInterval(updateCalibrationStatus, 2000);
+  };
 </script>
 </body>
 </html>

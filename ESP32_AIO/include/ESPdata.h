@@ -545,6 +545,7 @@ public:
         uint8_t settingsUpdated = 0;    ///< @brief Flag indicating steering settings have been updated
         uint8_t gainP = 1;          ///< @brief PID proportional gain value
         float gainI = 0.0;          ///< @brief PID integral gain value (Ki)
+        float gainD = 0.0;          ///< @brief PID derivative gain value (Kd)
         float gainPScalar = 200.0;  ///< @brief Scalar divisor for gainP calculation (default 200.0)
         float steerDeadband = 0.0;  ///< @brief Steering angle deadband (degrees); command set to 0 when error <= this value
         uint8_t highPWM = 255;      ///< @brief High-speed PWM limit for motor control

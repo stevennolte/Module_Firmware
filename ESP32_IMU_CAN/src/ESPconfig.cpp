@@ -44,6 +44,8 @@ uint8_t ESPconfig::loadConfig() {
 
     // Magnetic declination for true-north heading
     imuData.magDeclination = doc["magDeclination"] | 0.0f;
+    imuData.headingOffset  = doc["headingOffset"]  | -260.0f;
+    imuData.reverseHeading = doc["reverseHeading"] | false;
 
     // Parse version from VERSION string
     char version[64];
@@ -99,6 +101,8 @@ uint8_t ESPconfig::saveConfig() {
     doc["j1939SA"]       = canCfg.j1939SA;
     doc["canTxFreq"]     = canCfg.txFreq;
     doc["magDeclination"] = imuData.magDeclination;
+    doc["headingOffset"]  = imuData.headingOffset;
+    doc["reverseHeading"] = imuData.reverseHeading;
     doc["bnoAddress"]    = i2cDefs.BNO_ADDRESS;
 
     File out = LittleFS.open("/config.json", "w");

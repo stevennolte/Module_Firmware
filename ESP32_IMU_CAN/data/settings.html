@@ -30,6 +30,8 @@
           document.getElementById('j1939SA').value     = '0x' + cfg.j1939SA.toString(16).toUpperCase();
           document.getElementById('canTxFreq').value   = cfg.canTxFreq;
           document.getElementById('magDeclination').value = cfg.magDeclination;
+          document.getElementById('headingOffset').value = cfg.headingOffset || -260;
+          document.getElementById('reverseHeading').checked = cfg.reverseHeading || false;
           document.getElementById('ipOctet4').value    = cfg.ipOctet4;
         })
         .catch(console.error);
@@ -46,6 +48,9 @@
       const decl = parseFloat(document.getElementById('magDeclination').value);
       if (isNaN(decl) || decl < -90 || decl > 90) { alert('Magnetic declination must be -90 to +90°'); return; }
 
+      const offset = parseFloat(document.getElementById('headingOffset').value);
+      if (isNaN(offset) || offset < -360 || offset > 360) { alert('Heading offset must be -360 to +360°'); return; }
+
       const ip4 = parseInt(document.getElementById('ipOctet4').value);
       if (isNaN(ip4) || ip4 < 1 || ip4 > 254) { alert('IP last octet must be 1–254'); return; }
 
@@ -53,6 +58,8 @@
       fd.append('j1939SA',        sa);
       fd.append('canTxFreq',      freq);
       fd.append('magDeclination', decl);
+      fd.append('headingOffset',  offset);
+      fd.append('reverseHeading', document.getElementById('reverseHeading').checked ? 'true' : 'false');
       fd.append('ipOctet4',       ip4);
 
       document.getElementById('saveStatus').textContent = 'Saving…';
@@ -136,6 +143,18 @@
     <label for="magDeclination">Magnetic Declination (degrees, + east / − west)</label>
     <input type="number" id="magDeclination" step="0.1" min="-90" max="90" placeholder="0.0">
     <p class="hint">Look up your local value at <a href="https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml" target="_blank">NOAA Magnetic Declination</a>. Example: -5.2 = 5.2 degrees west.</p>
+
+    <label for="headingOffset">Heading Offset (degrees, -360 to +360)</label>
+    <input type="number" id="headingOffset" step="1" min="-360" max="360" placeholder="-260">
+    <p class="hint">Calibrate: Point sensor north, note the reading, then set offset = 0 - (that reading). Example: reads 260° → set -260. Reads 45° → set -45.</p>
+
+    <div style="margin-bottom: 12px;">
+      <label style="display: inline-flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" id="reverseHeading" style="margin-right: 8px; width: auto;">
+        <span>Reverse Heading Direction</span>
+      </label>
+      <p class="hint">Check this if heading increases in the wrong direction (e.g., turning right makes heading decrease).</p>
+    </div>
 
     <label for="ipOctet4">IP Address – Last Octet (1–254)</label>
     <input type="number" id="ipOctet4" min="1" max="254" placeholder="20">

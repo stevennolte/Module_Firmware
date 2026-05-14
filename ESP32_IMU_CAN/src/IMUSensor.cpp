@@ -20,6 +20,7 @@ bool IMUSensor::begin() {
             espConfig->i2cDefs.BNO_ADDRESS = addr;
             Serial.printf("BNO08x found at 0x%02X\n", addr);
             bno.enableRotationVector(espConfig->imuData.reportInterval);
+            bno.enableMagnetometer(espConfig->imuData.reportInterval);
             espConfig->progData.imuState = 1;
             return true;
         }
@@ -45,6 +46,10 @@ void IMUSensor::continuousLoop() {
             uint8_t acc;
             bno.getQuat(qi, qj, qk, qr, radAcc, acc);
 
+            // Get raw magnetometer data
+            uint8_t magAcc;
+            bno.getMag(espConfig->imuData.magX, espConfig->imuData.magY, espConfig->imuData.magZ, magAcc);
+
             // Normalize quaternion
             float norm = sqrtf(qr * qr + qi * qi + qj * qj + qk * qk);
             if (norm > 0.0f) {
@@ -54,9 +59,18 @@ void IMUSensor::continuousLoop() {
             float roll, pitch, yaw;
             quaternionToEuler(qi, qj, qk, qr, roll, pitch, yaw);
 
+            // Apply heading reverse if enabled
+            if (espConfig->imuData.reverseHeading) {
+                yaw = 360.0f - yaw;
+                if (yaw >= 360.0f) yaw -= 360.0f;
+            }
+            
+            // Apply configurable heading offset
+            yaw += espConfig->imuData.headingOffset;
+            while (yaw < 0.0f) yaw += 360.0f;
+            while (yaw >= 360.0f) yaw -= 360.0f;
+
             // Apply magnetic declination to obtain true-north heading
-            // Rotation Vector already fuses magnetometer → magnetic heading
-            // True heading = magnetic heading + declination (+ east, - west)
             float headingTrue = yaw + espConfig->imuData.magDeclination;
             while (headingTrue < 0.0f)    headingTrue += 360.0f;
             while (headingTrue >= 360.0f) headingTrue -= 360.0f;
@@ -67,6 +81,16 @@ void IMUSensor::continuousLoop() {
             espConfig->imuData.headingTrue  = headingTrue;
             espConfig->imuData.accuracy     = acc;
             espConfig->imuData.lastUpdate   = millis();
+            
+            // Auto-save calibration when well-calibrated (accuracy >= 2)
+            // Save once every 5 minutes to avoid excessive flash writes
+            uint32_t now = millis();
+            if (acc >= 2 && (acc > lastSavedAccuracy || now - lastCalibrationSave > 300000)) {
+                bno.saveCalibration();
+                lastCalibrationSave = now;
+                lastSavedAccuracy = acc;
+                Serial.printf("BNO08x calibration saved (accuracy: %d)\n", acc);
+            }
         }
         vTaskDelay(5 / portTICK_PERIOD_MS);
     }
@@ -91,4 +115,15 @@ void IMUSensor::quaternionToEuler(float qi, float qj, float qk, float qr,
     float t4 = +1.0f - 2.0f * (ysqr + qk * qk);
     yaw = atan2f(t3, t4) * RAD_TO_DEG;
     if (yaw < 0.0f) yaw += 360.0f;
+    
+    // Apply heading reverse if enabled
+    if (espConfig->imuData.reverseHeading) {
+        yaw = 360.0f - yaw;
+        if (yaw >= 360.0f) yaw -= 360.0f;
+    }
+    
+    // Apply configurable heading offset
+    yaw += espConfig->imuData.headingOffset;
+    while (yaw < 0.0f) yaw += 360.0f;
+    while (yaw >= 360.0f) yaw -= 360.0f;
 }

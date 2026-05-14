@@ -172,6 +172,9 @@ void updateDebugVars() {
     debugVars.push_back("Heading (magnetic): " + String(imuData.yaw, 2) + " deg");
     debugVars.push_back("Heading (true N):   " + String(imuData.headingTrue, 2) + " deg");
     debugVars.push_back("Mag Declination: " + String(imuData.magDeclination, 2) + " deg");
+    debugVars.push_back("Raw Mag X: " + String(imuData.magX, 2) + " uT");
+    debugVars.push_back("Raw Mag Y: " + String(imuData.magY, 2) + " uT");
+    debugVars.push_back("Raw Mag Z: " + String(imuData.magZ, 2) + " uT");
     debugVars.push_back("Accuracy: " + String(imuData.accuracy));
     debugVars.push_back("Last Update: " + String(imuData.lastUpdate) + " ms");
     debugVars.push_back("--- J1939 / CAN Config ---");
@@ -199,6 +202,8 @@ void handleGetSettings(AsyncWebServerRequest *request) {
     doc["j1939SA"]       = canCfg.j1939SA;
     doc["canTxFreq"]     = canCfg.txFreq;
     doc["magDeclination"] = imuData.magDeclination;
+    doc["headingOffset"]  = imuData.headingOffset;
+    doc["reverseHeading"] = imuData.reverseHeading;
     doc["ipOctet4"]      = wifiCfg.ips[3];
     String json;
     serializeJson(doc, json);
@@ -209,6 +214,8 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
     if (request->hasParam("j1939SA",   true)) canCfg.j1939SA  = (uint8_t)strtoul(request->getParam("j1939SA", true)->value().c_str(), nullptr, 0);
     if (request->hasParam("canTxFreq", true)) canCfg.txFreq   = request->getParam("canTxFreq", true)->value().toInt();
     if (request->hasParam("magDeclination", true)) imuData.magDeclination = request->getParam("magDeclination", true)->value().toFloat();
+    if (request->hasParam("headingOffset", true)) imuData.headingOffset = request->getParam("headingOffset", true)->value().toFloat();
+    if (request->hasParam("reverseHeading", true)) imuData.reverseHeading = request->getParam("reverseHeading", true)->value() == "true";
     if (request->hasParam("ipOctet4",  true)) wifiCfg.ips[3]  = request->getParam("ipOctet4",  true)->value().toInt();
     espConfig.saveConfig();
     request->send(200, "text/plain", "Settings saved. Rebooting...");
@@ -308,10 +315,11 @@ void loop() {
     // Debug print
     if (millis() - progData.debugTimestamp > progCfg.debugPrintDelay) {
         progData.debugTimestamp = millis();
-        Serial.printf("[%lu] Roll=%.2f  Pitch=%.2f  Mag=%.2f  TrueN=%.2f  acc=%d  imu=%d  can=%d  SA=0x%02X\n",
+        Serial.printf("[%lu] Roll=%.2f  Pitch=%.2f  Mag=%.2f  TrueN=%.2f  acc=%d  MagXYZ=[%.2f, %.2f, %.2f]uT  imu=%d  can=%d  SA=0x%02X\n",
                       millis(),
                       imuData.roll, imuData.pitch, imuData.yaw, imuData.headingTrue,
-                      imuData.accuracy, progData.imuState, progData.canState, canCfg.j1939SA);
+                      imuData.accuracy, imuData.magX, imuData.magY, imuData.magZ,
+                      progData.imuState, progData.canState, canCfg.j1939SA);
     }
 
     // Send IMU data over CAN bus at configured frequency

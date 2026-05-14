@@ -61,7 +61,7 @@ void WAS::loop(){
     }
         
     
-    vTaskDelay(50);  // 50ms delay for responsive steering control
+    vTaskDelay(5);  // 5ms delay for fast steering feedback (was 50ms)
     #else
     updateRampValue();
     vTaskDelay(10);

@@ -8,7 +8,7 @@ from zipfile import ZipFile
 Import("env", "projenv")
 
 version_path = r"./include/Version.h"
-bin_path = r"./.pio/build/esp32-s3-devkitc-1/firmware.bin"
+bin_path = r"./.pio/build/esp32-s3-supermini/firmware.bin"
 main_path = r"./src/main.cpp"
 program = ""
 

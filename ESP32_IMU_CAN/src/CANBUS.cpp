@@ -11,7 +11,7 @@ CANBUS::CANBUS(ESPconfig* vars) {
 void CANBUS::handle_tx(twai_message_t& message) {
     esp_err_t result = twai_transmit(&message, pdMS_TO_TICKS(100));
     if (result != ESP_OK) {
-        Serial.printf("CAN TX failed: %s\n", esp_err_to_name(result));
+        //Serial.printf("CAN TX failed: %s\n", esp_err_to_name(result));
     }
 }
 

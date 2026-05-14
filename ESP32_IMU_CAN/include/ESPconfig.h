@@ -15,10 +15,10 @@ public:
     class GPIO_Definitions {
         public:
             uint8_t LED_PIN  = 48;
-            uint8_t SDA_PIN  = 41;
-            uint8_t SCL_PIN  = 42;
-            uint8_t CAN_TX   = 1;
-            uint8_t CAN_RX   = 2;
+            uint8_t SDA_PIN  = 1;
+            uint8_t SCL_PIN  = 2;
+            uint8_t CAN_TX   = 12;
+            uint8_t CAN_RX   = 11;
             GPIO_Definitions() {}
     };
     GPIO_Definitions gpioDefs;
@@ -79,6 +79,11 @@ public:
             float yaw            = 0.0f;   // magnetic heading (deg, 0-360)
             float headingTrue    = 0.0f;   // true north heading (deg, 0-360)
             float magDeclination = 0.0f;   // magnetic declination (deg, + east / - west)
+            float headingOffset  = -260.0f; // heading offset correction (deg)
+            bool reverseHeading  = false;  // reverse heading direction
+            float magX           = 0.0f;   // raw magnetometer X (uT)
+            float magY           = 0.0f;   // raw magnetometer Y (uT)
+            float magZ           = 0.0f;   // raw magnetometer Z (uT)
             uint8_t accuracy     = 0;
             uint32_t lastUpdate  = 0;
             uint16_t reportInterval = 10;  // ms between BNO reports

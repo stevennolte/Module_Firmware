@@ -15,6 +15,8 @@ class IMUSensor {
     private:
         ESPconfig* espConfig;
         BNO080 bno;
+        uint32_t lastCalibrationSave = 0;
+        uint8_t lastSavedAccuracy = 0;
 
         static void taskHandler(void *param);
         void continuousLoop();

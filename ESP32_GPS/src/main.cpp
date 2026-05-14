@@ -100,6 +100,9 @@ struct AppSettings {
     bool disableHeading  = false;
     bool invertRoll      = true;
     bool flipPitchRoll   = true;
+    
+    // Heading calibration
+    float headingOffset  = 0.0f;  ///< IMU heading calibration offset (degrees)
 } appSettings;
 
 /// Load settings from LittleFS; keeps defaults when the file is absent/corrupt.
@@ -125,6 +128,8 @@ static void loadSettings() {
             appSettings.invertRoll = doc["invertRoll"];
         if (doc["flipPitchRoll"].is<bool>())
             appSettings.flipPitchRoll = doc["flipPitchRoll"];
+        if (doc["headingOffset"].is<float>())
+            appSettings.headingOffset = doc["headingOffset"];
     }
     f.close();
 }
@@ -142,6 +147,7 @@ static bool saveSettings() {
     doc["disableHeading"]= appSettings.disableHeading;
     doc["invertRoll"]    = appSettings.invertRoll;
     doc["flipPitchRoll"] = appSettings.flipPitchRoll;
+    doc["headingOffset"] = appSettings.headingOffset;
     serializeJson(doc, f);
     f.close();
     return true;
@@ -211,6 +217,16 @@ struct GPSState {
 
     // ── IMU watchdog ──
     uint32_t imuLastMsgMs = 0;  ///< millis() of last valid IMU frame
+    
+    // ── Heading calibration state ──
+    float    headingOffset           = 0.0f;  ///< Calibration offset to align IMU to true north (degrees)
+    uint8_t  calibrationState        = 0;     ///< 0=uncalibrated, 1=calibrating, 2=calibrated
+    double   calibrationStartLat     = 0.0;   ///< Reference latitude for distance calculation
+    double   calibrationStartLon     = 0.0;   ///< Reference longitude for distance calculation
+    uint8_t  calibrationSampleCount  = 0;     ///< Number of valid samples collected
+    float    calibrationSampleSum    = 0.0f;  ///< Sum of offset samples for averaging
+    uint32_t calibrationStartMs      = 0;     ///< Time when calibration attempt started (for timeout)
+    bool     manualRecalTrigger      = false; ///< Flag to force recalibration
     
     // ── Debug ──
     volatile int lastGgaFieldCount = 0;  ///< Number of fields in last GGA sentence (for debugging)
@@ -692,6 +708,113 @@ static void buildPandaSentence() {
     strcat(gpsState.nmea, "\r\n");
 }
 
+// ── Heading calibration helpers ────────────────────────────────────────────
+
+/**
+ * @brief Calculate distance between two lat/lon coordinates using Haversine formula.
+ * @param lat1 First latitude in decimal degrees
+ * @param lon1 First longitude in decimal degrees
+ * @param lat2 Second latitude in decimal degrees
+ * @param lon2 Second longitude in decimal degrees
+ * @return Distance in meters
+ */
+static float calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const float R = 6371000.0f; // Earth radius in meters
+    float dLat = (lat2 - lat1) * DEG_TO_RAD;
+    float dLon = (lon2 - lon1) * DEG_TO_RAD;
+    float a = sin(dLat / 2.0f) * sin(dLat / 2.0f) +
+              cos(lat1 * DEG_TO_RAD) * cos(lat2 * DEG_TO_RAD) *
+              sin(dLon / 2.0f) * sin(dLon / 2.0f);
+    float c = 2.0f * atan2(sqrt(a), sqrt(1.0f - a));
+    return R * c;
+}
+
+/**
+ * @brief Convert NMEA lat/lon format to decimal degrees.
+ * @param nmea NMEA coordinate string (ddmm.mmmm or dddmm.mmmm)
+ * @param isLon true for longitude, false for latitude
+ * @return Decimal degrees
+ */
+static double nmeaToDecimal(const char* nmea, bool isLon) {
+    double coord = atof(nmea);
+    int deg = (int)(coord / 100);
+    double min = coord - (deg * 100);
+    return deg + (min / 60.0);
+}
+
+/**
+ * @brief Check if conditions are met to perform heading calibration.
+ * @return true if calibration should proceed
+ */
+static bool shouldStartCalibration() {
+    // Check GPS position is valid
+    if (!isGpsPositionValid()) return false;
+    
+    // Check IMU is working
+    if (gpsState.imuState != 1 || gpsState.imuLastMsgMs == 0) return false;
+    if (millis() - gpsState.imuLastMsgMs > 2000) return false;
+    
+    // Check GPS heading is available
+    if (strlen(gpsState.vtgHeading) == 0) return false;
+    float gpsHeading = atof(gpsState.vtgHeading);
+    if (gpsHeading < 0.0f || gpsHeading > 360.0f) return false;
+    
+    // Check speed is sufficient (convert knots to m/s: 1 knot = 0.514444 m/s)
+    float speedKnots = atof(gpsState.speedKnots);
+    float speedMs = speedKnots * 0.514444f;
+    if (speedMs < 0.5f) return false;
+    
+    // Check distance traveled from start position
+    double currentLat = nmeaToDecimal(gpsState.latitude, false);
+    double currentLon = nmeaToDecimal(gpsState.longitude, false);
+    if (gpsState.latNS[0] == 'S') currentLat = -currentLat;
+    if (gpsState.lonEW[0] == 'W') currentLon = -currentLon;
+    
+    float distance = calculateDistance(
+        gpsState.calibrationStartLat, gpsState.calibrationStartLon,
+        currentLat, currentLon
+    );
+    
+    if (distance < 20.0f) return false;
+    
+    return true;
+}
+
+/**
+ * @brief Perform heading calibration by sampling GPS vs IMU heading.
+ */
+static void performCalibration() {
+    // Get current GPS and IMU headings
+    float gpsHeading = atof(gpsState.vtgHeading);
+    float imuHeading = atoi(gpsState.imuHeading) / 10.0f;
+    
+    // Calculate offset (GPS heading is true north, IMU heading needs correction)
+    float offset = gpsHeading - imuHeading;
+    
+    // Normalize offset to [-180, 180]
+    while (offset > 180.0f) offset -= 360.0f;
+    while (offset < -180.0f) offset += 360.0f;
+    
+    // Accumulate samples
+    gpsState.calibrationSampleSum += offset;
+    gpsState.calibrationSampleCount++;
+    
+    // After 10 samples, calculate average and finish
+    if (gpsState.calibrationSampleCount >= 10) {
+        float avgOffset = gpsState.calibrationSampleSum / (float)gpsState.calibrationSampleCount;
+        
+        gpsState.headingOffset = avgOffset;
+        appSettings.headingOffset = avgOffset;
+        gpsState.calibrationState = 2; // Calibrated
+        
+        // Save to persistent storage
+        saveSettings();
+        
+        Serial.printf("IMU heading calibration complete: offset = %.1f degrees\n", avgOffset);
+        Serial.printf("  GPS heading: %.1f°  IMU heading: %.1f°\n", gpsHeading, imuHeading);
+    }
+}
+
 // ── IMU handler ────────────────────────────────────────────────────────────
 
 /**
@@ -751,6 +874,9 @@ static void readIMU() {
     // Normalise heading to 0 – 360
     while (heading <    0.0f) heading += 360.0f;
     while (heading >= 360.0f) heading -= 360.0f;
+
+    // Apply calibration offset
+    heading = fmod(heading + gpsState.headingOffset + 360.0f, 360.0f);
 
     // Yaw rate (°/s)
     float    yawRate = 0.0f;
@@ -1501,6 +1627,8 @@ static void handleGpsPos(AsyncWebServerRequest* req) {
     doc["ageDGPS"] = atof(gpsState.ageDGPS);
     doc["ggaFieldCount"] = gpsState.lastGgaFieldCount;
     doc["ggaField13Raw"] = String(gpsState.lastGgaField13);  // Debug: raw field 13 content
+    doc["calibrationState"] = gpsState.calibrationState;
+    doc["headingOffset"] = round(gpsState.headingOffset * 10.0f) / 10.0f;  // Round to 1 decimal
     
     String json;
     serializeJson(doc, json);
@@ -1637,6 +1765,13 @@ void setup() {
     gpsState.disableHeading = appSettings.disableHeading;
     gpsState.invertRoll     = appSettings.invertRoll;
     gpsState.flipPitchRoll  = appSettings.flipPitchRoll;
+    gpsState.headingOffset  = appSettings.headingOffset;
+    
+    // Set calibration state based on whether we have a saved offset
+    if (appSettings.headingOffset != 0.0f) {
+        gpsState.calibrationState = 2;  // Already calibrated
+        Serial.printf("IMU heading offset loaded: %.1f degrees\n", appSettings.headingOffset);
+    }
 
     // ── WiFi STA/Client ───────────────────────────────────────────────────
     // Try connecting to WiFi network first (120 second timeout)
@@ -1704,6 +1839,7 @@ void setup() {
         doc["disableHeading"] = appSettings.disableHeading;
         doc["invertRoll"]     = appSettings.invertRoll;
         doc["flipPitchRoll"]  = appSettings.flipPitchRoll;
+        doc["headingOffset"]  = appSettings.headingOffset;
         String json;
         serializeJson(doc, json);
         r->send(200, "application/json", json);
@@ -1754,6 +1890,32 @@ void setup() {
         } else {
             r->send(500, "text/plain", "Failed to save settings.");
         }
+    });
+
+    // Heading calibration control
+    server.on("/triggerRecalibration", HTTP_POST, [](AsyncWebServerRequest* r) {
+        gpsState.manualRecalTrigger = true;
+        gpsState.calibrationState = 0;
+        Serial.println("Manual IMU recalibration triggered");
+        JsonDocument doc;
+        doc["success"] = true;
+        doc["message"] = "Recalibration initiated - move device 20+ meters";
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
+    });
+    server.on("/resetCalibration", HTTP_POST, [](AsyncWebServerRequest* r) {
+        gpsState.headingOffset = 0.0f;
+        appSettings.headingOffset = 0.0f;
+        gpsState.calibrationState = 0;
+        saveSettings();
+        Serial.println("IMU heading calibration reset to 0");
+        JsonDocument doc;
+        doc["success"] = true;
+        doc["message"] = "Calibration reset to 0 degrees";
+        String json;
+        serializeJson(doc, json);
+        r->send(200, "application/json", json);
     });
 
     // PANDA broadcast control
@@ -1932,6 +2094,45 @@ void loop() {
                       (unsigned long)gpsState.pandaCount,
                       (unsigned long)gpsState.ntripCount,
                       ESP.getFreeHeap());
+    }
+
+    // ── Heading calibration state machine ──
+    static uint32_t lastCalCheck = 0;
+    if (millis() - lastCalCheck >= 100) {  // Check calibration every 100ms
+        lastCalCheck = millis();
+        
+        if (gpsState.calibrationState == 0 || gpsState.manualRecalTrigger) {
+            // State 0: Uncalibrated - initialize calibration attempt
+            if (isGpsPositionValid()) {
+                double lat = nmeaToDecimal(gpsState.latitude, false);
+                double lon = nmeaToDecimal(gpsState.longitude, false);
+                if (gpsState.latNS[0] == 'S') lat = -lat;
+                if (gpsState.lonEW[0] == 'W') lon = -lon;
+                
+                gpsState.calibrationStartLat = lat;
+                gpsState.calibrationStartLon = lon;
+                gpsState.calibrationStartMs = millis();
+                gpsState.calibrationSampleCount = 0;
+                gpsState.calibrationSampleSum = 0.0f;
+                gpsState.calibrationState = 1;
+                gpsState.manualRecalTrigger = false;
+                
+                Serial.println("IMU heading calibration initiated - move device 20+ meters...");
+            }
+        }
+        else if (gpsState.calibrationState == 1) {
+            // State 1: Calibrating - check conditions and collect samples
+            if (shouldStartCalibration()) {
+                performCalibration();
+            }
+            
+            // Timeout after 30 seconds of no movement
+            if (millis() - gpsState.calibrationStartMs > 30000) {
+                gpsState.calibrationState = 0;
+                Serial.println("IMU calibration timeout - device did not move enough");
+            }
+        }
+        // State 2: Calibrated - do nothing, calibration is complete
     }
 
     delay(100);

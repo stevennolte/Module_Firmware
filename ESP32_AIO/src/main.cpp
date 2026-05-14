@@ -934,6 +934,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='section-title'>Steering Configuration</div>";
   html += "<div class='form-group'><label>PID Gain (Kp):</label><input type='number' id='kp' step='0.1' min='0' max='255'></div>";
   html += "<div class='form-group'><label>PID Integral (Ki):</label><input type='number' id='ki' step='0.001' min='0' max='10'></div>";
+  html += "<div class='form-group'><label>PID Derivative (Kd):</label><input type='number' id='kd' step='0.001' min='0' max='10'></div>";
   html += "<div class='form-group'><label>Kp Scalar (divisor):</label><input type='number' id='kpScalar' step='0.1' min='1' max='1000' title='Kp is divided by this value (default 200.0)'></div>";
   html += "<div class='form-group'><label>Steering Deadband (deg):</label><input type='number' id='steerDeadband' step='0.1' min='0' max='10' title='Angle error within this range sets motor command to 0'></div>";
   html += "<div class='form-group'><label>High PWM:</label><input type='number' id='highPWM' min='0' max='255'></div>";
@@ -1043,6 +1044,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      renderNetworkList(data.sta_networks || []);";
   html += "      if (data.kp !== undefined) document.getElementById('kp').value = data.kp;";
   html += "      if (data.ki !== undefined) document.getElementById('ki').value = data.ki;";
+  html += "      if (data.kd !== undefined) document.getElementById('kd').value = data.kd;";
   html += "      if (data.kpScalar !== undefined) document.getElementById('kpScalar').value = data.kpScalar;";
   html += "      if (data.steerDeadband !== undefined) document.getElementById('steerDeadband').value = data.steerDeadband;";
   html += "      if (data.highPWM !== undefined) document.getElementById('highPWM').value = data.highPWM;";
@@ -1083,6 +1085,7 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('ap_ip3', document.getElementById('ap_ip3').value);";
   html += "  formData.append('kp', parseFloat(document.getElementById('kp').value) || 50);";
   html += "  formData.append('ki', parseFloat(document.getElementById('ki').value) || 0);";
+  html += "  formData.append('kd', parseFloat(document.getElementById('kd').value) || 0);";
   html += "  formData.append('kpScalar', parseFloat(document.getElementById('kpScalar').value) || 200);";
   html += "  formData.append('steerDeadband', parseFloat(document.getElementById('steerDeadband').value) || 0);";
   html += "  formData.append('highPWM', parseInt(document.getElementById('highPWM').value) || 255);";
@@ -1214,6 +1217,7 @@ void handleGetSettings(AsyncWebServerRequest *request) {
   // Steering settings
   doc["kp"] = espData.steer.gainP;
   doc["ki"] = espData.steer.gainI;
+  doc["kd"] = espData.steer.gainD;
   doc["kpScalar"] = espData.steer.gainPScalar;
   doc["steerDeadband"] = espData.steer.steerDeadband;
   doc["highPWM"] = espData.steer.highPWM;
@@ -1320,6 +1324,9 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("ki", true)) {
     espData.steer.gainI = request->getParam("ki", true)->value().toFloat();
+  }
+  if (request->hasParam("kd", true)) {
+    espData.steer.gainD = request->getParam("kd", true)->value().toFloat();
   }
   if (request->hasParam("kpScalar", true)) {
     espData.steer.gainPScalar = request->getParam("kpScalar", true)->value().toFloat();
@@ -1546,6 +1553,7 @@ void handleExportSettings(AsyncWebServerRequest *request) {
   // Steering settings
   doc["kp"] = espData.steer.gainP;
   doc["ki"] = espData.steer.gainI;
+  doc["kd"] = espData.steer.gainD;
   doc["kpScalar"] = espData.steer.gainPScalar;
   doc["steerDeadband"] = espData.steer.steerDeadband;
   doc["highPWM"] = espData.steer.highPWM;
@@ -1666,6 +1674,9 @@ void handleImportSettings(AsyncWebServerRequest *request, String filename, size_
     }
     if (doc.containsKey("ki")) {
       espData.steer.gainI = doc["ki"];
+    }
+    if (doc.containsKey("kd")) {
+      espData.steer.gainD = doc["kd"];
     }
     if (doc.containsKey("kpScalar")) {
       espData.steer.gainPScalar = doc["kpScalar"];

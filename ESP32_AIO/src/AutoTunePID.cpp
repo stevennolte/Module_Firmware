@@ -111,8 +111,11 @@ void AutoTunePID::setLambda(float lambda)
 void AutoTunePID::update(float currentInput)
 {
     unsigned long now = millis();
-    if (now - _lastUpdate < 100)
-        return; // Maintain consistent sample time
+    // Calculate delta time in seconds (removed 100ms rate limit for fast control loops)
+    float dt = 0.0f;
+    if (_lastUpdate > 0) {
+        dt = (now - _lastUpdate) / 1000.0f;  // Convert ms to seconds
+    }
     _lastUpdate = now;
 
     // Update input (with filter if enabled)
@@ -129,8 +132,9 @@ void AutoTunePID::update(float currentInput)
         // Reset integral term if error is zero (faster and smoother zeroing)
         if (abs(_error) < 0.001) {
             _integral = 0;
-        } else {
-            _integral += _error * 0.1f; // Smoother integral accumulation
+        } else if (dt > 0.0f) {
+            // Use actual delta time for integral accumulation (proper time-based integration)
+            _integral += _error * dt;
         }
 
         _derivative = _error - _previousError;
