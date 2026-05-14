@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32-AIO Steering Improvements</title>
+<style>
+  /* ===== Reset & Base ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ===== Slide container ===== */
+  #deck {
+    width: min(960px, 95vw);
+    position: relative;
+  }
+
+  .slide {
+    display: none;
+    min-height: 540px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 16px;
+    padding: 48px 56px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.6);
+    animation: fadein .3s ease;
+  }
+  .slide.active { display: flex; flex-direction: column; justify-content: center; }
+
+  @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ===== Typography ===== */
+  .slide-num {
+    font-size: 0.75rem;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    margin-bottom: 18px;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #f0f6fc;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 16px;
+  }
+  .subtitle {
+    font-size: 1.1rem;
+    color: #8b949e;
+    margin-bottom: 28px;
+  }
+  p, li {
+    font-size: 1rem;
+    line-height: 1.75;
+    color: #c9d1d9;
+  }
+  ul { padding-left: 1.4em; }
+  li { margin-bottom: 6px; }
+
+  /* ===== Accent chips ===== */
+  .chip {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+  .chip-green  { background: rgba(63,185,80,.18); color: #3fb950; border: 1px solid #3fb950; }
+  .chip-blue   { background: rgba(88,166,255,.18); color: #58a6ff; border: 1px solid #58a6ff; }
+  .chip-yellow { background: rgba(210,153,34,.18); color: #d29922; border: 1px solid #d29922; }
+  .chip-purple { background: rgba(188,140,255,.18); color: #bc8cff; border: 1px solid #bc8cff; }
+  .chip-red    { background: rgba(248,81,73,.18); color: #f85149; border: 1px solid #f85149; }
+  .chip-gray   { background: rgba(139,148,158,.18); color: #8b949e; border: 1px solid #8b949e; }
+
+  /* ===== Two-column layout ===== */
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin-top: 8px;
+  }
+
+  /* ===== Callout boxes ===== */
+  .box {
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-top: 8px;
+  }
+  .box-blue   { background: rgba(88,166,255,.09); border: 1px solid rgba(88,166,255,.3); }
+  .box-green  { background: rgba(63,185,80,.09);  border: 1px solid rgba(63,185,80,.3);  }
+  .box-yellow { background: rgba(210,153,34,.09); border: 1px solid rgba(210,153,34,.3); }
+  .box-purple { background: rgba(188,140,255,.09);border: 1px solid rgba(188,140,255,.3);}
+  .box-red    { background: rgba(248,81,73,.09);  border: 1px solid rgba(248,81,73,.3);  }
+  .box-gray   { background: rgba(139,148,158,.09);border: 1px solid rgba(139,148,158,.3);}
+
+  .box-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: 8px;
+  }
+  .box-blue   .box-title { color: #58a6ff; }
+  .box-green  .box-title { color: #3fb950; }
+  .box-yellow .box-title { color: #d29922; }
+  .box-purple .box-title { color: #bc8cff; }
+  .box-red    .box-title { color: #f85149; }
+  .box-gray   .box-title { color: #8b949e; }
+
+  /* ===== Analogy highlight ===== */
+  .analogy {
+    border-left: 3px solid #58a6ff;
+    background: rgba(88,166,255,.07);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-style: italic;
+    color: #a5c8ff;
+  }
+  .analogy::before { content: '🚜  '; font-style: normal; }
+
+  /* ===== Setting table ===== */
+  .settings {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 0.9rem;
+  }
+  .settings th {
+    text-align: left;
+    padding: 8px 12px;
+    background: #21262d;
+    color: #8b949e;
+    font-weight: 600;
+    border-bottom: 1px solid #30363d;
+  }
+  .settings td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #21262d;
+    color: #c9d1d9;
+  }
+  .settings tr:last-child td { border-bottom: none; }
+  code {
+    background: #21262d;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #58a6ff;
+  }
+
+  /* ===== Diagram ===== */
+  .diagram {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #8b949e;
+    margin-top: 12px;
+    line-height: 2;
+  }
+  .dnode {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .dn-blue   { background: rgba(88,166,255,.2);  color: #58a6ff; }
+  .dn-green  { background: rgba(63,185,80,.2);   color: #3fb950; }
+  .dn-yellow { background: rgba(210,153,34,.2);  color: #d29922; }
+  .dn-purple { background: rgba(188,140,255,.2); color: #bc8cff; }
+  .dn-red    { background: rgba(248,81,73,.2);   color: #f85149; }
+  .arr { color: #8b949e; margin: 0 6px; }
+
+  /* ===== Sequence ===== */
+  .seq-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .seq-num {
+    min-width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #58a6ff;
+    color: #0d1117;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .seq-text strong { color: #f0f6fc; }
+
+  /* ===== Cover accent bar ===== */
+  .accent-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #58a6ff, #3fb950, #d29922, #bc8cff, #f85149);
+    margin-bottom: 28px;
+  }
+
+  /* ===== Nav ===== */
+  #nav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .nav-btn {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    padding: 8px 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background .15s;
+  }
+  .nav-btn:hover { background: #30363d; }
+  .nav-btn:disabled { opacity: .3; cursor: default; }
+  #slide-counter { color: #8b949e; font-size: 0.85rem; min-width: 80px; text-align: center; }
+
+  /* ===== Progress bar ===== */
+  #progress-bar {
+    height: 3px;
+    background: #58a6ff;
+    border-radius: 2px;
+    transition: width .3s ease;
+    margin-bottom: 14px;
+    width: min(960px, 95vw);
+  }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+<div id="deck">
+
+  <!-- ===== SLIDE 1: Title ===== -->
+  <div class="slide active">
+    <div class="accent-bar"></div>
+    <div class="slide-num">ESP32-AIO · Steering System</div>
+    <h1>Smarter Steering Control</h1>
+    <p class="subtitle">Six improvements to make auto-steer more reliable, responsive, and forgiving on real farm equipment</p>
+    <div style="margin-top: 24px;">
+      <span class="chip chip-blue">Stiction Boost</span>
+      <span class="chip chip-green">Error-Dep. Min PWM</span>
+      <span class="chip chip-yellow">Anti-Windup</span>
+      <span class="chip chip-purple">Input Filtering</span>
+      <span class="chip chip-gray">Deadband</span>
+      <span class="chip chip-red">Gain Scheduling</span>
+    </div>
+    <p style="margin-top:32px; color:#8b949e; font-size:0.9rem;">Use ← → arrow keys or the buttons below to navigate</p>
+  </div>
+
+  <!-- ===== SLIDE 2: How steering works (plain language) ===== -->
+  <div class="slide">
+    <div class="slide-num">Background</div>
+    <h2>How Auto-Steer Works (The Basics)</h2>
+    <p style="margin-bottom:14px;">The auto-steer system constantly asks one question:</p>
+    <div class="box box-blue" style="margin-bottom:18px;">
+      <div class="box-title">The Core Question</div>
+      <p style="font-size:1.15rem; font-weight:600; color:#f0f6fc;">"Where is the wheel pointed <em>right now</em>, and where do I <em want> it to be?"</p>
+    </div>
+    <div class="diagram">
+      <span class="dnode dn-blue">GPS / Guidance</span>
+      <span class="arr">→ target angle →</span>
+      <span class="dnode dn-yellow">PID Controller</span>
+      <span class="arr">→ motor command →</span>
+      <span class="dnode dn-green">Steering Motor</span>
+      <br>
+      <span style="margin-left: 200px; font-size: 0.75rem;">↑ feedback (actual angle) ↑</span>
+    </div>
+    <div class="analogy">Think of the PID controller like a very attentive driver watching a lane-keep line — pressing the steering wheel harder when far off, and easing off when close.</div>
+    <p style="margin-top:12px; color:#8b949e; font-size: 0.9rem;">The six improvements all make that "attentive driver" smarter in specific situations.</p>
+  </div>
+
+  <!-- ===== SLIDE 3: Stiction Boost ===== -->
+  <div class="slide">
+    <div class="slide-num">Improvement 1 of 6</div>
+    <h2><span class="chip chip-blue">Stiction Boost</span></h2>
+    <div class="cols">
+      <div>
+        <div class="box box-blue">
+          <div class="box-title">The Problem</div>
+          <p>In cold weather, with heavy implements, or on tight turns, the steering system can get <strong>stuck</strong> — the motor is running but the wheel isn't actually moving. The system just <em>sits there</em> with error piling up.</p>
+        </div>
+        <div class="analogy" style="margin-top:14px;">Like trying to open a stuck jar lid — you need an extra hard twist to break it free, then normal force to keep turning it.</div>
+      </div>
+      <div>
+        <div class="box box-green">
+          <div class="box-title">The Fix</div>
+          <p>The firmware now <strong>watches for stalls</strong>. If the wheel hasn't moved meaningfully after a configurable timeout, it adds a temporary boost to the motor output to break free — then immediately backs off once movement is detected.</p>
+        </div>
+        <table class="settings" style="margin-top:14px;">
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td><code>stictionBoost</code></td><td>Size of the extra kick (0–1.0)</td></tr>
+          <tr><td><code>stictionTimeout</code></td><td>How long to wait before boosting (ms)</td></tr>
+          <tr><td><code>stictionThreshold</code></td><td>Min movement to count as "not stuck" (degrees)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 4: Error-Dependent Min PWM ===== -->
+  <div class="slide">
+    <div class="slide-num">Improvement 2 of 6</div>
+    <h2><span class="chip chip-green">Error-Dependent Minimum PWM</span></h2>
+    <div class="cols">
+      <div>
+        <div class="box box-red">
+          <div class="box-title">The Problem</div>
+          <p>Motor drivers have a minimum power level before they can actually move. If that minimum is set too <em>high</em>, the wheel overshoots past the target and oscillates back and forth.</p>
+          <p style="margin-top:8px;">If it's set too <em>low</em>, the motor may stall when there's heavy resistance far from the target.</p>
+        </div>
+        <div class="analogy" style="margin-top:14px;">Like a car's gas pedal having only two settings: floor it, or coast — no gentle creeping into a parking spot.</div>
+      </div>
+      <div>
+        <div class="box box-green">
+          <div class="box-title">The Fix</div>
+          <p>The firmware now uses <strong>two different minimum power levels</strong>:</p>
+          <ul style="margin-top:10px;">
+            <li><strong>Far from target:</strong> higher minimum — enough muscle to overcome resistance</li>
+            <li><strong>Close to target:</strong> lower minimum — gentle enough to avoid overshoot</li>
+          </ul>
+        </div>
+        <table class="settings" style="margin-top:14px;">
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td><code>minPWMfar</code></td><td>Min power when error is large</td></tr>
+          <tr><td><code>minPWMnear</code></td><td>Min power when close to target</td></tr>
+          <tr><td><code>minPWMFarThreshold</code></td><td>The error distance that splits the two zones (degrees)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 5: Anti-Windup ===== -->
+  <div class="slide">
+    <div class="slide-num">Improvement 3 of 6</div>
+    <h2><span class="chip chip-yellow">Anti-Windup</span></h2>
+    <div class="cols">
+      <div>
+        <div class="box box-red">
+          <div class="box-title">The Problem: "Integral Windup"</div>
+          <p>The PID controller has a <strong>memory of past error</strong> (the "I" or integral term). When the system is stuck for a long time (e.g., operator held the wheel), that memory <em>overloads</em>.</p>
+          <p style="margin-top:8px;">When released, the motor <strong>overshoots wildly</strong> trying to "pay off" all that stored-up error.</p>
+        </div>
+        <div class="analogy" style="margin-top:14px;">Like pressing the gas harder and harder when stuck in mud — then getting surprised when the wheels suddenly grip and you launch forward.</div>
+      </div>
+      <div>
+        <div class="box box-green">
+          <div class="box-title">The Fix</div>
+          <p>Anti-windup <strong>caps how much memory can accumulate</strong>. Once the motor is already at maximum effort, the system stops adding to the memory — so when released, it responds promptly without overcorrecting.</p>
+        </div>
+        <table class="settings" style="margin-top:14px;">
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td><code>enableAntiWindup</code></td><td>Turn this protection on/off</td></tr>
+          <tr><td><code>antiWindupThreshold</code></td><td>Fraction of max output where cap kicks in (e.g. 0.8 = 80%)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 6: Input Filtering ===== -->
+  <div class="slide">
+    <div class="slide-num">Improvement 4 of 6</div>
+    <h2><span class="chip chip-purple">Input Filtering</span></h2>
+    <div class="cols">
+      <div>
+        <div class="box box-red">
+          <div class="box-title">The Problem: Sensor Noise</div>
+          <p>The wheel angle sensor (WAS) is never perfectly smooth — it has tiny electrical jitter and vibration noise. The <strong>derivative term</strong> in the PID reacts to rapid changes, so noise makes it <em>overreact</em>, causing a buzzy, oscillating motor command.</p>
+        </div>
+        <div class="analogy" style="margin-top:14px;">Like trying to hold a steering wheel perfectly still while driving on a gravel road — the bumps cause tiny twitches the driver has to constantly correct.</div>
+      </div>
+      <div>
+        <div class="box box-green">
+          <div class="box-title">The Fix</div>
+          <p>A <strong>smoothing filter</strong> is applied to the sensor reading before the PID sees it. Noise is averaged out, so the controller sees gradual, meaningful changes rather than jitter.</p>
+          <p style="margin-top:10px;">This is the same principle as a noise-cancelling microphone — let the real signal through, reject the static.</p>
+        </div>
+        <table class="settings" style="margin-top:14px;">
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td><code>pidInputFilt</code></td><td>Filter strength (0 = off, 1 = maximum smoothing). Higher values respond more slowly but are smoother.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 7: Deadband ===== -->
+  <div class="slide">
+    <div class="slide-num">Improvement 5 of 6</div>
+    <h2><span class="chip chip-gray">Deadband Preservation</span></h2>
+    <div class="cols">
+      <div>
+        <div class="box box-gray">
+          <div class="box-title">What It Does</div>
+          <p>The deadband defines a small <strong>"close enough" zone</strong> around the target angle. When the wheel is within that zone, the motor is commanded to <strong>zero</strong> — stop trying to make micro-corrections.</p>
+        </div>
+        <div class="analogy" style="margin-top:14px;">Like parking a car — once you're within a few inches of the curb, you stop nudging. Continuing to inch forward and back just wastes effort and risks bumping.</div>
+      </div>
+      <div>
+        <div class="box box-blue">
+          <div class="box-title">Why It Matters for the Other Features</div>
+          <ul>
+            <li>Stops the stiction boost from firing needlessly when the wheel is already at target</li>
+            <li>Prevents the integral memory from building up while sitting still</li>
+            <li>Reduces motor wear from constant micro-corrections</li>
+          </ul>
+        </div>
+        <table class="settings" style="margin-top:14px;">
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td><code>steerDeadband</code></td><td>Half-width of the "close enough" zone in degrees (0 = disabled)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 8: Gain Scheduling ===== -->
+  <div class="slide">
+    <div class="slide-num">Improvement 6 of 6</div>
+    <h2><span class="chip chip-red">Gain Scheduling</span></h2>
+    <div class="cols">
+      <div>
+        <div class="box box-yellow">
+          <div class="box-title">The Idea</div>
+          <p>A single fixed "aggressiveness" (Kp gain) can't be optimal for all situations:</p>
+          <ul style="margin-top:8px;">
+            <li><strong>Far from target:</strong> you want the motor to respond firmly and catch up quickly</li>
+            <li><strong>Close to target:</strong> you want a gentle touch to avoid overshooting</li>
+          </ul>
+        </div>
+        <div class="analogy" style="margin-top:14px;">Like how a driver steers differently when correcting a big swerve vs. making tiny adjustments to hold a lane.</div>
+      </div>
+      <div>
+        <div class="box box-green">
+          <div class="box-title">The Fix</div>
+          <p>The system can now <strong>automatically switch Kp</strong> based on how far the wheel is from its target. Gains are only updated when crossing the threshold — no unnecessary recalculation every loop.</p>
+        </div>
+        <table class="settings" style="margin-top:14px;">
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td><code>enableGainSchedule</code></td><td>Turn feature on/off</td></tr>
+          <tr><td><code>gainPNear</code></td><td>Kp to use when close to target (0 = use base Kp)</td></tr>
+          <tr><td><code>gainPFar</code></td><td>Kp to use when far from target (0 = use base Kp)</td></tr>
+          <tr><td><code>gainScheduleThreshold</code></td><td>Distance in degrees that separates "near" from "far"</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 9: How they work together ===== -->
+  <div class="slide">
+    <div class="slide-num">Big Picture</div>
+    <h2>How All Six Work Together</h2>
+    <div class="diagram" style="padding: 24px 16px; line-height: 2.4;">
+      <span class="dnode dn-blue">AgOpenGPS<br><small style="font-weight:400;font-size:0.7rem;">sends target angle</small></span>
+      <span class="arr">→</span>
+      <span class="dnode dn-yellow">PID Controller<br><small style="font-weight:400;font-size:0.7rem;">+ Anti-Windup ③<br>+ Input Filter ④<br>+ Gain Schedule ⑥</small></span>
+      <span class="arr">→</span>
+      <span class="dnode dn-purple">Stiction Check ①<br><small style="font-weight:400;font-size:0.7rem;">add boost if stalled</small></span>
+      <span class="arr">→</span>
+      <span class="dnode dn-green">Motor Driver<br><small style="font-weight:400;font-size:0.7rem;">+ Err-Dep MinPWM ②</small></span>
+      <br>
+      <span style="display:inline-block; margin-top: 8px; font-size: 0.75rem; color: #8b949e;">
+        ⑤ Deadband check intercepts early → sets output to 0, resets stiction, limits integral buildup
+      </span>
+    </div>
+    <div class="box box-blue" style="margin-top: 20px;">
+      <div class="box-title">Net effect on the field</div>
+      <p>The tractor holds its line more cleanly, recovers from bumps and obstacles faster, steers reliably under heavy load, and doesn't wander or oscillate when close to the guidance line.</p>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 10: Tuning guide ===== -->
+  <div class="slide">
+    <div class="slide-num">Tuning Guide</div>
+    <h2>Recommended Tuning Sequence</h2>
+    <p style="margin-bottom: 20px; color: #8b949e;">These features interact — tune them in order for the best result.</p>
+    <div class="seq-row"><div class="seq-num">1</div><div class="seq-text"><strong>Proportional only first.</strong> Set <code>gainI = 0</code>, <code>gainD = 0</code>. Adjust <code>gainP</code> until the steering responds briskly without obvious oscillation.</div></div>
+    <div class="seq-row"><div class="seq-num">2</div><div class="seq-text"><strong>Add input filtering.</strong> Set <code>pidInputFilt</code> to a small value (e.g. 0.1–0.3) to calm any sensor jitter before introducing derivative.</div></div>
+    <div class="seq-row"><div class="seq-num">3</div><div class="seq-text"><strong>Add integral gain.</strong> Slowly raise <code>gainI</code> until steady-state offset is removed. Enable <code>antiWindup</code> at this stage.</div></div>
+    <div class="seq-row"><div class="seq-num">4</div><div class="seq-text"><strong>Tune stiction boost</strong> if steering stalls under load. Start with a short <code>stictionTimeout</code> (300–500 ms) and small <code>stictionBoost</code> (0.15–0.25).</div></div>
+    <div class="seq-row"><div class="seq-num">5</div><div class="seq-text"><strong>Refine near-target behaviour.</strong> Lower <code>minPWMnear</code> and consider enabling <code>gainSchedule</code> with a softer <code>gainPNear</code> if overshoot remains.</div></div>
+  </div>
+
+  <!-- ===== SLIDE 11: Summary ===== -->
+  <div class="slide">
+    <div class="accent-bar"></div>
+    <div class="slide-num">Summary</div>
+    <h2>In Plain Terms</h2>
+    <div class="cols">
+      <div>
+        <div class="box box-blue" style="margin-bottom: 12px;">
+          <div class="box-title">① Stiction Boost</div>
+          <p>Gives the motor an extra kick when it gets stuck, then backs off once moving.</p>
+        </div>
+        <div class="box box-green" style="margin-bottom: 12px;">
+          <div class="box-title">② Error-Dep. Min PWM</div>
+          <p>Uses more power when far away, less power when almost there — avoids overshooting.</p>
+        </div>
+        <div class="box box-yellow">
+          <div class="box-title">③ Anti-Windup</div>
+          <p>Stops the controller from "overloading" its memory when blocked, preventing a lurch when released.</p>
+        </div>
+      </div>
+      <div>
+        <div class="box box-purple" style="margin-bottom: 12px;">
+          <div class="box-title">④ Input Filtering</div>
+          <p>Smooths out sensor noise so the controller doesn't over-react to vibration or jitter.</p>
+        </div>
+        <div class="box box-gray" style="margin-bottom: 12px;">
+          <div class="box-title">⑤ Deadband</div>
+          <p>Stops the motor when "close enough" — no unnecessary hunting or micro-corrections.</p>
+        </div>
+        <div class="box box-red">
+          <div class="box-title">⑥ Gain Scheduling</div>
+          <p>Automatically becomes more aggressive far from target and gentler when close.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#deck -->
+
+<div id="nav">
+  <button class="nav-btn" id="btn-prev" onclick="go(-1)" disabled>← Prev</button>
+  <span id="slide-counter">1 / 11</span>
+  <button class="nav-btn" id="btn-next" onclick="go(1)">Next →</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  function go(dir) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(total - 1, current + dir));
+    slides[current].classList.add('active');
+    document.getElementById('slide-counter').textContent = (current + 1) + ' / ' + total;
+    document.getElementById('btn-prev').disabled = current === 0;
+    document.getElementById('btn-next').disabled = current === total - 1;
+    document.getElementById('progress-bar').style.width =
+      'calc(' + ((current + 1) / total * 100) + '% * (min(960px, 95vw) / 100vw * 100vw))';
+    // simpler: set width as % of bar container
+    document.getElementById('progress-bar').style.width =
+      ((current + 1) / total * 100) + '%';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(-1);
+  });
+
+  // Init progress
+  go(0);
+</script>
+</body>
+</html>
