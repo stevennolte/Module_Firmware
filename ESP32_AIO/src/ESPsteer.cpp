@@ -228,10 +228,9 @@ void ESPsteer::steerTestLoop(){
     switch (espData->steer.testState){
         case 1:
             if (pid.getSetpoint() != 1){
-                pid.setSetpoint(100);
-                // Serial.println("Setting Setpoint to 100");
+                pid.setSetpoint(1.0);
             }
-            // pid.setSetpoint(100);
+            // pid.setSetpoint(1.0);
             pid.update(0);
             motorDriver.setOutput(pid.getOutput());
             
