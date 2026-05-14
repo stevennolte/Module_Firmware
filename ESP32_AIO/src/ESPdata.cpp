@@ -283,6 +283,26 @@ uint8_t ESPdata::loadConfig(){
     steer.currentLimit = preferences.getUChar("currentLimit", 200);
     steer.enableCurrentDebug = preferences.getBool("curDebugEnable", false);
 
+    // Stiction compensation
+    steer.stictionBoost = preferences.getFloat("stictionBoost", 0.0);
+    steer.stictionTimeout = preferences.getUInt("stictionTimeout", 500);
+    steer.stictionThreshold = preferences.getFloat("stictionThresh", 0.1);
+
+    // Anti-windup
+    steer.enableAntiWindup = preferences.getBool("antiWindupEn", false);
+    steer.antiWindupThreshold = preferences.getFloat("antiWindupThr", 0.8);
+
+    // Error-dependent min PWM
+    steer.minPWMnear = preferences.getUChar("minPWMnear", 0);
+    steer.minPWMfar = preferences.getUChar("minPWMfar", 0);
+    steer.minPWMFarThreshold = preferences.getFloat("minPWMFarThr", 5.0);
+
+    // Gain scheduling
+    steer.enableGainSchedule = preferences.getBool("gainSchedEn", false);
+    steer.gainPNear = preferences.getFloat("gainPNear", 0.0);
+    steer.gainPFar = preferences.getFloat("gainPFar", 0.0);
+    steer.gainScheduleThreshold = preferences.getFloat("gainSchedThr", 5.0);
+
     // Load GPS configuration
     gps.externalGPS = preferences.getBool("externalGPS", false);
     gps.ntripPandaMode = preferences.getBool("ntripPandaMode", true);
@@ -410,7 +430,27 @@ uint8_t ESPdata::saveConfig(){
     
     preferences.putUChar("currentLimit", steer.currentLimit);
     preferences.putBool("curDebugEnable", steer.enableCurrentDebug);
-    
+
+    // Stiction compensation
+    preferences.putFloat("stictionBoost", steer.stictionBoost);
+    preferences.putUInt("stictionTimeout", steer.stictionTimeout);
+    preferences.putFloat("stictionThresh", steer.stictionThreshold);
+
+    // Anti-windup
+    preferences.putBool("antiWindupEn", steer.enableAntiWindup);
+    preferences.putFloat("antiWindupThr", steer.antiWindupThreshold);
+
+    // Error-dependent min PWM
+    preferences.putUChar("minPWMnear", steer.minPWMnear);
+    preferences.putUChar("minPWMfar", steer.minPWMfar);
+    preferences.putFloat("minPWMFarThr", steer.minPWMFarThreshold);
+
+    // Gain scheduling
+    preferences.putBool("gainSchedEn", steer.enableGainSchedule);
+    preferences.putFloat("gainPNear", steer.gainPNear);
+    preferences.putFloat("gainPFar", steer.gainPFar);
+    preferences.putFloat("gainSchedThr", steer.gainScheduleThreshold);
+
     // Save motor current sensor calibration
     preferences.putUShort("currentZero", steer.currentZero);
 
@@ -460,6 +500,27 @@ uint8_t ESPdata::updateSteer(){
     preferences.putBool("useADS", steer.useADS);
     preferences.putFloat("pidInputFilt", steer.pidInputFilt);
     preferences.putFloat("pidOutputFilt", steer.pidOutputFilt);
+
+    // Stiction compensation
+    preferences.putFloat("stictionBoost", steer.stictionBoost);
+    preferences.putUInt("stictionTimeout", steer.stictionTimeout);
+    preferences.putFloat("stictionThresh", steer.stictionThreshold);
+
+    // Anti-windup
+    preferences.putBool("antiWindupEn", steer.enableAntiWindup);
+    preferences.putFloat("antiWindupThr", steer.antiWindupThreshold);
+
+    // Error-dependent min PWM
+    preferences.putUChar("minPWMnear", steer.minPWMnear);
+    preferences.putUChar("minPWMfar", steer.minPWMfar);
+    preferences.putFloat("minPWMFarThr", steer.minPWMFarThreshold);
+
+    // Gain scheduling
+    preferences.putBool("gainSchedEn", steer.enableGainSchedule);
+    preferences.putFloat("gainPNear", steer.gainPNear);
+    preferences.putFloat("gainPFar", steer.gainPFar);
+    preferences.putFloat("gainSchedThr", steer.gainScheduleThreshold);
+
     Serial.println(F("Successfully updated steer config in Preferences"));
     return 1;
 }

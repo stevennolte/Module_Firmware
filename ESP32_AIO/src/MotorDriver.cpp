@@ -93,8 +93,17 @@ void MotorDriver::init(){
 
 
 void MotorDriver::setOutput(float value){
-    // Serial.println(value);
-    espData->steer.minScalar = float(espData->steer.minPWM)/255.0;
+    // Compute error-dependent effective minimum PWM
+    float absErr = fabsf(espData->steer.targetSteerAngle - espData->steer.actSteerAngle);
+    uint8_t effectiveMinPWM;
+    if (espData->steer.minPWMnear > 0 || espData->steer.minPWMfar > 0) {
+        effectiveMinPWM = (absErr >= espData->steer.minPWMFarThreshold)
+            ? espData->steer.minPWMfar
+            : espData->steer.minPWMnear;
+    } else {
+        effectiveMinPWM = espData->steer.minPWM;
+    }
+    espData->steer.minScalar = float(effectiveMinPWM) / 255.0f;
     espData->steer.maxScalar = float(espData->steer.highPWM)/255.0;
     espData->steer.minCmd = maxPWM * espData->steer.minScalar;
     espData->steer.maxCmd = maxPWM * espData->steer.maxScalar;

@@ -141,6 +141,11 @@ class ESPsteer{
         bool currentLimitLatched;   ///< @brief Persistent overcurrent fault latch state
         float filteredCurrent = 0.0f; ///< @brief Exponential moving average filtered motor current
 
+        // Stiction boost runtime state
+        uint32_t _stictionStartTime = 0;  ///< @brief Timestamp when stall was first detected
+        float _stictionLastAngle = 0.0f;  ///< @brief Actual angle at stall detection start
+        bool _stictionActive = false;     ///< @brief True while stiction boost is being applied
+
 };
 
 #endif

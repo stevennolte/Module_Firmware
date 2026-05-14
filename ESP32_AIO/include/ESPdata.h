@@ -587,7 +587,27 @@ public:
         float currentBeforeFilter = 0.0; ///< @brief Current value before filtering (debug)
         uint8_t motorDirection = 0;     ///< @brief Motor direction (0=stopped, 1=CW, 2=CCW) (debug)
         bool enableCurrentDebug = false; ///< @brief Enable serial debug output for current measurement
-         
+
+        // Stiction compensation
+        float stictionBoost = 0.0f;        ///< @brief Extra output fraction added when steering stalls (0.0–1.0)
+        uint32_t stictionTimeout = 500;    ///< @brief Milliseconds of stall before stiction boost fires
+        float stictionThreshold = 0.1f;    ///< @brief Minimum angle change (degrees) to consider steering moving
+
+        // Anti-windup configuration
+        bool enableAntiWindup = false;     ///< @brief Enable PID integral anti-windup
+        float antiWindupThreshold = 0.8f;  ///< @brief Threshold (fraction of output range) at which anti-windup activates
+
+        // Error-dependent minimum PWM
+        uint8_t minPWMnear = 0;            ///< @brief Minimum PWM when |error| < minPWMFarThreshold degrees
+        uint8_t minPWMfar = 0;             ///< @brief Minimum PWM when |error| >= minPWMFarThreshold degrees
+        float minPWMFarThreshold = 5.0f;   ///< @brief Error threshold (degrees) switching between near/far min PWM
+
+        // Gain scheduling
+        bool enableGainSchedule = false;   ///< @brief Enable error-magnitude-based Kp gain scheduling
+        float gainPNear = 0.0f;            ///< @brief Override Kp when |error| < gainScheduleThreshold (0 = use gainP)
+        float gainPFar = 0.0f;             ///< @brief Override Kp when |error| >= gainScheduleThreshold (0 = use gainP)
+        float gainScheduleThreshold = 5.0f;///< @brief Error (degrees) threshold for gain schedule switch
+
     } steer;
 
     /**
