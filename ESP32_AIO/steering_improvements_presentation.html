@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESP32-AIO Steering Improvements</title>
 <style>
-  /* ===== Reset & Base ===== */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -20,247 +19,114 @@
     justify-content: center;
   }
 
-  /* ===== Slide container ===== */
-  #deck {
-    width: min(960px, 95vw);
-    position: relative;
-  }
+  #deck { width: min(960px, 95vw); position: relative; }
 
   .slide {
     display: none;
-    min-height: 540px;
+    min-height: 530px;
     background: #161b22;
     border: 1px solid #30363d;
     border-radius: 16px;
-    padding: 48px 56px;
+    padding: 36px 50px;
     box-shadow: 0 8px 40px rgba(0,0,0,.6);
     animation: fadein .3s ease;
   }
   .slide.active { display: flex; flex-direction: column; justify-content: center; }
+  @keyframes fadein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 
-  @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .slide-num { font-size:.75rem; color:#8b949e; text-transform:uppercase; letter-spacing:.1em; margin-bottom:14px; }
+  h1 { font-size:2.2rem; font-weight:700; line-height:1.2; color:#f0f6fc; margin-bottom:12px; }
+  h2 { font-size:1.45rem; font-weight:700; color:#f0f6fc; margin-bottom:14px; }
+  .subtitle { font-size:1.1rem; color:#8b949e; margin-bottom:28px; }
+  p, li { font-size:.97rem; line-height:1.7; color:#c9d1d9; }
+  ul { padding-left:1.4em; }
+  li { margin-bottom:5px; }
 
-  /* ===== Typography ===== */
-  .slide-num {
-    font-size: 0.75rem;
-    color: #8b949e;
-    text-transform: uppercase;
-    letter-spacing: .1em;
-    margin-bottom: 18px;
-  }
+  .chip { display:inline-block; padding:3px 12px; border-radius:20px; font-size:.78rem; font-weight:600; letter-spacing:.04em; margin-right:6px; margin-bottom:6px; }
+  .chip-green  { background:rgba(63,185,80,.18);  color:#3fb950; border:1px solid #3fb950; }
+  .chip-blue   { background:rgba(88,166,255,.18); color:#58a6ff; border:1px solid #58a6ff; }
+  .chip-yellow { background:rgba(210,153,34,.18); color:#d29922; border:1px solid #d29922; }
+  .chip-purple { background:rgba(188,140,255,.18);color:#bc8cff; border:1px solid #bc8cff; }
+  .chip-red    { background:rgba(248,81,73,.18);  color:#f85149; border:1px solid #f85149; }
+  .chip-gray   { background:rgba(139,148,158,.18);color:#8b949e; border:1px solid #8b949e; }
 
-  h1 {
-    font-size: 2.2rem;
-    font-weight: 700;
-    line-height: 1.2;
-    color: #f0f6fc;
-    margin-bottom: 12px;
-  }
-  h2 {
-    font-size: 1.55rem;
-    font-weight: 700;
-    color: #f0f6fc;
-    margin-bottom: 16px;
-  }
-  .subtitle {
-    font-size: 1.1rem;
-    color: #8b949e;
-    margin-bottom: 28px;
-  }
-  p, li {
-    font-size: 1rem;
-    line-height: 1.75;
-    color: #c9d1d9;
-  }
-  ul { padding-left: 1.4em; }
-  li { margin-bottom: 6px; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:6px; }
 
-  /* ===== Accent chips ===== */
-  .chip {
-    display: inline-block;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: .04em;
-    margin-right: 6px;
-    margin-bottom: 6px;
-  }
-  .chip-green  { background: rgba(63,185,80,.18); color: #3fb950; border: 1px solid #3fb950; }
-  .chip-blue   { background: rgba(88,166,255,.18); color: #58a6ff; border: 1px solid #58a6ff; }
-  .chip-yellow { background: rgba(210,153,34,.18); color: #d29922; border: 1px solid #d29922; }
-  .chip-purple { background: rgba(188,140,255,.18); color: #bc8cff; border: 1px solid #bc8cff; }
-  .chip-red    { background: rgba(248,81,73,.18); color: #f85149; border: 1px solid #f85149; }
-  .chip-gray   { background: rgba(139,148,158,.18); color: #8b949e; border: 1px solid #8b949e; }
+  .box { border-radius:10px; padding:14px 18px; margin-top:6px; }
+  .box-blue   { background:rgba(88,166,255,.09);  border:1px solid rgba(88,166,255,.3); }
+  .box-green  { background:rgba(63,185,80,.09);   border:1px solid rgba(63,185,80,.3);  }
+  .box-yellow { background:rgba(210,153,34,.09);  border:1px solid rgba(210,153,34,.3); }
+  .box-purple { background:rgba(188,140,255,.09); border:1px solid rgba(188,140,255,.3);}
+  .box-red    { background:rgba(248,81,73,.09);   border:1px solid rgba(248,81,73,.3);  }
+  .box-gray   { background:rgba(139,148,158,.09); border:1px solid rgba(139,148,158,.3);}
+  .box-title  { font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin-bottom:7px; }
+  .box-blue   .box-title { color:#58a6ff; }
+  .box-green  .box-title { color:#3fb950; }
+  .box-yellow .box-title { color:#d29922; }
+  .box-purple .box-title { color:#bc8cff; }
+  .box-red    .box-title { color:#f85149; }
+  .box-gray   .box-title { color:#8b949e; }
 
-  /* ===== Two-column layout ===== */
-  .cols {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 28px;
-    margin-top: 8px;
-  }
-
-  /* ===== Callout boxes ===== */
-  .box {
-    border-radius: 10px;
-    padding: 18px 22px;
-    margin-top: 8px;
-  }
-  .box-blue   { background: rgba(88,166,255,.09); border: 1px solid rgba(88,166,255,.3); }
-  .box-green  { background: rgba(63,185,80,.09);  border: 1px solid rgba(63,185,80,.3);  }
-  .box-yellow { background: rgba(210,153,34,.09); border: 1px solid rgba(210,153,34,.3); }
-  .box-purple { background: rgba(188,140,255,.09);border: 1px solid rgba(188,140,255,.3);}
-  .box-red    { background: rgba(248,81,73,.09);  border: 1px solid rgba(248,81,73,.3);  }
-  .box-gray   { background: rgba(139,148,158,.09);border: 1px solid rgba(139,148,158,.3);}
-
-  .box-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    margin-bottom: 8px;
-  }
-  .box-blue   .box-title { color: #58a6ff; }
-  .box-green  .box-title { color: #3fb950; }
-  .box-yellow .box-title { color: #d29922; }
-  .box-purple .box-title { color: #bc8cff; }
-  .box-red    .box-title { color: #f85149; }
-  .box-gray   .box-title { color: #8b949e; }
-
-  /* ===== Analogy highlight ===== */
-  .analogy {
-    border-left: 3px solid #58a6ff;
-    background: rgba(88,166,255,.07);
-    padding: 12px 16px;
-    border-radius: 0 8px 8px 0;
-    margin: 14px 0;
-    font-style: italic;
-    color: #a5c8ff;
-  }
-  .analogy::before { content: '🚜  '; font-style: normal; }
-
-  /* ===== Setting table ===== */
-  .settings {
+  /* ===== Canvas animations ===== */
+  .anim-canvas {
     width: 100%;
-    border-collapse: collapse;
+    height: 128px;
+    display: block;
     margin-top: 12px;
-    font-size: 0.9rem;
-  }
-  .settings th {
-    text-align: left;
-    padding: 8px 12px;
-    background: #21262d;
-    color: #8b949e;
-    font-weight: 600;
-    border-bottom: 1px solid #30363d;
-  }
-  .settings td {
-    padding: 8px 12px;
-    border-bottom: 1px solid #21262d;
-    color: #c9d1d9;
-  }
-  .settings tr:last-child td { border-bottom: none; }
-  code {
-    background: #21262d;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 0.85em;
-    color: #58a6ff;
-  }
-
-  /* ===== Diagram ===== */
-  .diagram {
+    border-radius: 8px;
     background: #0d1117;
     border: 1px solid #30363d;
-    border-radius: 10px;
-    padding: 20px;
-    text-align: center;
-    font-size: 0.85rem;
-    color: #8b949e;
-    margin-top: 12px;
-    line-height: 2;
   }
-  .dnode {
-    display: inline-block;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.8rem;
-  }
-  .dn-blue   { background: rgba(88,166,255,.2);  color: #58a6ff; }
-  .dn-green  { background: rgba(63,185,80,.2);   color: #3fb950; }
-  .dn-yellow { background: rgba(210,153,34,.2);  color: #d29922; }
-  .dn-purple { background: rgba(188,140,255,.2); color: #bc8cff; }
-  .dn-red    { background: rgba(248,81,73,.2);   color: #f85149; }
-  .arr { color: #8b949e; margin: 0 6px; }
-
-  /* ===== Sequence ===== */
-  .seq-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-  .seq-num {
-    min-width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #58a6ff;
-    color: #0d1117;
-    font-weight: 700;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 3px;
-  }
-  .seq-text strong { color: #f0f6fc; }
-
-  /* ===== Cover accent bar ===== */
-  .accent-bar {
-    height: 4px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, #58a6ff, #3fb950, #d29922, #bc8cff, #f85149);
-    margin-bottom: 28px;
-  }
-
-  /* ===== Nav ===== */
-  #nav {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-top: 20px;
-  }
-  .nav-btn {
-    background: #21262d;
-    border: 1px solid #30363d;
-    color: #c9d1d9;
-    padding: 8px 22px;
+  .anim-canvas-wide {
+    width: 100%;
+    height: 140px;
+    display: block;
+    margin-top: 10px;
     border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    transition: background .15s;
+    background: #0d1117;
+    border: 1px solid #30363d;
   }
-  .nav-btn:hover { background: #30363d; }
-  .nav-btn:disabled { opacity: .3; cursor: default; }
-  #slide-counter { color: #8b949e; font-size: 0.85rem; min-width: 80px; text-align: center; }
+  .canvas-caption {
+    font-size: .72rem;
+    color: #8b949e;
+    margin-top: 5px;
+    font-style: italic;
+  }
 
-  /* ===== Progress bar ===== */
-  #progress-bar {
-    height: 3px;
-    background: #58a6ff;
-    border-radius: 2px;
-    transition: width .3s ease;
-    margin-bottom: 14px;
-    width: min(960px, 95vw);
-  }
+  .settings { width:100%; border-collapse:collapse; margin-top:10px; font-size:.88rem; }
+  .settings th { text-align:left; padding:7px 10px; background:#21262d; color:#8b949e; font-weight:600; border-bottom:1px solid #30363d; }
+  .settings td { padding:7px 10px; border-bottom:1px solid #21262d; color:#c9d1d9; }
+  .settings tr:last-child td { border-bottom:none; }
+  code { background:#21262d; padding:1px 6px; border-radius:4px; font-size:.84em; color:#58a6ff; }
+
+  .diagram { background:#0d1117; border:1px solid #30363d; border-radius:10px; padding:16px; text-align:center; font-size:.85rem; color:#8b949e; margin-top:10px; line-height:2; }
+  .dnode { display:inline-block; padding:5px 12px; border-radius:6px; font-weight:600; font-size:.78rem; }
+  .dn-blue   { background:rgba(88,166,255,.2);  color:#58a6ff; }
+  .dn-green  { background:rgba(63,185,80,.2);   color:#3fb950; }
+  .dn-yellow { background:rgba(210,153,34,.2);  color:#d29922; }
+  .dn-purple { background:rgba(188,140,255,.2); color:#bc8cff; }
+  .dn-red    { background:rgba(248,81,73,.2);   color:#f85149; }
+  .arr { color:#8b949e; margin:0 6px; }
+
+  .seq-row { display:flex; align-items:flex-start; gap:14px; margin-bottom:16px; }
+  .seq-num { min-width:30px; height:30px; border-radius:50%; background:#58a6ff; color:#0d1117; font-weight:700; font-size:.88rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+  .seq-text strong { color:#f0f6fc; }
+
+  .accent-bar { height:4px; border-radius:2px; background:linear-gradient(90deg,#58a6ff,#3fb950,#d29922,#bc8cff,#f85149); margin-bottom:24px; }
+
+  #nav { display:flex; align-items:center; gap:16px; margin-top:16px; }
+  .nav-btn { background:#21262d; border:1px solid #30363d; color:#c9d1d9; padding:8px 22px; border-radius:8px; cursor:pointer; font-size:.95rem; transition:background .15s; }
+  .nav-btn:hover { background:#30363d; }
+  .nav-btn:disabled { opacity:.3; cursor:default; }
+  #slide-counter { color:#8b949e; font-size:.85rem; min-width:80px; text-align:center; }
+
+  #progress-wrap { width:min(960px,95vw); height:3px; background:#21262d; border-radius:2px; margin-bottom:12px; }
+  #progress-bar  { height:3px; background:#58a6ff; border-radius:2px; transition:width .3s ease; }
 </style>
 </head>
 <body>
 
-<div id="progress-bar"></div>
+<div id="progress-wrap"><div id="progress-bar" style="width:0%"></div></div>
 <div id="deck">
 
   <!-- ===== SLIDE 1: Title ===== -->
@@ -269,7 +135,7 @@
     <div class="slide-num">ESP32-AIO · Steering System</div>
     <h1>Smarter Steering Control</h1>
     <p class="subtitle">Six improvements to make auto-steer more reliable, responsive, and forgiving on real farm equipment</p>
-    <div style="margin-top: 24px;">
+    <div style="margin-top:20px;">
       <span class="chip chip-blue">Stiction Boost</span>
       <span class="chip chip-green">Error-Dep. Min PWM</span>
       <span class="chip chip-yellow">Anti-Windup</span>
@@ -277,17 +143,17 @@
       <span class="chip chip-gray">Deadband</span>
       <span class="chip chip-red">Gain Scheduling</span>
     </div>
-    <p style="margin-top:32px; color:#8b949e; font-size:0.9rem;">Use ← → arrow keys or the buttons below to navigate</p>
+    <p style="margin-top:28px;color:#8b949e;font-size:.9rem;">Use ← → arrow keys or the buttons below to navigate</p>
   </div>
 
-  <!-- ===== SLIDE 2: How steering works (plain language) ===== -->
+  <!-- ===== SLIDE 2: Background ===== -->
   <div class="slide">
     <div class="slide-num">Background</div>
     <h2>How Auto-Steer Works (The Basics)</h2>
-    <p style="margin-bottom:14px;">The auto-steer system constantly asks one question:</p>
-    <div class="box box-blue" style="margin-bottom:18px;">
+    <p style="margin-bottom:12px;">The auto-steer system constantly asks one question:</p>
+    <div class="box box-blue" style="margin-bottom:12px;">
       <div class="box-title">The Core Question</div>
-      <p style="font-size:1.15rem; font-weight:600; color:#f0f6fc;">"Where is the wheel pointed <em>right now</em>, and where do I <em want> it to be?"</p>
+      <p style="font-size:1.05rem;font-weight:600;color:#f0f6fc;">"Where is the wheel pointed <em>right now</em>, and where do I <em>want</em> it to be?"</p>
     </div>
     <div class="diagram">
       <span class="dnode dn-blue">GPS / Guidance</span>
@@ -296,10 +162,10 @@
       <span class="arr">→ motor command →</span>
       <span class="dnode dn-green">Steering Motor</span>
       <br>
-      <span style="margin-left: 200px; font-size: 0.75rem;">↑ feedback (actual angle) ↑</span>
+      <span style="margin-left:200px;font-size:.75rem;">↑ feedback (actual angle) ↑</span>
     </div>
-    <div class="analogy">Think of the PID controller like a very attentive driver watching a lane-keep line — pressing the steering wheel harder when far off, and easing off when close.</div>
-    <p style="margin-top:12px; color:#8b949e; font-size: 0.9rem;">The six improvements all make that "attentive driver" smarter in specific situations.</p>
+    <canvas id="c-pid" class="anim-canvas-wide"></canvas>
+    <p class="canvas-caption">🎬 Animated: actual wheel angle (blue) converging to target (dashed). Shaded area = remaining error the controller is working to eliminate.</p>
   </div>
 
   <!-- ===== SLIDE 3: Stiction Boost ===== -->
@@ -312,18 +178,19 @@
           <div class="box-title">The Problem</div>
           <p>In cold weather, with heavy implements, or on tight turns, the steering system can get <strong>stuck</strong> — the motor is running but the wheel isn't actually moving. The system just <em>sits there</em> with error piling up.</p>
         </div>
-        <div class="analogy" style="margin-top:14px;">Like trying to open a stuck jar lid — you need an extra hard twist to break it free, then normal force to keep turning it.</div>
+        <canvas id="c-stiction" class="anim-canvas"></canvas>
+        <p class="canvas-caption">🎬 Orange = motor effort · Blue = wheel movement · Red zone = boost fires to break free</p>
       </div>
       <div>
         <div class="box box-green">
           <div class="box-title">The Fix</div>
-          <p>The firmware now <strong>watches for stalls</strong>. If the wheel hasn't moved meaningfully after a configurable timeout, it adds a temporary boost to the motor output to break free — then immediately backs off once movement is detected.</p>
+          <p>The firmware now <strong>watches for stalls</strong>. If the wheel hasn't moved meaningfully after a configurable timeout, it adds a temporary boost to break free — then backs off once movement is detected.</p>
         </div>
-        <table class="settings" style="margin-top:14px;">
+        <table class="settings" style="margin-top:12px;">
           <tr><th>Setting</th><th>What it does</th></tr>
           <tr><td><code>stictionBoost</code></td><td>Size of the extra kick (0–1.0)</td></tr>
           <tr><td><code>stictionTimeout</code></td><td>How long to wait before boosting (ms)</td></tr>
-          <tr><td><code>stictionThreshold</code></td><td>Min movement to count as "not stuck" (degrees)</td></tr>
+          <tr><td><code>stictionThreshold</code></td><td>Min movement to count as "not stuck" (°)</td></tr>
         </table>
       </div>
     </div>
@@ -337,25 +204,25 @@
       <div>
         <div class="box box-red">
           <div class="box-title">The Problem</div>
-          <p>Motor drivers have a minimum power level before they can actually move. If that minimum is set too <em>high</em>, the wheel overshoots past the target and oscillates back and forth.</p>
-          <p style="margin-top:8px;">If it's set too <em>low</em>, the motor may stall when there's heavy resistance far from the target.</p>
+          <p>Motor drivers have a minimum power level before they can actually move. Set too <em>high</em> → wheel overshoots and oscillates. Set too <em>low</em> → motor stalls under load far from target.</p>
         </div>
-        <div class="analogy" style="margin-top:14px;">Like a car's gas pedal having only two settings: floor it, or coast — no gentle creeping into a parking spot.</div>
+        <canvas id="c-minpwm" class="anim-canvas"></canvas>
+        <p class="canvas-caption">🎬 Fixed high minPWM (red) overshoots and hunts · Adaptive minPWM (green) settles cleanly</p>
       </div>
       <div>
         <div class="box box-green">
           <div class="box-title">The Fix</div>
           <p>The firmware now uses <strong>two different minimum power levels</strong>:</p>
-          <ul style="margin-top:10px;">
+          <ul style="margin-top:8px;">
             <li><strong>Far from target:</strong> higher minimum — enough muscle to overcome resistance</li>
             <li><strong>Close to target:</strong> lower minimum — gentle enough to avoid overshoot</li>
           </ul>
         </div>
-        <table class="settings" style="margin-top:14px;">
+        <table class="settings" style="margin-top:12px;">
           <tr><th>Setting</th><th>What it does</th></tr>
           <tr><td><code>minPWMfar</code></td><td>Min power when error is large</td></tr>
           <tr><td><code>minPWMnear</code></td><td>Min power when close to target</td></tr>
-          <tr><td><code>minPWMFarThreshold</code></td><td>The error distance that splits the two zones (degrees)</td></tr>
+          <tr><td><code>minPWMFarThreshold</code></td><td>Error distance splitting the two zones (°)</td></tr>
         </table>
       </div>
     </div>
@@ -369,17 +236,17 @@
       <div>
         <div class="box box-red">
           <div class="box-title">The Problem: "Integral Windup"</div>
-          <p>The PID controller has a <strong>memory of past error</strong> (the "I" or integral term). When the system is stuck for a long time (e.g., operator held the wheel), that memory <em>overloads</em>.</p>
-          <p style="margin-top:8px;">When released, the motor <strong>overshoots wildly</strong> trying to "pay off" all that stored-up error.</p>
+          <p>The PID controller has a <strong>memory of past error</strong> (the "I" term). When the system is held or blocked for a long time, that memory <em>overloads</em>. When released, the motor <strong>overshoots wildly</strong>.</p>
         </div>
-        <div class="analogy" style="margin-top:14px;">Like pressing the gas harder and harder when stuck in mud — then getting surprised when the wheels suddenly grip and you launch forward.</div>
+        <canvas id="c-windup" class="anim-canvas"></canvas>
+        <p class="canvas-caption">🎬 Left: integral overloads → big overshoot · Right: cap limits buildup → smooth release</p>
       </div>
       <div>
         <div class="box box-green">
           <div class="box-title">The Fix</div>
-          <p>Anti-windup <strong>caps how much memory can accumulate</strong>. Once the motor is already at maximum effort, the system stops adding to the memory — so when released, it responds promptly without overcorrecting.</p>
+          <p>Anti-windup <strong>caps how much memory can accumulate</strong>. Once the motor is at maximum effort, the system stops adding to the memory — so when released, it responds promptly without overcorrecting.</p>
         </div>
-        <table class="settings" style="margin-top:14px;">
+        <table class="settings" style="margin-top:12px;">
           <tr><th>Setting</th><th>What it does</th></tr>
           <tr><td><code>enableAntiWindup</code></td><td>Turn this protection on/off</td></tr>
           <tr><td><code>antiWindupThreshold</code></td><td>Fraction of max output where cap kicks in (e.g. 0.8 = 80%)</td></tr>
@@ -396,19 +263,20 @@
       <div>
         <div class="box box-red">
           <div class="box-title">The Problem: Sensor Noise</div>
-          <p>The wheel angle sensor (WAS) is never perfectly smooth — it has tiny electrical jitter and vibration noise. The <strong>derivative term</strong> in the PID reacts to rapid changes, so noise makes it <em>overreact</em>, causing a buzzy, oscillating motor command.</p>
+          <p>The wheel angle sensor (WAS) has tiny electrical jitter and vibration noise. The <strong>derivative term</strong> in the PID reacts to rapid changes — noise makes it <em>overreact</em>, causing a buzzy, oscillating motor command.</p>
         </div>
-        <div class="analogy" style="margin-top:14px;">Like trying to hold a steering wheel perfectly still while driving on a gravel road — the bumps cause tiny twitches the driver has to constantly correct.</div>
+        <canvas id="c-filter" class="anim-canvas"></canvas>
+        <p class="canvas-caption">🎬 Raw WAS signal (orange, noisy) vs filtered input the PID actually sees (blue, smooth)</p>
       </div>
       <div>
         <div class="box box-green">
           <div class="box-title">The Fix</div>
           <p>A <strong>smoothing filter</strong> is applied to the sensor reading before the PID sees it. Noise is averaged out, so the controller sees gradual, meaningful changes rather than jitter.</p>
-          <p style="margin-top:10px;">This is the same principle as a noise-cancelling microphone — let the real signal through, reject the static.</p>
+          <p style="margin-top:8px;">Same principle as a noise-cancelling microphone — let the real signal through, reject the static.</p>
         </div>
-        <table class="settings" style="margin-top:14px;">
+        <table class="settings" style="margin-top:12px;">
           <tr><th>Setting</th><th>What it does</th></tr>
-          <tr><td><code>pidInputFilt</code></td><td>Filter strength (0 = off, 1 = maximum smoothing). Higher values respond more slowly but are smoother.</td></tr>
+          <tr><td><code>pidInputFilt</code></td><td>Filter strength (0 = off, 1 = max smoothing). Higher = smoother but slower response.</td></tr>
         </table>
       </div>
     </div>
@@ -424,18 +292,19 @@
           <div class="box-title">What It Does</div>
           <p>The deadband defines a small <strong>"close enough" zone</strong> around the target angle. When the wheel is within that zone, the motor is commanded to <strong>zero</strong> — stop trying to make micro-corrections.</p>
         </div>
-        <div class="analogy" style="margin-top:14px;">Like parking a car — once you're within a few inches of the curb, you stop nudging. Continuing to inch forward and back just wastes effort and risks bumping.</div>
+        <canvas id="c-deadband" class="anim-canvas"></canvas>
+        <p class="canvas-caption">🎬 Top: no deadband — hunts forever near target · Bottom: deadband zone (green) — motor stops</p>
       </div>
       <div>
         <div class="box box-blue">
           <div class="box-title">Why It Matters for the Other Features</div>
           <ul>
-            <li>Stops the stiction boost from firing needlessly when the wheel is already at target</li>
-            <li>Prevents the integral memory from building up while sitting still</li>
+            <li>Stops the stiction boost from firing needlessly when already at target</li>
+            <li>Prevents integral memory from building up while sitting still</li>
             <li>Reduces motor wear from constant micro-corrections</li>
           </ul>
         </div>
-        <table class="settings" style="margin-top:14px;">
+        <table class="settings" style="margin-top:12px;">
           <tr><th>Setting</th><th>What it does</th></tr>
           <tr><td><code>steerDeadband</code></td><td>Half-width of the "close enough" zone in degrees (0 = disabled)</td></tr>
         </table>
@@ -452,59 +321,60 @@
         <div class="box box-yellow">
           <div class="box-title">The Idea</div>
           <p>A single fixed "aggressiveness" (Kp gain) can't be optimal for all situations:</p>
-          <ul style="margin-top:8px;">
+          <ul style="margin-top:7px;">
             <li><strong>Far from target:</strong> you want the motor to respond firmly and catch up quickly</li>
             <li><strong>Close to target:</strong> you want a gentle touch to avoid overshooting</li>
           </ul>
         </div>
-        <div class="analogy" style="margin-top:14px;">Like how a driver steers differently when correcting a big swerve vs. making tiny adjustments to hold a lane.</div>
+        <canvas id="c-gainsched" class="anim-canvas"></canvas>
+        <p class="canvas-caption">🎬 Fixed gain (blue) — steady but slow · Gain-scheduled (green) — fast catch, smooth landing</p>
       </div>
       <div>
         <div class="box box-green">
           <div class="box-title">The Fix</div>
-          <p>The system can now <strong>automatically switch Kp</strong> based on how far the wheel is from its target. Gains are only updated when crossing the threshold — no unnecessary recalculation every loop.</p>
+          <p>The system can now <strong>automatically switch Kp</strong> based on how far the wheel is from its target. Gains only update on zone transitions — no unnecessary recalculation every loop.</p>
         </div>
-        <table class="settings" style="margin-top:14px;">
+        <table class="settings" style="margin-top:12px;">
           <tr><th>Setting</th><th>What it does</th></tr>
           <tr><td><code>enableGainSchedule</code></td><td>Turn feature on/off</td></tr>
-          <tr><td><code>gainPNear</code></td><td>Kp to use when close to target (0 = use base Kp)</td></tr>
-          <tr><td><code>gainPFar</code></td><td>Kp to use when far from target (0 = use base Kp)</td></tr>
-          <tr><td><code>gainScheduleThreshold</code></td><td>Distance in degrees that separates "near" from "far"</td></tr>
+          <tr><td><code>gainPNear</code></td><td>Kp close to target (0 = use base Kp)</td></tr>
+          <tr><td><code>gainPFar</code></td><td>Kp far from target (0 = use base Kp)</td></tr>
+          <tr><td><code>gainScheduleThreshold</code></td><td>Distance in degrees separating near/far zones</td></tr>
         </table>
       </div>
     </div>
   </div>
 
-  <!-- ===== SLIDE 9: How they work together ===== -->
+  <!-- ===== SLIDE 9: Big Picture ===== -->
   <div class="slide">
     <div class="slide-num">Big Picture</div>
     <h2>How All Six Work Together</h2>
-    <div class="diagram" style="padding: 24px 16px; line-height: 2.4;">
-      <span class="dnode dn-blue">AgOpenGPS<br><small style="font-weight:400;font-size:0.7rem;">sends target angle</small></span>
+    <div class="diagram" style="padding:20px 14px;line-height:2.4;">
+      <span class="dnode dn-blue">AgOpenGPS<br><small style="font-weight:400;font-size:.7rem;">sends target angle</small></span>
       <span class="arr">→</span>
-      <span class="dnode dn-yellow">PID Controller<br><small style="font-weight:400;font-size:0.7rem;">+ Anti-Windup ③<br>+ Input Filter ④<br>+ Gain Schedule ⑥</small></span>
+      <span class="dnode dn-yellow">PID Controller<br><small style="font-weight:400;font-size:.7rem;">+ Anti-Windup ③<br>+ Input Filter ④<br>+ Gain Schedule ⑥</small></span>
       <span class="arr">→</span>
-      <span class="dnode dn-purple">Stiction Check ①<br><small style="font-weight:400;font-size:0.7rem;">add boost if stalled</small></span>
+      <span class="dnode dn-purple">Stiction Check ①<br><small style="font-weight:400;font-size:.7rem;">add boost if stalled</small></span>
       <span class="arr">→</span>
-      <span class="dnode dn-green">Motor Driver<br><small style="font-weight:400;font-size:0.7rem;">+ Err-Dep MinPWM ②</small></span>
+      <span class="dnode dn-green">Motor Driver<br><small style="font-weight:400;font-size:.7rem;">+ Err-Dep MinPWM ②</small></span>
       <br>
-      <span style="display:inline-block; margin-top: 8px; font-size: 0.75rem; color: #8b949e;">
+      <span style="display:inline-block;margin-top:8px;font-size:.75rem;color:#8b949e;">
         ⑤ Deadband check intercepts early → sets output to 0, resets stiction, limits integral buildup
       </span>
     </div>
-    <div class="box box-blue" style="margin-top: 20px;">
+    <div class="box box-blue" style="margin-top:18px;">
       <div class="box-title">Net effect on the field</div>
       <p>The tractor holds its line more cleanly, recovers from bumps and obstacles faster, steers reliably under heavy load, and doesn't wander or oscillate when close to the guidance line.</p>
     </div>
   </div>
 
-  <!-- ===== SLIDE 10: Tuning guide ===== -->
+  <!-- ===== SLIDE 10: Tuning Guide ===== -->
   <div class="slide">
     <div class="slide-num">Tuning Guide</div>
     <h2>Recommended Tuning Sequence</h2>
-    <p style="margin-bottom: 20px; color: #8b949e;">These features interact — tune them in order for the best result.</p>
-    <div class="seq-row"><div class="seq-num">1</div><div class="seq-text"><strong>Proportional only first.</strong> Set <code>gainI = 0</code>, <code>gainD = 0</code>. Adjust <code>gainP</code> until the steering responds briskly without obvious oscillation.</div></div>
-    <div class="seq-row"><div class="seq-num">2</div><div class="seq-text"><strong>Add input filtering.</strong> Set <code>pidInputFilt</code> to a small value (e.g. 0.1–0.3) to calm any sensor jitter before introducing derivative.</div></div>
+    <p style="margin-bottom:16px;color:#8b949e;">These features interact — tune them in order for the best result.</p>
+    <div class="seq-row"><div class="seq-num">1</div><div class="seq-text"><strong>Proportional only first.</strong> Set <code>gainI = 0</code>, <code>gainD = 0</code>. Adjust <code>gainP</code> until steering responds briskly without obvious oscillation.</div></div>
+    <div class="seq-row"><div class="seq-num">2</div><div class="seq-text"><strong>Add input filtering.</strong> Set <code>pidInputFilt</code> to a small value (e.g. 0.1–0.3) to calm sensor jitter before introducing derivative.</div></div>
     <div class="seq-row"><div class="seq-num">3</div><div class="seq-text"><strong>Add integral gain.</strong> Slowly raise <code>gainI</code> until steady-state offset is removed. Enable <code>antiWindup</code> at this stage.</div></div>
     <div class="seq-row"><div class="seq-num">4</div><div class="seq-text"><strong>Tune stiction boost</strong> if steering stalls under load. Start with a short <code>stictionTimeout</code> (300–500 ms) and small <code>stictionBoost</code> (0.15–0.25).</div></div>
     <div class="seq-row"><div class="seq-num">5</div><div class="seq-text"><strong>Refine near-target behaviour.</strong> Lower <code>minPWMnear</code> and consider enabling <code>gainSchedule</code> with a softer <code>gainPNear</code> if overshoot remains.</div></div>
@@ -517,11 +387,11 @@
     <h2>In Plain Terms</h2>
     <div class="cols">
       <div>
-        <div class="box box-blue" style="margin-bottom: 12px;">
+        <div class="box box-blue" style="margin-bottom:10px;">
           <div class="box-title">① Stiction Boost</div>
           <p>Gives the motor an extra kick when it gets stuck, then backs off once moving.</p>
         </div>
-        <div class="box box-green" style="margin-bottom: 12px;">
+        <div class="box box-green" style="margin-bottom:10px;">
           <div class="box-title">② Error-Dep. Min PWM</div>
           <p>Uses more power when far away, less power when almost there — avoids overshooting.</p>
         </div>
@@ -531,11 +401,11 @@
         </div>
       </div>
       <div>
-        <div class="box box-purple" style="margin-bottom: 12px;">
+        <div class="box box-purple" style="margin-bottom:10px;">
           <div class="box-title">④ Input Filtering</div>
           <p>Smooths out sensor noise so the controller doesn't over-react to vibration or jitter.</p>
         </div>
-        <div class="box box-gray" style="margin-bottom: 12px;">
+        <div class="box box-gray" style="margin-bottom:10px;">
           <div class="box-title">⑤ Deadband</div>
           <p>Stops the motor when "close enough" — no unnecessary hunting or micro-corrections.</p>
         </div>
@@ -556,31 +426,670 @@
 </div>
 
 <script>
-  const slides = document.querySelectorAll('.slide');
-  const total = slides.length;
-  let current = 0;
+// ============================================================
+//  Navigation
+// ============================================================
+const slides = document.querySelectorAll('.slide');
+const TOTAL  = slides.length;
+let current  = 0;
 
-  function go(dir) {
-    slides[current].classList.remove('active');
-    current = Math.max(0, Math.min(total - 1, current + dir));
-    slides[current].classList.add('active');
-    document.getElementById('slide-counter').textContent = (current + 1) + ' / ' + total;
-    document.getElementById('btn-prev').disabled = current === 0;
-    document.getElementById('btn-next').disabled = current === total - 1;
-    document.getElementById('progress-bar').style.width =
-      'calc(' + ((current + 1) / total * 100) + '% * (min(960px, 95vw) / 100vw * 100vw))';
-    // simpler: set width as % of bar container
-    document.getElementById('progress-bar').style.width =
-      ((current + 1) / total * 100) + '%';
+function go(dir) {
+  stopAnim();
+  slides[current].classList.remove('active');
+  current = Math.max(0, Math.min(TOTAL - 1, current + dir));
+  slides[current].classList.add('active');
+  document.getElementById('slide-counter').textContent = (current + 1) + ' / ' + TOTAL;
+  document.getElementById('btn-prev').disabled = current === 0;
+  document.getElementById('btn-next').disabled = current === TOTAL - 1;
+  document.getElementById('progress-bar').style.width = ((current + 1) / TOTAL * 100) + '%';
+  if (SLIDE_ANIMS[current]) {
+    startAnim(SLIDE_ANIMS[current]);
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(-1);
+});
+
+// ============================================================
+//  Animation Engine
+// ============================================================
+let _raf = null, _startTs = null;
+
+function stopAnim() {
+  if (_raf) { cancelAnimationFrame(_raf); _raf = null; }
+  _startTs = null;
+}
+
+function startAnim(factoryFn) {
+  stopAnim();
+  // Delay one frame so the slide is rendered and canvas has real dimensions
+  setTimeout(function() {
+    const drawFn = factoryFn();
+    if (!drawFn) return;
+    function tick(ts) {
+      if (!_startTs) _startTs = ts;
+      drawFn((ts - _startTs) * 0.001);
+      _raf = requestAnimationFrame(tick);
+    }
+    _raf = requestAnimationFrame(tick);
+  }, 60);
+}
+
+// ============================================================
+//  Shared Helpers
+// ============================================================
+function setupCV(id) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  var dpr  = window.devicePixelRatio || 1;
+  var rect = el.getBoundingClientRect();
+  if (rect.width < 10) return null;
+  el.width  = Math.round(rect.width  * dpr);
+  el.height = Math.round(rect.height * dpr);
+  var ctx = el.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx: ctx, W: rect.width, H: rect.height };
+}
+
+function clamp(x, lo, hi) { return x < lo ? lo : x > hi ? hi : x; }
+function lerp(a, b, t)     { return a + (b - a) * t; }
+
+// Underdamped step response (zeta<1) — returns value 0..~1.something
+function stepR(t, zeta, wn) {
+  if (t <= 0) return 0;
+  var wd  = wn * Math.sqrt(clamp(1 - zeta * zeta, 0.0001, 1));
+  var env = Math.exp(-zeta * wn * t);
+  return 1 - env * (Math.cos(wd * t) + (zeta / Math.sqrt(1 - zeta * zeta)) * Math.sin(wd * t));
+}
+
+// First-order low-pass filtered step: response is 1 - e^(-wn*t)
+function lpStep(t, wn) {
+  if (t <= 0) return 0;
+  return 1 - Math.exp(-wn * t);
+}
+
+// Draw a polyline from [[x,y],...] array
+function polyline(ctx, pts, color, lw) {
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = lw || 2;
+  ctx.lineJoin    = 'round';
+  ctx.lineCap     = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Render text helper
+function lbl(ctx, s, x, y, color, size, align) {
+  ctx.save();
+  ctx.fillStyle  = color  || '#8b949e';
+  ctx.font       = (size || 11) + 'px Segoe UI,Arial';
+  ctx.textAlign  = align  || 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(s, x, y);
+  ctx.restore();
+}
+
+// Dark background + faint grid
+function bgGrid(ctx, W, H) {
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#1c2128';
+  ctx.lineWidth = 1;
+  for (var i = 1; i < 4; i++) {
+    ctx.beginPath(); ctx.moveTo(0, H * i / 4); ctx.lineTo(W, H * i / 4); ctx.stroke();
+  }
+  for (var j = 1; j < 5; j++) {
+    ctx.beginPath(); ctx.moveTo(W * j / 5, 0); ctx.lineTo(W * j / 5, H); ctx.stroke();
+  }
+}
+
+// Deterministic noise from multiple sine waves (no random, fully repeatable)
+function noise(t) {
+  return (Math.sin(t * 43.7) + Math.sin(t * 71.3) + Math.sin(t * 113.9)) / 3;
+}
+
+// ============================================================
+//  Slide 2 — PID Step Response (full-width canvas)
+// ============================================================
+function anim_pid() {
+  var cv = setupCV('c-pid');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PL = 38, PR = 12, PT = 16, PB = 20;
+  var pw = W - PL - PR, ph = H - PT - PB;
+
+  function vx(f)   { return PL + f * pw; }
+  function vy(v)   { return PT + ph * (1 - clamp(v, -0.15, 1.2)); }
+
+  var PERIOD = 6; // seconds for one full loop
+
+  return function(t) {
+    var phase = (t % PERIOD) / PERIOD; // 0..1
+
+    bgGrid(ctx, W, H);
+
+    // Target dashed line
+    var ty = vy(1.0);
+    ctx.save();
+    ctx.setLineDash([7, 5]);
+    ctx.strokeStyle = '#d29922';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(vx(0), ty); ctx.lineTo(vx(1), ty); ctx.stroke();
+    ctx.restore();
+    lbl(ctx, 'target angle', W - PR - 3, ty - 4, '#d29922', 10, 'right');
+    lbl(ctx, '0°', 2, vy(0) + 4, '#8b949e', 10);
+    lbl(ctx, 'time →', PL + pw / 2, H - 3, '#8b949e', 10, 'center');
+
+    // Compute points up to current phase
+    var SIM = 5; // 5 simulation seconds shown across width
+    var nPx = Math.floor(phase * pw) + 1;
+    var pts = [];
+    for (var px = 0; px < nPx; px++) {
+      var simT = (px / pw) * SIM;
+      var v    = stepR(simT, 0.45, 2.6);
+      pts.push([vx(px / pw), vy(v)]);
+    }
+
+    if (pts.length > 1) {
+      // Shaded area between curve and target
+      ctx.save();
+      ctx.fillStyle = 'rgba(88,166,255,0.09)';
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], ty);
+      for (var i = 0; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.lineTo(pts[pts.length - 1][0], ty);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      polyline(ctx, pts, '#58a6ff', 2.5);
+    }
+
+    // Moving dot at leading edge
+    if (pts.length > 0) {
+      var lp = pts[pts.length - 1];
+      ctx.beginPath();
+      ctx.arc(lp[0], lp[1], 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#58a6ff';
+      ctx.fill();
+    }
+
+    lbl(ctx, 'actual wheel angle', PL + 4, PT + ph + 14, '#58a6ff', 10);
+  };
+}
+
+// ============================================================
+//  Slide 3 — Stiction Boost
+// ============================================================
+function anim_stiction() {
+  var cv = setupCV('c-stiction');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PL = 8, PR = 8, PT = 20, PB = 18;
+  var pw = W - PL - PR, ph = H - PT - PB;
+
+  function vx(f)   { return PL + f * pw; }
+  function vy(v)   { return PT + ph * (1 - clamp(v, 0, 1.05)); }
+
+  // Motor effort value at fraction f (0..1)
+  function motorAt(f) {
+    if (f < 0.35) return 0.48;
+    if (f < 0.56) return 0.84;  // boost
+    return 0.48;
+  }
+  // Wheel position at fraction f
+  function wheelAt(f) {
+    if (f < 0.37) return 0.06;
+    var rise = (f - 0.37) / 0.63;
+    return 0.06 + 0.88 * clamp(stepR(rise * 3.5, 0.75, 3.0), 0, 1);
   }
 
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') go(1);
-    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   go(-1);
-  });
+  var PERIOD = 5;
 
-  // Init progress
-  go(0);
+  return function(t) {
+    var phase = (t % PERIOD) / PERIOD;
+
+    bgGrid(ctx, W, H);
+
+    // Legend
+    lbl(ctx, '── Motor effort', PL, 13, '#f0883e', 10);
+    lbl(ctx, '── Wheel movement', PL + 110, 13, '#58a6ff', 10);
+
+    // Target line
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(vx(0), vy(0.94)); ctx.lineTo(vx(1), vy(0.94)); ctx.stroke();
+    ctx.restore();
+    lbl(ctx, 'target', W - PR - 2, vy(0.94) - 3, '#3fb950', 9, 'right');
+
+    // Boost zone background
+    if (phase > 0.35) {
+      var bx0 = vx(0.35), bx1 = vx(Math.min(0.56, phase));
+      ctx.fillStyle = 'rgba(248,81,73,0.10)';
+      ctx.fillRect(bx0, PT, bx1 - bx0, ph);
+      lbl(ctx, 'BOOST!', vx(0.455), vy(0.5), '#f85149', 10, 'center');
+    }
+
+    // Draw curves up to current phase
+    var N   = Math.floor(phase * pw) + 1;
+    var mPts = [], wPts = [];
+    for (var i = 0; i < N; i++) {
+      var f = i / pw;
+      mPts.push([vx(f), vy(motorAt(f))]);
+      wPts.push([vx(f), vy(wheelAt(f))]);
+    }
+    if (mPts.length > 1) polyline(ctx, mPts, '#f0883e', 2.5);
+    if (wPts.length > 1) polyline(ctx, wPts, '#58a6ff', 2.5);
+
+    // Stall marker
+    var sx = vx(0.35);
+    if (phase > 0.33) {
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#f85149';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(sx, PT); ctx.lineTo(sx, PT + ph); ctx.stroke();
+      ctx.restore();
+      lbl(ctx, 'timeout', sx + 2, PT + 10, '#f85149', 9);
+    }
+  };
+}
+
+// ============================================================
+//  Slide 4 — Error-Dependent Min PWM
+// ============================================================
+function anim_minpwm() {
+  var cv = setupCV('c-minpwm');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PL = 10, PR = 10, PT = 20, PB = 18;
+  var pw = W - PL - PR, ph = H - PT - PB;
+
+  function vx(f)   { return PL + f * pw; }
+  // y-axis: angle error (high at top = far, 0 at center = on target)
+  function vy(v)   { return PT + ph * (1 - clamp(v, -0.35, 1.05)); }
+
+  var SIM = 5, PERIOD = 6;
+
+  // Red: fixed high minPWM → oscillates around zero
+  function redCurve(simT) {
+    if (simT < 0) return 1;
+    var base = 1 - lpStep(simT, 1.2);
+    var osc  = Math.exp(-simT * 0.9) * 0.28 * Math.sin(simT * 5.5);
+    return base + osc;
+  }
+
+  // Green: adaptive minPWM → clean monotonic settle
+  function greenCurve(simT) {
+    if (simT < 0) return 1;
+    return clamp(1 - lpStep(simT, 0.9) - 0.04 * Math.max(0, 1 - simT / 4), 0, 1);
+  }
+
+  return function(t) {
+    var phase = (t % PERIOD) / PERIOD;
+
+    bgGrid(ctx, W, H);
+    lbl(ctx, '── Fixed minPWM (overshoots)', PL, 13, '#f85149', 10);
+    lbl(ctx, '── Adaptive (settles cleanly)', PL, H - 4, '#3fb950', 10);
+
+    // Target (zero-error) line
+    var ty = vy(0);
+    ctx.save();
+    ctx.setLineDash([7, 5]);
+    ctx.strokeStyle = '#d29922';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(vx(0), ty); ctx.lineTo(vx(1), ty); ctx.stroke();
+    ctx.restore();
+    lbl(ctx, 'target (zero error)', W - PR - 2, ty - 4, '#d29922', 9, 'right');
+
+    // Draw both curves up to current phase
+    var nPx = Math.floor(phase * pw) + 1;
+    var rPts = [], gPts = [];
+    for (var px = 0; px < nPx; px++) {
+      var f    = px / pw;
+      var simT = f * SIM;
+      rPts.push([vx(f), vy(redCurve(simT))]);
+      gPts.push([vx(f), vy(greenCurve(simT))]);
+    }
+    if (rPts.length > 1) polyline(ctx, rPts, '#f85149', 2.5);
+    if (gPts.length > 1) polyline(ctx, gPts, '#3fb950', 2.5);
+
+    // Dots at leading edge
+    if (rPts.length > 0) {
+      var r = rPts[rPts.length - 1];
+      ctx.beginPath(); ctx.arc(r[0], r[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#f85149'; ctx.fill();
+    }
+    if (gPts.length > 0) {
+      var g = gPts[gPts.length - 1];
+      ctx.beginPath(); ctx.arc(g[0], g[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#3fb950'; ctx.fill();
+    }
+  };
+}
+
+// ============================================================
+//  Slide 5 — Anti-Windup: dual "tank" visualization
+// ============================================================
+function anim_windup() {
+  var cv = setupCV('c-windup');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PERIOD = 5;
+
+  var tankW  = (W - 60) / 2;
+  var tankH  = H - 48;
+  var tankY  = 24;
+  var lTankX = 10;
+  var rTankX = lTankX + tankW + 40;
+  var CAP    = 0.78; // anti-windup threshold at 78%
+
+  function drawTank(x, level, capped, label, sublabel) {
+    // Border
+    ctx.strokeStyle = '#30363d';
+    ctx.lineWidth   = 1;
+    ctx.strokeRect(x, tankY, tankW, tankH);
+
+    // Fill
+    var fillH   = Math.min(level, 1.05) * tankH;
+    var fillY   = tankY + tankH - fillH;
+    var overflow = level > 1.0;
+    var color   = capped ? '#58a6ff' : (overflow ? '#f85149' : '#d29922');
+    ctx.fillStyle = color;
+    ctx.fillRect(x, fillY, tankW, fillH);
+
+    // Overflow flash effect
+    if (overflow) {
+      ctx.fillStyle = 'rgba(248,81,73,0.3)';
+      ctx.fillRect(x - 6, tankY - 8, tankW + 12, 10);
+    }
+
+    // Cap line (right tank)
+    if (capped) {
+      var capY = tankY + tankH * (1 - CAP);
+      ctx.save();
+      ctx.setLineDash([5, 3]);
+      ctx.strokeStyle = '#d29922';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 6, capY); ctx.lineTo(x + tankW + 6, capY); ctx.stroke();
+      ctx.restore();
+      lbl(ctx, 'cap', x + tankW + 4, capY + 4, '#d29922', 9);
+    }
+
+    // Label
+    lbl(ctx, label,    x + tankW / 2, tankY - 8,          '#c9d1d9', 10, 'center');
+    lbl(ctx, sublabel, x + tankW / 2, tankY + tankH + 14, '#8b949e', 9,  'center');
+
+    // Percentage text
+    lbl(ctx, Math.round(clamp(level, 0, 1.05) * 100) + '%', x + tankW / 2, fillY + 14, '#0d1117', 10, 'center');
+  }
+
+  return function(t) {
+    var phase = (t % PERIOD) / PERIOD;
+
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, W, H);
+
+    // Left: no anti-windup — fills past 100% then overshoots
+    var rawLevel   = clamp(phase * 1.5, 0, 1.35);
+    // Right: with anti-windup — fills to CAP then holds
+    var cappedLevel = clamp(phase * 1.5, 0, CAP);
+
+    drawTank(lTankX, rawLevel,   false, 'Without Anti-Windup', 'integral memory');
+    drawTank(rTankX, cappedLevel, true,  'With Anti-Windup',    'integral memory');
+
+    // Overshoot annotation on left
+    if (rawLevel > 1.0) {
+      lbl(ctx, '⚠ OVERFLOW → overshoot!', lTankX + tankW / 2, tankY + tankH / 2, '#f85149', 10, 'center');
+    }
+  };
+}
+
+// ============================================================
+//  Slide 6 — Input Filtering: scrolling noisy vs smooth
+// ============================================================
+function anim_filter() {
+  var cv = setupCV('c-filter');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PL = 8, PR = 8, PT = 20, PB = 18;
+  var pw = W - PL - PR, ph = H - PT - PB;
+  var SCROLL_SPEED = 1.2; // time units per second scrolled
+  var WIN_DURATION = 4;   // seconds of data visible at once
+
+  // Base (true) signal: slow sine wave
+  function trueSignal(t) {
+    return 0.45 + 0.38 * Math.sin(t * 0.9);
+  }
+  // Raw = true + noise
+  function rawSignal(t) {
+    return trueSignal(t) + 0.12 * noise(t * 6);
+  }
+  // Filtered = simple exponential moving average of raw (alpha=0.18)
+  // Pre-compute a smooth filtered signal
+  function filtSignal(t) {
+    return 0.45 + 0.35 * Math.sin(t * 0.9 - 0.15); // slightly lagged smooth
+  }
+
+  return function(t) {
+    var scrollT = t * SCROLL_SPEED;
+    var tEnd    = scrollT;
+    var tStart  = tEnd - WIN_DURATION;
+
+    bgGrid(ctx, W, H);
+
+    lbl(ctx, 'Raw WAS signal',           PL,       13, '#f0883e', 10);
+    lbl(ctx, 'Filtered (PID input)',  PL + 120, 13, '#58a6ff', 10);
+    lbl(ctx, 'time →', PL + pw / 2, H - 3, '#8b949e', 10, 'center');
+
+    var STEPS = Math.floor(pw);
+    var rawPts = [], filtPts = [];
+
+    for (var i = 0; i <= STEPS; i++) {
+      var tt = tStart + (i / STEPS) * WIN_DURATION;
+      var x  = PL + (i / STEPS) * pw;
+      var yr  = PT + ph * (1 - clamp(rawSignal(tt), 0, 1));
+      var yf  = PT + ph * (1 - clamp(filtSignal(tt), 0, 1));
+      rawPts.push([x, yr]);
+      filtPts.push([x, yf]);
+    }
+
+    polyline(ctx, rawPts,  '#f0883e', 1.8);
+    polyline(ctx, filtPts, '#58a6ff', 2.5);
+  };
+}
+
+// ============================================================
+//  Slide 7 — Deadband: hunting vs settled
+// ============================================================
+function anim_deadband() {
+  var cv = setupCV('c-deadband');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PL = 8, PR = 8, PT = 4, PB = 4;
+  var pw = W - PL - PR;
+  var halfH = (H - PT - PB) / 2;
+  var midY  = PT + halfH;
+  var DEADBAND = 0.12; // fraction of half-height
+
+  var SIM = 5, PERIOD = 6;
+
+  function vx(f)  { return PL + f * pw; }
+  // Map normalized value to y in a panel (panelTopY, panelH)
+  function vy(v, panelTopY, panelH) {
+    return panelTopY + panelH * (1 - clamp(v, -0.25, 1.15));
+  }
+
+  // No deadband: angle approaches target but micro-oscillates forever
+  function noDB(simT) {
+    var settle = 1 - clamp(stepR(simT, 0.55, 2.5), 0, 1);
+    var osc    = 0.06 * Math.exp(-simT * 0.5) * Math.sin(simT * 8);
+    var micro  = 0.04 * Math.sin(simT * 15);
+    return clamp(settle + osc + micro, 0, 1);
+  }
+
+  // With deadband: angle approaches and flatlines inside zone
+  function withDB(simT) {
+    var settle = 1 - clamp(stepR(simT, 0.65, 2.5), 0, 1);
+    return clamp(simT > 2.5 ? Math.max(0, settle) : settle, 0, 1);
+  }
+
+  return function(t) {
+    var phase = (t % PERIOD) / PERIOD;
+
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, W, H);
+
+    // Divider
+    ctx.strokeStyle = '#21262d';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
+
+    // Panel labels
+    lbl(ctx, 'No deadband (hunts near target)', PL + 2, PT + 11, '#f85149', 9);
+    lbl(ctx, 'With deadband (settles)',         PL + 2, midY + 11, '#3fb950', 9);
+
+    var panelTop1 = PT + 14, panelH1 = halfH - 18;
+    var panelTop2 = midY + 14, panelH2 = halfH - 18;
+
+    // Target lines
+    var t1y = vy(0, panelTop1, panelH1);
+    var t2y = vy(0, panelTop2, panelH2);
+    ctx.save(); ctx.setLineDash([5,4]); ctx.strokeStyle='#d29922'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(vx(0),t1y); ctx.lineTo(vx(1),t1y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(vx(0),t2y); ctx.lineTo(vx(1),t2y); ctx.stroke();
+    ctx.restore();
+
+    // Deadband zone on panel 2
+    var dbTop  = vy(DEADBAND,  panelTop2, panelH2);
+    var dbBot  = vy(-DEADBAND, panelTop2, panelH2);
+    ctx.fillStyle = 'rgba(63,185,80,0.12)';
+    ctx.fillRect(PL, dbTop, pw, dbBot - dbTop);
+    lbl(ctx, 'deadband zone', W - PR - 3, t2y + 4, '#3fb950', 8, 'right');
+
+    // Draw curves
+    var nPx = Math.floor(phase * pw) + 1;
+    var pts1 = [], pts2 = [];
+    for (var i = 0; i < nPx; i++) {
+      var f    = i / pw;
+      var simT = f * SIM;
+      pts1.push([vx(f), vy(noDB(simT),  panelTop1, panelH1)]);
+      pts2.push([vx(f), vy(withDB(simT), panelTop2, panelH2)]);
+    }
+    if (pts1.length > 1) polyline(ctx, pts1, '#f85149', 2);
+    if (pts2.length > 1) polyline(ctx, pts2, '#3fb950', 2);
+  };
+}
+
+// ============================================================
+//  Slide 8 — Gain Scheduling: two step responses
+// ============================================================
+function anim_gainsched() {
+  var cv = setupCV('c-gainsched');
+  if (!cv) return null;
+  var ctx = cv.ctx, W = cv.W, H = cv.H;
+  var PL = 8, PR = 12, PT = 20, PB = 18;
+  var pw = W - PL - PR, ph = H - PT - PB;
+
+  function vx(f)   { return PL + f * pw; }
+  // Y: angle error, high = far, 0 = on target
+  function vy(v)   { return PT + ph * (1 - clamp(v, -0.05, 1.1)); }
+
+  var SIM = 5, PERIOD = 6;
+
+  // Fixed moderate gain: slower approach (overdamped-ish)
+  function fixedGain(simT) {
+    return clamp(1 - lpStep(simT, 1.0), 0, 1);
+  }
+
+  // Gain-scheduled: fast catch initially (high Kp), gentle near target (low Kp)
+  function gainSched(simT) {
+    // High gain phase (simT < 1.5): fast response with slight overshoot
+    if (simT < 2.5) {
+      return clamp(1 - stepR(simT, 0.5, 3.5), 0, 1.05);
+    }
+    // Near-target phase: gentle decay from ~0.1 to 0
+    var tR = simT - 2.5;
+    var nearStart = 1 - stepR(2.5, 0.5, 3.5);
+    return clamp(nearStart * Math.exp(-tR * 2.5), 0, 1);
+  }
+
+  return function(t) {
+    var phase = (t % PERIOD) / PERIOD;
+
+    bgGrid(ctx, W, H);
+
+    lbl(ctx, '── Fixed gain (steady, slow)', PL, 13, '#58a6ff', 10);
+    lbl(ctx, '── Gain scheduled (fast → gentle)', PL + 165, 13, '#3fb950', 10);
+
+    // Target line
+    var ty = vy(0);
+    ctx.save();
+    ctx.setLineDash([7, 5]);
+    ctx.strokeStyle = '#d29922';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(vx(0), ty); ctx.lineTo(vx(1), ty); ctx.stroke();
+    ctx.restore();
+    lbl(ctx, 'on target', W - PR - 2, ty - 4, '#d29922', 9, 'right');
+
+    // Zone threshold line
+    var threshY = vy(0.25);
+    ctx.save();
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = '#8b949e';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(vx(0), threshY); ctx.lineTo(vx(1), threshY); ctx.stroke();
+    ctx.restore();
+    lbl(ctx, '← near zone', PL + 3, threshY - 3, '#8b949e', 9);
+
+    var nPx = Math.floor(phase * pw) + 1;
+    var bPts = [], gPts = [];
+    for (var i = 0; i < nPx; i++) {
+      var f    = i / pw;
+      var simT = f * SIM;
+      bPts.push([vx(f), vy(fixedGain(simT))]);
+      gPts.push([vx(f), vy(gainSched(simT))]);
+    }
+    if (bPts.length > 1) polyline(ctx, bPts, '#58a6ff', 2.5);
+    if (gPts.length > 1) polyline(ctx, gPts, '#3fb950', 2.5);
+
+    if (bPts.length > 0) {
+      var b = bPts[bPts.length - 1];
+      ctx.beginPath(); ctx.arc(b[0], b[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#58a6ff'; ctx.fill();
+    }
+    if (gPts.length > 0) {
+      var g = gPts[gPts.length - 1];
+      ctx.beginPath(); ctx.arc(g[0], g[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#3fb950'; ctx.fill();
+    }
+  };
+}
+
+// ============================================================
+//  Slide → animation factory map (0-indexed)
+// ============================================================
+var SLIDE_ANIMS = {
+  1: anim_pid,
+  2: anim_stiction,
+  3: anim_minpwm,
+  4: anim_windup,
+  5: anim_filter,
+  6: anim_deadband,
+  7: anim_gainsched
+};
+
+// Init first slide (no animation on title)
+go(0);
 </script>
 </body>
 </html>
