@@ -87,6 +87,59 @@ std::vector<String> debugVars;
 /// @brief Debug mode flag - true for full debug, false for minimal
 bool fullDebugMode = false;
 
+// ── Steering debug log ────────────────────────────────────────────────────────
+static volatile bool steerLogActive  = false; ///< @brief True while recording is in progress
+static volatile bool steerLogReady   = false; ///< @brief True when a complete log is available
+static String        steerLogBuffer;           ///< @brief CSV log data built by steerLogTask
+static TaskHandle_t  steerLogTaskHandle = NULL;///< @brief Handle for the logging FreeRTOS task
+
+static const unsigned long STEER_LOG_DURATION_S   = 120;        ///< @brief Recording duration in seconds
+static const size_t        STEER_LOG_BUFFER_RESERVE = 65536;    ///< @brief Pre-allocated CSV buffer (bytes)
+static const size_t        STEER_LOG_LINE_SIZE      = 128;      ///< @brief Max bytes per CSV row
+static const size_t        STEER_LOG_TASK_STACK     = 4096;     ///< @brief FreeRTOS task stack (words)
+static const UBaseType_t   STEER_LOG_TASK_PRIORITY  = 1;        ///< @brief FreeRTOS task priority
+
+/**
+ * @brief FreeRTOS task that records steering telemetry as CSV for 2 minutes.
+ * @details Samples every 200 ms → 600 rows.  Sets steerLogReady when done.
+ */
+void steerLogTask(void* /*param*/) {
+    const unsigned long DURATION_MS  = STEER_LOG_DURATION_S * 1000UL;
+    const TickType_t    PERIOD_TICKS = pdMS_TO_TICKS(200);
+
+    steerLogBuffer.reserve(STEER_LOG_BUFFER_RESERVE);
+    steerLogBuffer = "ms,targetAngle,actAngle,error,pidOutput,pidCmd,pwmCmd,motorDir,steerCurrent,status,testState\r\n";
+
+    unsigned long startMs = millis();
+    // Unsigned subtraction correctly handles millis() overflow (Arduino/ESP32 standard pattern)
+    while (millis() - startMs < DURATION_MS) {
+        unsigned long now = millis();
+        float tgt = espData.steer.targetSteerAngle;
+        float act = espData.steer.actSteerAngle;
+        float err = tgt - act;
+        char line[STEER_LOG_LINE_SIZE];
+        snprintf(line, sizeof(line),
+                 "%lu,%.3f,%.3f,%.3f,%.3f,%.3f,%u,%u,%u,%u,%u\r\n",
+                 now - startMs,
+                 tgt, act, err,
+                 (double)espData.steer.pidOutput,
+                 (double)espData.steer.pidCmd,
+                 (unsigned)espData.steer.pwmCmd,
+                 (unsigned)espData.steer.motorDirection,
+                 (unsigned)espData.steer.steerCurrent,
+                 (unsigned)espData.steer.status,
+                 (unsigned)espData.steer.testState);
+        steerLogBuffer += line;
+        vTaskDelay(PERIOD_TICKS);
+    }
+
+    steerLogActive      = false;
+    steerLogReady       = true;
+    steerLogTaskHandle  = NULL;
+    vTaskDelete(NULL);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // WebSocket Serial Monitor Variables
 // String serialBuffer = "";
 // const size_t MAX_SERIAL_BUFFER = 8192;  // 8KB buffer
@@ -1809,6 +1862,58 @@ void handleToggleAPMode(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", apModeState ? "AP_Mode is ON" : "AP_Mode is OFF");
 }
 
+// ── Steering debug log endpoints ──────────────────────────────────────────────
+
+/** POST /startSteerLog – begin a 2-minute recording session */
+void handleStartSteerLog(AsyncWebServerRequest *request) {
+  if (steerLogActive) {
+    request->send(200, "application/json", "{\"status\":\"already_running\"}");
+    return;
+  }
+  steerLogActive = true;
+  steerLogReady  = false;
+  steerLogBuffer = "";
+  if (xTaskCreate(steerLogTask, "SteerLog", STEER_LOG_TASK_STACK, NULL,
+                  STEER_LOG_TASK_PRIORITY, &steerLogTaskHandle) != pdPASS) {
+    steerLogActive    = false;
+    steerLogTaskHandle = NULL;
+    request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Task creation failed\"}");
+    return;
+  }
+  String startJson = "{\"status\":\"started\",\"duration\":" + String(STEER_LOG_DURATION_S) + "}";
+  request->send(200, "application/json", startJson);
+}
+
+/** GET /steerLogStatus – return current log state as JSON */
+void handleSteerLogStatus(AsyncWebServerRequest *request) {
+  JsonDocument doc;
+  doc["active"] = (bool)steerLogActive;
+  doc["ready"]  = (bool)steerLogReady;
+  doc["size"]   = (int)steerLogBuffer.length();
+  String json;
+  serializeJson(doc, json);
+  request->send(200, "application/json", json);
+}
+
+/** GET /downloadSteerLog – serve the CSV log as a file download */
+void handleDownloadSteerLog(AsyncWebServerRequest *request) {
+  if (steerLogActive) {
+    String msg = "Log still recording. Try again after " +
+                 String(STEER_LOG_DURATION_S) + " seconds.";
+    request->send(503, "text/plain", msg);
+    return;
+  }
+  if (!steerLogReady || steerLogBuffer.length() == 0) {
+    request->send(404, "text/plain", "No log available. Press 'Start Log' first.");
+    return;
+  }
+  AsyncWebServerResponse* resp =
+      request->beginResponse(200, "text/csv", steerLogBuffer);
+  resp->addHeader("Content-Disposition",
+                  "attachment; filename=\"steer_debug_log.csv\"");
+  request->send(resp);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 
 #pragma endregion
@@ -2391,6 +2496,9 @@ void normalboot(){
           }
         });
         server.on("/getSteerData", HTTP_GET, handleGetSteerData);
+        server.on("/startSteerLog",    HTTP_POST, handleStartSteerLog);
+        server.on("/steerLogStatus",   HTTP_GET,  handleSteerLogStatus);
+        server.on("/downloadSteerLog", HTTP_GET,  handleDownloadSteerLog);
         
         // Route to set debug mode (minimal vs full)
         server.on("/setDebugMode", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
