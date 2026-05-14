@@ -279,14 +279,20 @@ void ESPsteer::steerLoop(){
         } else {
             // Gain scheduling: optionally switch Kp based on error magnitude
             if (espData->steer.enableGainSchedule) {
-                float kpOverride = (fabsf(angleError) < espData->steer.gainScheduleThreshold)
-                    ? espData->steer.gainPNear
-                    : espData->steer.gainPFar;
-                if (kpOverride > 0.0f) {
-                    pid.setManualGains(kpOverride, espData->steer.gainI, espData->steer.gainD);
-                } else {
-                    setPIDgains();
+                bool nearZone = fabsf(angleError) < espData->steer.gainScheduleThreshold;
+                if (nearZone != _gainScheduleNearZone) {
+                    _gainScheduleNearZone = nearZone;
+                    float kpOverride = nearZone ? espData->steer.gainPNear : espData->steer.gainPFar;
+                    if (kpOverride > 0.0f) {
+                        pid.setManualGains(kpOverride, espData->steer.gainI, espData->steer.gainD);
+                    } else {
+                        setPIDgains();
+                    }
                 }
+            } else if (_gainScheduleNearZone) {
+                // Gain scheduling was just disabled – restore base gains once
+                _gainScheduleNearZone = false;
+                setPIDgains();
             }
 
             pid.setSetpoint(espData->steer.targetSteerAngle);

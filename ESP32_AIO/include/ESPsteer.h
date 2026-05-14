@@ -146,6 +146,9 @@ class ESPsteer{
         float _stictionLastAngle = 0.0f;  ///< @brief Actual angle at stall detection start
         bool _stictionActive = false;     ///< @brief True while stiction boost is being applied
 
+        // Gain scheduling runtime state
+        bool _gainScheduleNearZone = false; ///< @brief Cached near/far zone for gain scheduling
+
 };
 
 #endif
