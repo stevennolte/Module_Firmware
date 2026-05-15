@@ -183,14 +183,9 @@
     .controls button:hover { background: #0d47a1; }
     .controls button.pause { background: #ff9800; }
     .controls button.pause:hover { background: #e65100; }
-    .controls button.stop  { background: #e53935; }
-    .controls button.stop:hover { background: #b71c1c; }
-    .controls button.download { background: #43a047; }
-    .controls button.download:hover { background: #2e7d32; }
-    #logStatus { font-size: 0.8rem; padding: 4px 10px; border-radius: 12px;
-                 background: #90a4ae; color: white; white-space: nowrap; }
-
     #lastUpdate { font-size: 0.75rem; color: #888; margin-left: auto; }
+
+    /* Current bar */
     .current-bar-wrap {
       height: 14px;
       background: #e0e0e0;
@@ -232,9 +227,6 @@
     <button onclick="applyInterval()">Set</button>
     <button id="pauseBtn" class="pause" onclick="togglePause()">⏸ Pause</button>
     <span id="lastUpdate"></span>
-    <button id="logBtn" onclick="startLog()">⏺ Start Log (2 min)</button>
-    <span id="logStatus">● No log</span>
-    <button id="downloadBtn" class="download" onclick="downloadLog()" style="display:none">⬇ Download Log</button>
   </div>
 
   <!-- Angle visualiser (full-width card) -->
@@ -534,71 +526,6 @@
         })
         .catch(() => setStatus(false));
     }
-
-    // ── Debug log ────────────────────────────────────────────────────────────
-    let logPollerID = null;
-    let logDurationS = 120; // updated from server response
-
-    function startLog() {
-      const btn = document.getElementById('logBtn');
-      const st  = document.getElementById('logStatus');
-      btn.disabled = true;
-      st.style.background = '#1565c0';
-      st.textContent = '● Starting…';
-      fetch('/startSteerLog', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => {
-          if (d.status === 'started') {
-            logDurationS = d.duration || 120;
-            st.textContent = '● Recording 0 / ' + logDurationS + ' s';
-            st.style.background = '#e53935';
-            document.getElementById('downloadBtn').style.display = 'none';
-            logPollerID = setInterval(pollLogStatus, 2000);
-          } else if (d.status === 'already_running') {
-            st.textContent = '● Already recording';
-            btn.disabled = false;
-            logPollerID = setInterval(pollLogStatus, 2000);
-          }
-        })
-        .catch(() => { st.textContent = '● Error starting log'; btn.disabled = false; });
-    }
-
-    function pollLogStatus() {
-      fetch('/steerLogStatus')
-        .then(r => r.json())
-        .then(d => {
-          const btn = document.getElementById('logBtn');
-          const st  = document.getElementById('logStatus');
-          if (d.active) {
-            // Approx elapsed seconds: header ~80 bytes, each data row ~80 bytes, sampled at 200 ms
-            const AVG_ROW_BYTES = 80;
-            const rows = Math.max(0, Math.round((d.size - AVG_ROW_BYTES) / AVG_ROW_BYTES));
-            const elapsed = Math.min(logDurationS, Math.round(rows * 0.2));
-            st.textContent = '● Recording ' + elapsed + ' / ' + logDurationS + ' s';
-            st.style.background = '#e53935';
-          } else if (d.ready) {
-            clearInterval(logPollerID);
-            logPollerID = null;
-            st.textContent = '● Log ready (' + Math.round(d.size / 1024) + ' KB)';
-            st.style.background = '#43a047';
-            btn.textContent = '⏺ Start New Log (' + logDurationS + ' s)';
-            btn.disabled = false;
-            document.getElementById('downloadBtn').style.display = '';
-          } else {
-            clearInterval(logPollerID);
-            logPollerID = null;
-            st.textContent = '● No log';
-            st.style.background = '#90a4ae';
-            btn.disabled = false;
-          }
-        })
-        .catch(() => { /* ignore transient errors */ });
-    }
-
-    function downloadLog() {
-      window.location.href = '/downloadSteerLog';
-    }
-    // ─────────────────────────────────────────────────────────────────────────
 
     // Start polling on load
     window.onload = function () {

@@ -273,68 +273,17 @@ void ESPsteer::steerLoop(){
             pid.update(espData->steer.actSteerAngle);
             espData->steer.pidCmd = 0.0f;
             motorDriver.setOutput(0.0f);
-            // Reset stiction state when inside deadband
-            _stictionActive = false;
-            _stictionStartTime = 0;
         } else {
-            // Gain scheduling: optionally switch Kp based on error magnitude
-            if (espData->steer.enableGainSchedule) {
-                bool nearZone = fabsf(angleError) < espData->steer.gainScheduleThreshold;
-                if (nearZone != _gainScheduleNearZone) {
-                    _gainScheduleNearZone = nearZone;
-                    float kpOverride = nearZone ? espData->steer.gainPNear : espData->steer.gainPFar;
-                    if (kpOverride > 0.0f) {
-                        pid.setManualGains(kpOverride, espData->steer.gainI, espData->steer.gainD);
-                    } else {
-                        setPIDgains();
-                    }
-                }
-            } else if (_gainScheduleNearZone) {
-                // Gain scheduling was just disabled – restore base gains once
-                _gainScheduleNearZone = false;
-                setPIDgains();
-            }
-
             pid.setSetpoint(espData->steer.targetSteerAngle);
             pid.update(espData->steer.actSteerAngle);
-            float pidOut = pid.getOutput();
-
-            // Stiction boost: detect stall and add a temporary extra output
-            if (espData->steer.stictionBoost > 0.0f) {
-                float moved = fabsf(espData->steer.actSteerAngle - _stictionLastAngle);
-                if (moved >= espData->steer.stictionThreshold) {
-                    // Wheel is moving – reset stall timer
-                    _stictionStartTime = millis();
-                    _stictionLastAngle = espData->steer.actSteerAngle;
-                    _stictionActive = false;
-                } else if (_stictionStartTime == 0) {
-                    _stictionStartTime = millis();
-                    _stictionLastAngle = espData->steer.actSteerAngle;
-                } else if (millis() - _stictionStartTime >= espData->steer.stictionTimeout) {
-                    _stictionActive = true;
-                }
-                if (_stictionActive) {
-                    float boost = (angleError > 0.0f)
-                        ? espData->steer.stictionBoost
-                        : -espData->steer.stictionBoost;
-                    pidOut = constrain(pidOut + boost, -1.0f, 1.0f);
-                }
-            } else {
-                // Stiction disabled – clear state
-                _stictionActive = false;
-                _stictionStartTime = 0;
-            }
-
-            espData->steer.pidCmd = pidOut;
-            motorDriver.setOutput(pidOut);
+            espData->steer.pidCmd = pid.getOutput();
+            motorDriver.setOutput(espData->steer.pidCmd);
         }
     } else {
         pid.setSetpoint(0);
         pid.update(0);
         espData->steer.pidCmd = pid.getOutput();
         motorDriver.setOutput(espData->steer.pidCmd);
-        _stictionActive = false;
-        _stictionStartTime = 0;
     }
 }
 
@@ -360,15 +309,14 @@ void ESPsteer::begin(ESPudp* espUdp) {
     was.init();
 
     // *********Start PID Setup**********
+    // pid.enableOutputFilter(espData->steerCfg.pidOutputFilt);
     Serial.println("\tSetting PID Gains");
     setPIDgains();
     pid.setSetpoint(0); // Target setpoint
-    if (espData->steer.pidInputFilt > 0.0f) {
-        pid.enableInputFilter(espData->steer.pidInputFilt);
-    }
-    if (espData->steer.enableAntiWindup) {
-        pid.enableAntiWindup(true, espData->steer.antiWindupThreshold);
-    }
+    // pid.enableInputFilter(espData->steerCfg.pidInputFilt); // Optional input filtering
+    // pid.enableAntiWindup(true, 0.8); // Enable anti-windup with 80% threshold
+    // pid.setOscillationMode(OscillationMode::Normal); // Set oscillation mode to Normal
+    // pid.setOperationalMode(OperationalMode::Tune); // Set operational mode to Tune
     // ********End PID Setup**********
 
     Serial.println("\tWAS Initialized");

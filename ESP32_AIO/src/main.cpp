@@ -87,59 +87,6 @@ std::vector<String> debugVars;
 /// @brief Debug mode flag - true for full debug, false for minimal
 bool fullDebugMode = false;
 
-// ── Steering debug log ────────────────────────────────────────────────────────
-static volatile bool steerLogActive  = false; ///< @brief True while recording is in progress
-static volatile bool steerLogReady   = false; ///< @brief True when a complete log is available
-static String        steerLogBuffer;           ///< @brief CSV log data built by steerLogTask
-static TaskHandle_t  steerLogTaskHandle = NULL;///< @brief Handle for the logging FreeRTOS task
-
-static const unsigned long STEER_LOG_DURATION_S   = 120;        ///< @brief Recording duration in seconds
-static const size_t        STEER_LOG_BUFFER_RESERVE = 65536;    ///< @brief Pre-allocated CSV buffer (bytes)
-static const size_t        STEER_LOG_LINE_SIZE      = 128;      ///< @brief Max bytes per CSV row
-static const size_t        STEER_LOG_TASK_STACK     = 4096;     ///< @brief FreeRTOS task stack (words)
-static const UBaseType_t   STEER_LOG_TASK_PRIORITY  = 1;        ///< @brief FreeRTOS task priority
-
-/**
- * @brief FreeRTOS task that records steering telemetry as CSV for 2 minutes.
- * @details Samples every 200 ms → 600 rows.  Sets steerLogReady when done.
- */
-void steerLogTask(void* /*param*/) {
-    const unsigned long DURATION_MS  = STEER_LOG_DURATION_S * 1000UL;
-    const TickType_t    PERIOD_TICKS = pdMS_TO_TICKS(200);
-
-    steerLogBuffer.reserve(STEER_LOG_BUFFER_RESERVE);
-    steerLogBuffer = "ms,targetAngle,actAngle,error,pidOutput,pidCmd,pwmCmd,motorDir,steerCurrent,status,testState\r\n";
-
-    unsigned long startMs = millis();
-    // Unsigned subtraction correctly handles millis() overflow (Arduino/ESP32 standard pattern)
-    while (millis() - startMs < DURATION_MS) {
-        unsigned long now = millis();
-        float tgt = espData.steer.targetSteerAngle;
-        float act = espData.steer.actSteerAngle;
-        float err = tgt - act;
-        char line[STEER_LOG_LINE_SIZE];
-        snprintf(line, sizeof(line),
-                 "%lu,%.3f,%.3f,%.3f,%.3f,%.3f,%u,%u,%u,%u,%u\r\n",
-                 now - startMs,
-                 tgt, act, err,
-                 (double)espData.steer.pidOutput,
-                 (double)espData.steer.pidCmd,
-                 (unsigned)espData.steer.pwmCmd,
-                 (unsigned)espData.steer.motorDirection,
-                 (unsigned)espData.steer.steerCurrent,
-                 (unsigned)espData.steer.status,
-                 (unsigned)espData.steer.testState);
-        steerLogBuffer += line;
-        vTaskDelay(PERIOD_TICKS);
-    }
-
-    steerLogActive      = false;
-    steerLogReady       = true;
-    steerLogTaskHandle  = NULL;
-    vTaskDelete(NULL);
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 // WebSocket Serial Monitor Variables
 // String serialBuffer = "";
 // const size_t MAX_SERIAL_BUFFER = 8192;  // 8KB buffer
@@ -999,21 +946,6 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "<div class='form-group'><label>PID Output Filter:</label><input type='number' id='pidOutputFilt' step='0.01' min='0' max='1'></div>";
   html += "<div class='form-group'><label>WAS Voltage Filter:</label><input type='number' id='wasFilter' step='0.01' min='0' max='1'></div>";
   html += "<div class='form-group'><label>Use ADS1115:</label><select id='useADS'><option value='1'>Yes</option><option value='0'>No</option></select></div>";
-  html += "<div class='form-group'><label>Enable Anti-Windup:</label><select id='enableAntiWindup' title='Prevent integral windup during large corrections'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
-  html += "<div class='form-group'><label>Anti-Windup Threshold (0-1):</label><input type='number' id='antiWindupThreshold' step='0.05' min='0' max='1' title='Fraction of output range at which anti-windup activates (e.g. 0.8)'></div>";
-  html += "<hr style='margin:10px 0'>";
-  html += "<div class='form-group'><label>Min PWM Near Target:</label><input type='number' id='minPWMnear' min='0' max='255' title='Minimum PWM when error is within Far Threshold'></div>";
-  html += "<div class='form-group'><label>Min PWM Far Target:</label><input type='number' id='minPWMfar' min='0' max='255' title='Minimum PWM when error exceeds Far Threshold'></div>";
-  html += "<div class='form-group'><label>Min PWM Far Threshold (deg):</label><input type='number' id='minPWMFarThreshold' step='0.1' min='0' title='Error above this uses Far min PWM; below uses Near min PWM'></div>";
-  html += "<hr style='margin:10px 0'>";
-  html += "<div class='form-group'><label>Stiction Boost (0-1):</label><input type='number' id='stictionBoost' step='0.01' min='0' max='1' title='Extra output fraction added when steering stalls'></div>";
-  html += "<div class='form-group'><label>Stiction Timeout (ms):</label><input type='number' id='stictionTimeout' min='0' max='5000' step='50' title='Milliseconds of stall before stiction boost fires'></div>";
-  html += "<div class='form-group'><label>Stiction Threshold (deg):</label><input type='number' id='stictionThreshold' step='0.01' min='0' title='Minimum angle movement (deg) to consider steering moving'></div>";
-  html += "<hr style='margin:10px 0'>";
-  html += "<div class='form-group'><label>Enable Gain Schedule:</label><select id='enableGainSchedule' title='Switch Kp based on error magnitude'><option value='0'>Disabled</option><option value='1'>Enabled</option></select></div>";
-  html += "<div class='form-group'><label>Kp Near Target (0=use Kp):</label><input type='number' id='gainPNear' step='0.01' min='0' title='Override Kp when error is within Gain Schedule Threshold'></div>";
-  html += "<div class='form-group'><label>Kp Far Target (0=use Kp):</label><input type='number' id='gainPFar' step='0.01' min='0' title='Override Kp when error exceeds Gain Schedule Threshold'></div>";
-  html += "<div class='form-group'><label>Gain Schedule Threshold (deg):</label><input type='number' id='gainScheduleThreshold' step='0.1' min='0' title='Error threshold for near/far Kp switch'></div>";
   html += "</div>";
   
   // Motor Current Sensor Settings Section
@@ -1124,18 +1056,6 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "      if (data.pidOutputFilt !== undefined) document.getElementById('pidOutputFilt').value = data.pidOutputFilt;";
   html += "      if (data.wasFilter !== undefined) document.getElementById('wasFilter').value = data.wasFilter;";
   html += "      if (data.useADS !== undefined) document.getElementById('useADS').value = data.useADS;";
-  html += "      if (data.enableAntiWindup !== undefined) document.getElementById('enableAntiWindup').value = String(data.enableAntiWindup);";
-  html += "      if (data.antiWindupThreshold !== undefined) document.getElementById('antiWindupThreshold').value = data.antiWindupThreshold;";
-  html += "      if (data.minPWMnear !== undefined) document.getElementById('minPWMnear').value = data.minPWMnear;";
-  html += "      if (data.minPWMfar !== undefined) document.getElementById('minPWMfar').value = data.minPWMfar;";
-  html += "      if (data.minPWMFarThreshold !== undefined) document.getElementById('minPWMFarThreshold').value = data.minPWMFarThreshold;";
-  html += "      if (data.stictionBoost !== undefined) document.getElementById('stictionBoost').value = data.stictionBoost;";
-  html += "      if (data.stictionTimeout !== undefined) document.getElementById('stictionTimeout').value = data.stictionTimeout;";
-  html += "      if (data.stictionThreshold !== undefined) document.getElementById('stictionThreshold').value = data.stictionThreshold;";
-  html += "      if (data.enableGainSchedule !== undefined) document.getElementById('enableGainSchedule').value = String(data.enableGainSchedule);";
-  html += "      if (data.gainPNear !== undefined) document.getElementById('gainPNear').value = data.gainPNear;";
-  html += "      if (data.gainPFar !== undefined) document.getElementById('gainPFar').value = data.gainPFar;";
-  html += "      if (data.gainScheduleThreshold !== undefined) document.getElementById('gainScheduleThreshold').value = data.gainScheduleThreshold;";
   html += "      if (data.currentZero !== undefined) document.getElementById('currentZero').value = data.currentZero;";
   html += "      if (data.currentFilter !== undefined) document.getElementById('currentFilter').value = data.currentFilter;";
   html += "      if (data.currentScaler !== undefined) document.getElementById('currentScaler').value = data.currentScaler;";
@@ -1177,18 +1097,6 @@ void handleSettingsPage(AsyncWebServerRequest *request) {
   html += "  formData.append('pidOutputFilt', parseFloat(document.getElementById('pidOutputFilt').value) || 0.1);";
   html += "  formData.append('wasFilter', parseFloat(document.getElementById('wasFilter').value) || 0.2);";
   html += "  formData.append('useADS', document.getElementById('useADS').value);";
-  html += "  formData.append('enableAntiWindup', document.getElementById('enableAntiWindup').value);";
-  html += "  formData.append('antiWindupThreshold', parseFloat(document.getElementById('antiWindupThreshold').value) || 0.8);";
-  html += "  formData.append('minPWMnear', parseInt(document.getElementById('minPWMnear').value) || 0);";
-  html += "  formData.append('minPWMfar', parseInt(document.getElementById('minPWMfar').value) || 0);";
-  html += "  formData.append('minPWMFarThreshold', parseFloat(document.getElementById('minPWMFarThreshold').value) || 5.0);";
-  html += "  formData.append('stictionBoost', parseFloat(document.getElementById('stictionBoost').value) || 0);";
-  html += "  formData.append('stictionTimeout', parseInt(document.getElementById('stictionTimeout').value) || 500);";
-  html += "  formData.append('stictionThreshold', parseFloat(document.getElementById('stictionThreshold').value) || 0.1);";
-  html += "  formData.append('enableGainSchedule', document.getElementById('enableGainSchedule').value);";
-  html += "  formData.append('gainPNear', parseFloat(document.getElementById('gainPNear').value) || 0);";
-  html += "  formData.append('gainPFar', parseFloat(document.getElementById('gainPFar').value) || 0);";
-  html += "  formData.append('gainScheduleThreshold', parseFloat(document.getElementById('gainScheduleThreshold').value) || 5.0);";
   html += "  formData.append('currentZero', parseInt(document.getElementById('currentZero').value) || 32767);";
   html += "  formData.append('currentFilter', parseFloat(document.getElementById('currentFilter').value) || 0.3);";
   html += "  formData.append('currentScaler', parseFloat(document.getElementById('currentScaler').value) || 1.0);";
@@ -1332,20 +1240,6 @@ void handleGetSettings(AsyncWebServerRequest *request) {
                 limitValue, espData.steer.enableCurrentLimit, 
                 espData.steer.enableCurrentLimit ? "true" : "false");
   doc["currentLimit"] = (int)espData.steer.currentLimit;
-
-  // Stiction, anti-windup, gain scheduling
-  doc["stictionBoost"] = espData.steer.stictionBoost;
-  doc["stictionTimeout"] = espData.steer.stictionTimeout;
-  doc["stictionThreshold"] = espData.steer.stictionThreshold;
-  doc["enableAntiWindup"] = espData.steer.enableAntiWindup ? 1 : 0;
-  doc["antiWindupThreshold"] = espData.steer.antiWindupThreshold;
-  doc["minPWMnear"] = espData.steer.minPWMnear;
-  doc["minPWMfar"] = espData.steer.minPWMfar;
-  doc["minPWMFarThreshold"] = espData.steer.minPWMFarThreshold;
-  doc["enableGainSchedule"] = espData.steer.enableGainSchedule ? 1 : 0;
-  doc["gainPNear"] = espData.steer.gainPNear;
-  doc["gainPFar"] = espData.steer.gainPFar;
-  doc["gainScheduleThreshold"] = espData.steer.gainScheduleThreshold;
   
   // System settings
   doc["gpsSource"] = espData.gps.externalGPS ? 1 : 0;
@@ -1462,42 +1356,6 @@ void handleSaveSettings(AsyncWebServerRequest *request) {
   }
   if (request->hasParam("pidOutputFilt", true)) {
     espData.steer.pidOutputFilt = request->getParam("pidOutputFilt", true)->value().toFloat();
-  }
-  if (request->hasParam("enableAntiWindup", true)) {
-    espData.steer.enableAntiWindup = (bool)request->getParam("enableAntiWindup", true)->value().toInt();
-  }
-  if (request->hasParam("antiWindupThreshold", true)) {
-    espData.steer.antiWindupThreshold = request->getParam("antiWindupThreshold", true)->value().toFloat();
-  }
-  if (request->hasParam("minPWMnear", true)) {
-    espData.steer.minPWMnear = request->getParam("minPWMnear", true)->value().toInt();
-  }
-  if (request->hasParam("minPWMfar", true)) {
-    espData.steer.minPWMfar = request->getParam("minPWMfar", true)->value().toInt();
-  }
-  if (request->hasParam("minPWMFarThreshold", true)) {
-    espData.steer.minPWMFarThreshold = request->getParam("minPWMFarThreshold", true)->value().toFloat();
-  }
-  if (request->hasParam("stictionBoost", true)) {
-    espData.steer.stictionBoost = request->getParam("stictionBoost", true)->value().toFloat();
-  }
-  if (request->hasParam("stictionTimeout", true)) {
-    espData.steer.stictionTimeout = request->getParam("stictionTimeout", true)->value().toInt();
-  }
-  if (request->hasParam("stictionThreshold", true)) {
-    espData.steer.stictionThreshold = request->getParam("stictionThreshold", true)->value().toFloat();
-  }
-  if (request->hasParam("enableGainSchedule", true)) {
-    espData.steer.enableGainSchedule = (bool)request->getParam("enableGainSchedule", true)->value().toInt();
-  }
-  if (request->hasParam("gainPNear", true)) {
-    espData.steer.gainPNear = request->getParam("gainPNear", true)->value().toFloat();
-  }
-  if (request->hasParam("gainPFar", true)) {
-    espData.steer.gainPFar = request->getParam("gainPFar", true)->value().toFloat();
-  }
-  if (request->hasParam("gainScheduleThreshold", true)) {
-    espData.steer.gainScheduleThreshold = request->getParam("gainScheduleThreshold", true)->value().toFloat();
   }
   if (request->hasParam("wasFilter", true)) {
     espData.steer.wasFilterValue = request->getParam("wasFilter", true)->value().toFloat();
@@ -1951,58 +1809,6 @@ void handleToggleAPMode(AsyncWebServerRequest *request) {
   request->send(200, "text/plain", apModeState ? "AP_Mode is ON" : "AP_Mode is OFF");
 }
 
-// ── Steering debug log endpoints ──────────────────────────────────────────────
-
-/** POST /startSteerLog – begin a 2-minute recording session */
-void handleStartSteerLog(AsyncWebServerRequest *request) {
-  if (steerLogActive) {
-    request->send(200, "application/json", "{\"status\":\"already_running\"}");
-    return;
-  }
-  steerLogActive = true;
-  steerLogReady  = false;
-  steerLogBuffer = "";
-  if (xTaskCreate(steerLogTask, "SteerLog", STEER_LOG_TASK_STACK, NULL,
-                  STEER_LOG_TASK_PRIORITY, &steerLogTaskHandle) != pdPASS) {
-    steerLogActive    = false;
-    steerLogTaskHandle = NULL;
-    request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Task creation failed\"}");
-    return;
-  }
-  String startJson = "{\"status\":\"started\",\"duration\":" + String(STEER_LOG_DURATION_S) + "}";
-  request->send(200, "application/json", startJson);
-}
-
-/** GET /steerLogStatus – return current log state as JSON */
-void handleSteerLogStatus(AsyncWebServerRequest *request) {
-  JsonDocument doc;
-  doc["active"] = (bool)steerLogActive;
-  doc["ready"]  = (bool)steerLogReady;
-  doc["size"]   = (int)steerLogBuffer.length();
-  String json;
-  serializeJson(doc, json);
-  request->send(200, "application/json", json);
-}
-
-/** GET /downloadSteerLog – serve the CSV log as a file download */
-void handleDownloadSteerLog(AsyncWebServerRequest *request) {
-  if (steerLogActive) {
-    String msg = "Log still recording. Try again after " +
-                 String(STEER_LOG_DURATION_S) + " seconds.";
-    request->send(503, "text/plain", msg);
-    return;
-  }
-  if (!steerLogReady || steerLogBuffer.length() == 0) {
-    request->send(404, "text/plain", "No log available. Press 'Start Log' first.");
-    return;
-  }
-  AsyncWebServerResponse* resp =
-      request->beginResponse(200, "text/csv", steerLogBuffer);
-  resp->addHeader("Content-Disposition",
-                  "attachment; filename=\"steer_debug_log.csv\"");
-  request->send(resp);
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 
 #pragma endregion
@@ -2585,9 +2391,6 @@ void normalboot(){
           }
         });
         server.on("/getSteerData", HTTP_GET, handleGetSteerData);
-        server.on("/startSteerLog",    HTTP_POST, handleStartSteerLog);
-        server.on("/steerLogStatus",   HTTP_GET,  handleSteerLogStatus);
-        server.on("/downloadSteerLog", HTTP_GET,  handleDownloadSteerLog);
         
         // Route to set debug mode (minimal vs full)
         server.on("/setDebugMode", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
