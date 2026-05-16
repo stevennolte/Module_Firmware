@@ -137,7 +137,7 @@ void AutoTunePID::update(float currentInput)
             _integral += _error * dt;
         }
 
-        _derivative = _error - _previousError;
+        _derivative = (dt > 0.0f) ? (_error - _previousError) / dt : 0.0f;
         computePID();
         applyAntiWindup();
         _previousError = _error;
