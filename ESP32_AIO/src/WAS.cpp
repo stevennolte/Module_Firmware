@@ -57,6 +57,14 @@ void WAS::loop(){
             steeringPosition = steeringPosition - 6805 + (int16_t)espData->steer.steerOffset;
             espData->steer.actSteerAngle = (float)steeringPosition / (float)espData->steer.countsPerDeg;
         }
+
+        // Ackerman correction from PGN 252 byte 12 (100 = no correction)
+        if (espData->steer.actSteerAngle < 0.0f) {
+            const float ackermanFactor = (espData->steer.ackermanFix > 0)
+                ? (static_cast<float>(espData->steer.ackermanFix) * 0.01f)
+                : 1.0f;
+            espData->steer.actSteerAngle *= ackermanFactor;
+        }
         
     }
         

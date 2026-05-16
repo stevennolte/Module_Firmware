@@ -165,6 +165,12 @@ void ESPudp::begin(ESPGPS* gps){
               this->espData->steer.absAngle = float(wirelessWASunion.angle)/100.0;
             }
             this->espData->steer.actSteerAngle = this->espData->steer.absAngle - this->espData->steer.wasZeroAngle;
+            if (this->espData->steer.actSteerAngle < 0.0f) {
+              const float ackermanFactor = (this->espData->steer.ackermanFix > 0)
+                ? (static_cast<float>(this->espData->steer.ackermanFix) * 0.01f)
+                : 1.0f;
+              this->espData->steer.actSteerAngle *= ackermanFactor;
+            }
 
             break;
         }
@@ -288,6 +294,12 @@ void ESPudp::begin(ESPGPS* gps){
                 this->espData->steer.absAngle = float(wirelessWASunion.angle)/100.0;
               }
               this->espData->steer.actSteerAngle = this->espData->steer.absAngle - this->espData->steer.wasZeroAngle;
+              if (this->espData->steer.actSteerAngle < 0.0f) {
+                const float ackermanFactor = (this->espData->steer.ackermanFix > 0)
+                  ? (static_cast<float>(this->espData->steer.ackermanFix) * 0.01f)
+                  : 1.0f;
+                this->espData->steer.actSteerAngle *= ackermanFactor;
+              }
               // this->espData->steerData.actSteerAngle = this->espData->steerData.actSteerAngle + float(espData->steerCfg.steerOffset/espData->steerCfg.countsPerDeg);
               break;
             }
@@ -441,6 +453,5 @@ void ESPudp::ntripTask(void* pvParameters) {
     }
 }
 */
-
 
 
