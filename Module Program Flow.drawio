@@ -1,0 +1,65 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="C5RBs43oDa-KdzZeNtuy" name="Page-1">
+    <mxGraphModel dx="1173" dy="658" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-0" />
+        <mxCell id="WIyWlLk6GJQsqaUBKTNV-1" parent="WIyWlLk6GJQsqaUBKTNV-0" />
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-2" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="jzuiXe9GI0_KlsSyWovC-1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-0" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="Boot" vertex="1">
+          <mxGeometry height="30" width="100" x="140" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-16" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="jzuiXe9GI0_KlsSyWovC-20" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="235" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-1" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rounded=1;whiteSpace=wrap;html=1;" value="Start Serial port with baud rate 11500" vertex="1">
+          <mxGeometry height="60" width="120" x="320" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-6" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="jzuiXe9GI0_KlsSyWovC-5" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-8" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="jzuiXe9GI0_KlsSyWovC-7" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-3" parent="WIyWlLk6GJQsqaUBKTNV-1" style="rhombus;whiteSpace=wrap;html=1;rounded=1;" value="Preference flag set to 1" vertex="1">
+          <mxGeometry height="80" width="80" x="940" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-14" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="jzuiXe9GI0_KlsSyWovC-13" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-5" parent="WIyWlLk6GJQsqaUBKTNV-1" style="whiteSpace=wrap;html=1;rounded=1;" value="Load Config" vertex="1">
+          <mxGeometry height="60" width="120" x="1080" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-10" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="jzuiXe9GI0_KlsSyWovC-9" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-7" parent="WIyWlLk6GJQsqaUBKTNV-1" style="whiteSpace=wrap;html=1;rounded=1;" value="Load Default" vertex="1">
+          <mxGeometry height="60" width="120" x="920" y="365" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-12" edge="1" parent="WIyWlLk6GJQsqaUBKTNV-1" source="jzuiXe9GI0_KlsSyWovC-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="jzuiXe9GI0_KlsSyWovC-11" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-9" parent="WIyWlLk6GJQsqaUBKTNV-1" style="whiteSpace=wrap;html=1;rounded=1;" value="Create Wifi AP" vertex="1">
+          <mxGeometry height="60" width="120" x="920" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-11" parent="WIyWlLk6GJQsqaUBKTNV-1" style="whiteSpace=wrap;html=1;rounded=1;" value="Start Webserver" vertex="1">
+          <mxGeometry height="60" width="120" x="920" y="645" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-13" parent="WIyWlLk6GJQsqaUBKTNV-1" style="whiteSpace=wrap;html=1;rounded=1;" value="Load Config" vertex="1">
+          <mxGeometry height="60" width="120" x="1280" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-17" parent="WIyWlLk6GJQsqaUBKTNV-1" style="swimlane;whiteSpace=wrap;html=1;" value="Start Wifi AP" vertex="1">
+          <mxGeometry height="150" width="270" x="550" y="180" as="geometry">
+            <mxRectangle height="30" width="110" x="600" y="330" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="jzuiXe9GI0_KlsSyWovC-20" parent="jzuiXe9GI0_KlsSyWovC-17" style="text;strokeColor=none;fillColor=none;html=1;whiteSpace=wrap;verticalAlign=middle;overflow=hidden;" value="&lt;ul&gt;&lt;li&gt;SSID: Module Name (ex: GPS_NODE)&lt;/li&gt;&lt;li&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Password: 123456789&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;" vertex="1">
+          <mxGeometry height="125" width="270" y="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
